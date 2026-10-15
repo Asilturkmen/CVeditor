@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="tr" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Şablonlu, tarayıcıda çalışan CV editörü" />
+    <title>CVeditör</title>
+    <script>
+      // Tema ve vurgu rengi ilk boyamadan önce uygulanır (yanıp sönme olmasın).
+      try {
+        var t = localStorage.getItem('cveditor:theme')
+        if (t === 'dark') document.documentElement.dataset.theme = 'dark'
+        var a = { petrol: '#1f6f6b', murekkep: '#2b4f81', kiremit: '#a8502d', orman: '#2f6a3c', grafit: '#45443f' }[
+          localStorage.getItem('cveditor:accent')
+        ]
+        if (a) document.documentElement.style.setProperty('--accent-base', a)
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

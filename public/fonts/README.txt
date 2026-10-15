@@ -1,0 +1,5 @@
+Inter: SIL Open Font License 1.1 (@fontsource-variable/inter)
+IBM Plex Sans: SIL Open Font License 1.1 (@fontsource-variable/ibm-plex-sans)
+Source Sans 3: SIL Open Font License 1.1 (@fontsource-variable/source-sans-3)
+Source Serif 4: SIL Open Font License 1.1 (@fontsource-variable/source-serif-4)
+Literata: SIL Open Font License 1.1 (@fontsource-variable/literata)

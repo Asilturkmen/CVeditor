@@ -1,0 +1,261 @@
+@import 'tailwindcss';
+
+/*
+ * Site kimliği: sade ve nötr, tek sakin vurgu rengi. CV sahnenin yıldızı;
+ * arayüz geri planda. Renkler token olarak burada; bileşenler yalnız
+ * token'ları kullanır (bg-surface, text-muted, border-line, bg-accent ...).
+ */
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+:root {
+  --accent-base: #1f6f6b;
+
+  --bg: #f6f6f3;
+  --surface: #ffffff;
+  --surface-2: #f0efeb;
+  --surface-3: #e8e7e2;
+  --canvas: #e9e8e3;
+  --line: #e2e1dc;
+  --line-strong: #cfcec8;
+  --text: #1b1b19;
+  --muted: #66655f;
+  --faint: #96958e;
+  --accent: var(--accent-base);
+  --accent-hover: color-mix(in oklab, var(--accent-base) 86%, black);
+  --accent-fg: #ffffff;
+  --accent-soft: color-mix(in oklab, var(--accent-base) 10%, var(--surface));
+  --accent-line: color-mix(in oklab, var(--accent-base) 35%, var(--surface));
+  --danger: #b42318;
+  --danger-soft: #fdecea;
+  --warn: #9a5b00;
+  --warn-soft: #fff4dc;
+  --ok: #1f7a46;
+  --shadow-sm: 0 1px 2px rgb(20 20 18 / 0.05);
+  --shadow-md: 0 1px 2px rgb(20 20 18 / 0.04), 0 8px 24px rgb(20 20 18 / 0.08);
+  --shadow-lg: 0 2px 6px rgb(20 20 18 / 0.05), 0 24px 64px rgb(20 20 18 / 0.16);
+
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  --bg: #121211;
+  --surface: #1a1a19;
+  --surface-2: #222220;
+  --surface-3: #2b2b29;
+  --canvas: #0d0d0c;
+  --line: #2b2b29;
+  --line-strong: #3b3b38;
+  --text: #ecebe7;
+  --muted: #a3a29b;
+  --faint: #73726c;
+  --accent: color-mix(in oklab, var(--accent-base) 62%, white);
+  --accent-hover: color-mix(in oklab, var(--accent-base) 50%, white);
+  --accent-fg: #0f0f0e;
+  --accent-soft: color-mix(in oklab, var(--accent-base) 22%, var(--surface));
+  --accent-line: color-mix(in oklab, var(--accent-base) 50%, var(--surface));
+  --danger: #f2877d;
+  --danger-soft: #3a1d1a;
+  --warn: #f0b860;
+  --warn-soft: #33270f;
+  --ok: #6ccf97;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.35);
+  --shadow-lg: 0 2px 6px rgb(0 0 0 / 0.4), 0 24px 64px rgb(0 0 0 / 0.55);
+
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-canvas: var(--canvas);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-line: var(--accent-line);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-ok: var(--ok);
+
+  --font-sans: 'Instrument Sans Variable', ui-sans-serif, system-ui, sans-serif;
+
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+
+  --ease-out-soft: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.3, 0.64, 1);
+}
+
+@layer base {
+  html {
+    font-size: 14px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-feature-settings: 'ss01' on;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--accent-base) 22%, transparent);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+}
+
+/* Sayfa geçişi: CV listesinden editöre geçerken kısa çapraz geçiş. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 180ms;
+  animation-timing-function: var(--ease-out-soft);
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+}
+
+@keyframes pop-out {
+  to {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+}
+
+@keyframes flash {
+  0% {
+    box-shadow: 0 0 0 0 var(--accent-line);
+    background: var(--accent-soft);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@keyframes save-tick {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 160ms var(--ease-out-soft);
+}
+
+.animate-rise-in {
+  animation: rise-in 220ms var(--ease-out-soft);
+}
+
+.animate-flash {
+  animation: flash 1100ms var(--ease-out-soft);
+}
+
+/* Radix içerikleri için açılış/kapanış */
+.pop[data-state='open'] {
+  animation: pop-in 160ms var(--ease-out-soft);
+}
+
+.pop[data-state='closed'] {
+  animation: pop-out 120ms ease-in forwards;
+}
+
+.overlay[data-state='open'] {
+  animation: fade-in 160ms var(--ease-out-soft);
+}
+
+.overlay[data-state='closed'] {
+  animation: fade-in 120ms ease-in reverse forwards;
+}
+
+/* TipTap düzenleyici */
+.rich-editor .ProseMirror {
+  outline: none;
+  min-height: 4.5rem;
+  padding: 0.5rem 0.75rem;
+  line-height: 1.5;
+}
+
+.rich-editor .ProseMirror p + p,
+.rich-editor .ProseMirror p + ul,
+.rich-editor .ProseMirror ul + p {
+  margin-top: 0.35rem;
+}
+
+.rich-editor .ProseMirror ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+}
+
+.rich-editor .ProseMirror li + li {
+  margin-top: 0.15rem;
+}
+
+.rich-editor .ProseMirror a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.rich-editor .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--faint);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after,
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}

@@ -1,0 +1,368 @@
+/*
+ * Bütün şablonların ortak çizim tabanı. Önizleme (iframe) ve PDF (yazdır /
+ * V2'de sunucu Chrome'u) aynı dosyayı kullanır. Şablon CSS'leri yalnız
+ * görünümü değiştirir; yapı (sayfa, sütun, blok) burada sabittir.
+ */
+@page {
+  size: A4;
+  margin: 0;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: var(--fs);
+  line-height: var(--lh);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-kerning: normal;
+  /* Kelime bölme yok: CV dilinde yanlış heceleme riskini almıyoruz */
+  hyphens: manual;
+  overflow-wrap: break-word;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+#cv-source {
+  display: none;
+}
+
+#cv-pages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sheet-gap, 24px);
+  padding: var(--sheet-pad, 0);
+}
+
+.page {
+  width: 210mm;
+  height: 297mm;
+  background: var(--paper);
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--sheet-shadow, none);
+}
+
+.page-inner {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.page-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--block-gap);
+  padding: 0 var(--pad-x) var(--pad-y);
+  min-width: 0;
+}
+
+.col > * {
+  flex: none;
+}
+
+.page-inner:not(.has-header) .col {
+  padding-top: var(--pad-y);
+}
+
+.col-main {
+  flex: 1;
+}
+
+.col-side {
+  flex: none;
+  width: var(--side-width, 34%);
+}
+
+.cols-2 .col-side {
+  padding-right: calc(var(--pad-x) * 0.6);
+}
+
+.cols-2 .col-main {
+  padding-left: calc(var(--pad-x) * 0.6);
+}
+
+.cv-header {
+  padding: var(--pad-y) var(--pad-x) var(--section-gap);
+  display: flex;
+  gap: 5mm;
+  align-items: center;
+}
+
+.align-center .cv-header {
+  flex-direction: column;
+  text-align: center;
+}
+
+.align-center .cv-contact {
+  justify-content: center;
+}
+
+.cv-identity {
+  min-width: 0;
+  flex: 1;
+}
+
+.cv-photo {
+  width: 26mm;
+  height: 26mm;
+  object-fit: cover;
+  flex: none;
+}
+
+h1,
+h2,
+p,
+ul {
+  margin: 0;
+}
+
+.cv-name {
+  font-size: 2.3em;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.cv-headline {
+  margin-top: 1.2mm;
+  font-size: 1.15em;
+}
+
+.cv-contact {
+  list-style: none;
+  padding: 0;
+  margin-top: 2.5mm;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6mm 4mm;
+  font-size: 0.95em;
+}
+
+.col-side .cv-contact {
+  flex-direction: column;
+  margin-top: 0;
+  gap: 1mm;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.section-title {
+  margin-top: var(--section-gap);
+  font-size: 1.05em;
+  line-height: 1.25;
+}
+
+.col > .section-title:first-child {
+  margin-top: 0;
+}
+
+.entry-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 4mm;
+}
+
+.entry-title {
+  min-width: 0;
+}
+
+.entry-date {
+  flex: none;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 0.93em;
+  font-variant-numeric: tabular-nums;
+}
+
+.col-side .entry-head {
+  flex-direction: column;
+  gap: 0;
+}
+
+.entry-sub {
+  color: var(--muted);
+}
+
+.entry-body {
+  margin-top: 1mm;
+}
+
+.rich p + p {
+  margin-top: 1mm;
+}
+
+.rich ul {
+  padding-left: 4.2mm;
+  margin: 0;
+}
+
+.rich li {
+  padding-left: 0.6mm;
+}
+
+.rich li + li {
+  margin-top: 0.6mm;
+}
+
+.rich p + ul,
+.rich ul + p {
+  margin-top: 1mm;
+}
+
+.rich a {
+  text-decoration: underline;
+  text-decoration-thickness: 0.5px;
+  text-underline-offset: 1.5px;
+}
+
+.entry-summary .entry-body {
+  margin-top: 0;
+}
+
+/* Bölünmüş kaydın devamı başlıksız başlar */
+.entry.is-continued > .entry-body {
+  margin-top: 0;
+}
+
+/* Önizlemeye özgü: yer tutucu, etkileşim, öneri işaretleri. PDF'e basılmaz. */
+.ph {
+  color: #b9b9b9;
+}
+
+body.interactive [data-item-id],
+body.interactive [data-target='personal'] {
+  cursor: pointer;
+  border-radius: 1.5mm;
+  transition: box-shadow 140ms ease;
+}
+
+body.interactive [data-item-id]:hover,
+body.interactive [data-target='personal']:hover {
+  box-shadow: 0 0 0 1.5mm color-mix(in srgb, var(--accent) 7%, transparent);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+body.interactive .is-focused {
+  box-shadow: 0 0 0 1.5mm color-mix(in srgb, var(--accent) 12%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.sg {
+  border-radius: 1mm;
+}
+
+.sg-block {
+  box-shadow: 0 0 0 1.2mm #fff7d6;
+  background: #fff7d6;
+  animation: sg-in 320ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.sg-del {
+  color: #b42318;
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  background: #fde8e7;
+}
+
+.sg-ins {
+  color: #0f6b3a;
+  text-decoration: none;
+  background: #dcf5e6;
+}
+
+@keyframes sg-in {
+  from {
+    background: #fff0b3;
+    box-shadow: 0 0 0 2.5mm #fff0b3;
+  }
+}
+
+.page-enter {
+  animation: page-in 260ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+.overflow-warning {
+  outline: 0.6mm dashed #d97706;
+  outline-offset: 1mm;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@media print {
+  html,
+  body {
+    background: none;
+  }
+
+  #cv-pages {
+    display: block;
+    padding: 0;
+  }
+
+  .page {
+    box-shadow: none;
+    break-after: page;
+  }
+
+  .page:last-child {
+    break-after: auto;
+  }
+
+  .ph {
+    visibility: hidden;
+  }
+
+  body.interactive [data-item-id],
+  body.interactive [data-target='personal'],
+  body.interactive .is-focused {
+    background: none;
+    box-shadow: none;
+  }
+
+  .overflow-warning {
+    outline: none;
+  }
+
+  .page-enter {
+    animation: none;
+  }
+}
