@@ -168,7 +168,12 @@ function ItemBlock({ section, item, ctx }: { section: Section; item: AnyItem; ct
         <div {...entryAttrs(section, item, 'languages')}>
           <div className="entry-line">
             <strong className="line-label">{t('name', it.name)}</strong>
-            {it.level && <span className="line-value"> — {t('level', it.level)}</span>}
+            {it.level && (
+              <span className="line-value">
+                <span className="line-sep"> — </span>
+                {t('level', it.level)}
+              </span>
+            )}
           </div>
         </div>
       )
@@ -180,7 +185,7 @@ function ItemBlock({ section, item, ctx }: { section: Section; item: AnyItem; ct
           <EntryHead title={<strong>{t('name', it.name)}</strong>} date={formatYearMonth(it.date, lang)} />
           {(it.issuer || it.url) && (
             <Sub>
-              <Joined parts={[v('issuer', it.issuer), it.url ? <Link value={it.url} /> : null]} />
+              <Joined parts={[v('issuer', it.issuer), it.url ? <Link key="url" value={it.url} /> : null]} />
             </Sub>
           )}
         </div>
@@ -228,8 +233,8 @@ function ItemBlock({ section, item, ctx }: { section: Section; item: AnyItem; ct
             <Sub>
               <Joined
                 parts={[
-                  it.email ? <a href={toHref(it.email)}>{it.email}</a> : null,
-                  it.phone ? <a href={`tel:${it.phone.replace(/\s/g, '')}`}>{it.phone}</a> : null,
+                  it.email ? <a key="email" href={toHref(it.email)}>{it.email}</a> : null,
+                  it.phone ? <a key="phone" href={`tel:${it.phone.replace(/\s/g, '')}`}>{it.phone}</a> : null,
                 ]}
               />
             </Sub>
@@ -245,7 +250,7 @@ function ItemBlock({ section, item, ctx }: { section: Section; item: AnyItem; ct
           {(it.subtitle || it.location || it.url) && (
             <Sub>
               <Joined
-                parts={[v('subtitle', it.subtitle), v('location', it.location), it.url ? <Link value={it.url} /> : null]}
+                parts={[v('subtitle', it.subtitle), v('location', it.location), it.url ? <Link key="url" value={it.url} /> : null]}
               />
             </Sub>
           )}

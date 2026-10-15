@@ -208,6 +208,15 @@ a {
   color: var(--muted);
 }
 
+/* Dar yan sütunda dil seviyesi alt satırda, ayırıcısız */
+.col-side .entry-languages .line-label {
+  display: block;
+}
+
+.col-side .entry-languages .line-sep {
+  display: none;
+}
+
 .entry-body {
   margin-top: 1mm;
 }
@@ -293,6 +302,20 @@ body.interactive .is-focused {
   color: #0f6b3a;
   text-decoration: none;
   background: #dcf5e6;
+}
+
+.sg-old {
+  color: #8a2c22;
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  opacity: 0.7;
+  margin-bottom: 1.2mm;
+}
+
+.sg-new {
+  background: #dcf5e6;
+  box-shadow: 0 0 0 0.8mm #dcf5e6;
+  border-radius: 0.5mm;
 }
 
 @keyframes sg-in {

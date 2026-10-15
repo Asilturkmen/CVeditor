@@ -1,4 +1,4 @@
-import { ArrowUp, Check, ChevronDown, Loader2, Square, X } from 'lucide-react'
+import { ArrowUp, Check, ChevronDown, Info, Loader2, Square, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { sectionTitle } from '@/cv/locale'
 import type { AnyItem, Cv } from '@/cv/schema'
@@ -232,7 +232,14 @@ export function PromptBox({ cv }: { cv: Cv }) {
           )}
         </div>
       </div>
-      <p className="mt-2 px-1 text-[11.5px] leading-snug text-faint">{m.ai_privacy_note()}</p>
+      <p className="mt-1.5 flex items-center gap-1.5 px-1 text-[11.5px] text-faint">
+        {m.ai_preview_note()}
+        <Tooltip content={m.ai_privacy_note()} side="top">
+          <button type="button" aria-label={m.ai_privacy_title()} className="rounded text-faint hover:text-text">
+            <Info className="size-3.5" />
+          </button>
+        </Tooltip>
+      </p>
     </div>
   )
 }

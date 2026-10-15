@@ -76,7 +76,7 @@ export function AppShell() {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   return (
     <div className="min-h-dvh">
-      <header className="sticky top-0 z-30 border-b border-line bg-bg/85 backdrop-blur-md">
+      <header className="sticky top-0 z-30 border-b border-line bg-bg">
         <div className="mx-auto flex h-14 max-w-[1240px] items-stretch gap-6 px-6">
           <Link to="/" className="flex items-center" aria-label={m.app_name()}>
             <Wordmark />

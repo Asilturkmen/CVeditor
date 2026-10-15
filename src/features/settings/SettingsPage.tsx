@@ -270,7 +270,6 @@ export function SettingsPage() {
             </span>
           ) : (
             <Button
-              size="sm"
               onClick={() =>
                 void requestPersistence().then((ok) => {
                   setPersisted(ok)

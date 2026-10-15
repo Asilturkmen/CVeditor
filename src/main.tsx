@@ -20,3 +20,10 @@ createRoot(document.getElementById('root')!).render(
 )
 
 void requestPersistence()
+
+// Uçtan uca testler ve geliştirme için veritabanına erişim (yalnız geliştirme sunucusunda).
+if (import.meta.env.DEV) {
+  void import('./db/db').then(({ db }) => {
+    ;(window as unknown as { __cveditorDb: unknown }).__cveditorDb = db
+  })
+}

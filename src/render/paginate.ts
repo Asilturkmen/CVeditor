@@ -107,12 +107,22 @@ export function paginate(doc: Document, options: { previousPageCount?: number } 
     const col = column(pageIndex, flow)
     col.appendChild(block)
     if (fits(col)) return pageIndex
+    const blockHeight = block.getBoundingClientRect().height
     col.removeChild(block)
 
     // Sütun boşsa (ya da yalnız bölüm başlığı varsa) blok tek başına bile sığmıyor demektir.
     if (col.childElementCount === 0 || onlyKeepWithNext(col)) return split(block, flow, pageIndex)
 
-    // Sondaki bölüm başlıklarını blokla birlikte sonraki sayfaya taşı.
+    // Boş bir sayfaya bile sığmayacak kadar uzunsa zaten bölünecek: sayfanın
+    // altını boş bırakmamak için bölmeye bu sayfanın kalan yerinden başla.
+    if (blockHeight > emptyColumnHeight(flow)) return split(block, flow, pageIndex)
+
+    return place(block, flow, moveToNextPage(flow, pageIndex))
+  }
+
+  /** Sondaki bölüm başlıklarını sonraki sayfaya taşır; yeni sayfa numarasını döndürür. */
+  function moveToNextPage(flow: Flow, pageIndex: number): number {
+    const col = column(pageIndex, flow)
     const carry: Element[] = []
     while (col.lastElementChild?.hasAttribute('data-keep-with-next')) {
       carry.unshift(col.lastElementChild)
@@ -120,7 +130,21 @@ export function paginate(doc: Document, options: { previousPageCount?: number } 
     }
     const next = column(pageIndex + 1, flow)
     for (const el of carry) next.appendChild(el)
-    return place(block, flow, pageIndex + 1)
+    return pageIndex + 1
+  }
+
+  const emptyHeights = new Map<Flow, number>()
+  /** Başlıksız (2. ve sonraki) bir sayfada sütunun içerik yüksekliği. */
+  function emptyColumnHeight(flow: Flow): number {
+    const cached = emptyHeights.get(flow)
+    if (cached !== undefined) return cached
+    const probe = createPage(Number.MAX_SAFE_INTEGER)
+    const col = probe.cols[flow]!
+    const style = getComputedStyle(col)
+    const height = col.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom)
+    probe.page.remove()
+    emptyHeights.set(flow, height)
+    return height
   }
 
   function collectAtoms(block: Element): Atom[] {
@@ -187,6 +211,16 @@ export function paginate(doc: Document, options: { previousPageCount?: number } 
         parent.removeChild(node)
         pruneEmpty()
         if (placed === 0) {
+          const fresh = Array.from(col.children).every((c) => c === part || c.hasAttribute('data-keep-with-next'))
+          if (!fresh) {
+            // Bu sayfada ilk parçaya bile yer yok: kaydı sonraki sayfadan başlat (başlığıyla).
+            part.remove()
+            page = moveToNextPage(flow, page)
+            col = column(page, flow)
+            part = startPart(block, col, false)
+            open = []
+            continue
+          }
           // Taze sayfada bile sığmayan tek parça: yerleştir, kırpılma uyarısı ver.
           openPath(atom.path).appendChild(atom.node.cloneNode(true))
           result.clipped = true

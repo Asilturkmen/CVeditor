@@ -164,7 +164,15 @@ function BackupReminder({ cvs }: { cvs: Cv[] }) {
   const lastBackup = useLiveQuery(() => getMeta<string>(META_LAST_BACKUP), [], null)
   if (lastBackup === null || cvs.length === 0) return null
   const days = daysSince(lastBackup)
-  if (days !== null && days < BACKUP_REMIND_DAYS) return null
+  if (days === null) {
+    // Hiç yedek yok: ilk CV'yi oluşturur oluşturmaz değil, bir gün sonra hatırlat.
+    const oldest = Math.max(...cvs.map((cv) => daysSince(cv.createdAt) ?? 0))
+    if (oldest < 1) return null
+  } else {
+    // Yedekten sonra değişiklik yoksa hatırlatmaya gerek yok.
+    const changedSince = cvs.some((cv) => cv.updatedAt > lastBackup!)
+    if (days < BACKUP_REMIND_DAYS || !changedSince) return null
+  }
   return (
     <div className="mb-6 flex items-center gap-4 rounded-xl border border-line bg-surface px-4 py-3 animate-rise-in">
       <div className="flex-1 text-sm">

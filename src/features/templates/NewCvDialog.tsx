@@ -235,6 +235,7 @@ export function NewCvDialog({ templateId, onClose }: { templateId: TemplateId | 
             <div className="flex flex-col gap-1.5">
               <span className="text-[12.5px] font-medium text-muted">{m.new_cv_language()}</span>
               <Segmented
+                className="self-start"
                 value={language}
                 onChange={changeLanguage}
                 aria-label={m.new_cv_language()}

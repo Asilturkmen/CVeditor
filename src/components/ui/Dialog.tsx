@@ -18,7 +18,7 @@ export function Dialog({ open, onOpenChange, title, description, children, foote
   return (
     <D.Root open={open} onOpenChange={onOpenChange}>
       <D.Portal>
-        <D.Overlay className="overlay fixed inset-0 z-50 bg-black/30 backdrop-blur-[1px] dark:bg-black/55" />
+        <D.Overlay className="overlay fixed inset-0 z-50 bg-black/35 dark:bg-black/60" />
         <D.Content
           className={cn(
             'pop fixed top-1/2 left-1/2 z-50 flex max-h-[min(88vh,760px)] w-[min(92vw,520px)] -translate-x-1/2 -translate-y-1/2 flex-col',

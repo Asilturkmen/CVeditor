@@ -36,6 +36,8 @@ interface Props {
   title?: string
   /** "fit" ölçeğinde kenarlarda bırakılacak toplam boşluk (px) */
   fitPadding?: number
+  /** "fit" ölçeğinin üst sınırı (editörde sayfa gerçek boyutundan büyümesin) */
+  maxFitScale?: number
 }
 
 /**
@@ -57,6 +59,7 @@ export const CvFrame = forwardRef<CvFrameHandle, Props>(function CvFrame(
     className,
     title,
     fitPadding = 48,
+    maxFitScale = 4,
   },
   ref,
 ) {
@@ -84,7 +87,7 @@ export const CvFrame = forwardRef<CvFrameHandle, Props>(function CvFrame(
   const effectiveScale =
     scale === 'fit'
       ? containerWidth > 0
-        ? Math.min(1.4, Math.max(0.1, (containerWidth - fitPadding) / PAGE_WIDTH_PX))
+        ? Math.min(maxFitScale, Math.max(0.1, (containerWidth - fitPadding) / PAGE_WIDTH_PX))
         : 0
       : scale
 

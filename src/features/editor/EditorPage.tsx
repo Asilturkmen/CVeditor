@@ -94,7 +94,7 @@ function CvName({ cv }: { cv: Cv }) {
             d.name = m.untitled_cv()
           })
       }}
-      className="h-8 w-[clamp(8rem,22vw,18rem)] min-w-0 truncate rounded-md border border-transparent bg-transparent px-2 text-[15px] font-semibold tracking-tight transition-colors hover:border-line focus:border-accent focus:outline-none"
+      className="h-8 max-w-[22rem] min-w-24 truncate rounded-md [field-sizing:content] border border-transparent bg-transparent px-2 text-[15px] font-semibold tracking-tight transition-colors hover:border-line focus:border-accent focus:outline-none"
     />
   )
 }
@@ -379,7 +379,7 @@ export function EditorPage() {
             {cv.language}
           </span>
         </Tooltip>
-        <span className="ml-2">
+        <span className="ml-2 flex items-center">
           <SaveIndicator />
         </span>
 

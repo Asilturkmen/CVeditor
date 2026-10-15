@@ -88,10 +88,6 @@
   display: block;
 }
 
-.tpl-modern.cols-2 .col-side .entry-skills .line-label::after {
-  content: '';
-}
-
 .tpl-modern.cols-2 .col-side .entry-sub {
   color: var(--muted);
 }
