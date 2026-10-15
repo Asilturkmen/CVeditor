@@ -255,6 +255,8 @@ export function paginate(doc: Document, options: { previousPageCount?: number } 
     }
   }
 
+  // Kaynak artık sayfalarda; belgede aynı metnin ikinci kopyası kalmasın.
+  source.replaceChildren()
   result.pageCount = pages.length
   return result
 }
