@@ -28,6 +28,7 @@ interface Props {
   firstPageOnly?: boolean
   interactive?: boolean
   placeholders?: boolean
+  emptyHint?: string
   focusedItemId?: string | null
   onResult?: (result: PaginateResult) => void
   onTargetClick?: (target: CvFrameTarget) => void
@@ -52,6 +53,7 @@ export const CvFrame = forwardRef<CvFrameHandle, Props>(function CvFrame(
     firstPageOnly = false,
     interactive = false,
     placeholders = false,
+    emptyHint,
     focusedItemId = null,
     onResult,
     onTargetClick,
@@ -116,7 +118,7 @@ export const CvFrame = forwardRef<CvFrameHandle, Props>(function CvFrame(
     )
     if (token !== renderToken.current) return
 
-    doc.getElementById('cv-source')!.innerHTML = renderCvSource(cv, { suggestions, placeholders })
+    doc.getElementById('cv-source')!.innerHTML = renderCvSource(cv, { suggestions, placeholders, emptyHint })
     const result = paginate(doc, { previousPageCount: pageCountRef.current })
     pageCountRef.current = result.pageCount
     if (focusedItemId) {
@@ -125,7 +127,7 @@ export const CvFrame = forwardRef<CvFrameHandle, Props>(function CvFrame(
     const pagesEl = doc.getElementById('cv-pages')!
     setContentHeight(firstPageOnly ? PAGE_HEIGHT_PX : pagesEl.scrollHeight)
     callbacks.current.onResult?.(result)
-  }, [cv, suggestions, interactive, placeholders, focusedItemId, firstPageOnly])
+  }, [cv, suggestions, interactive, placeholders, emptyHint, focusedItemId, firstPageOnly])
 
   useEffect(() => {
     if (!ready) return

@@ -57,7 +57,7 @@ function Joined({ parts }: { parts: ReactNode[] }) {
     <>
       {present.map((p, i) => (
         <span key={i} className="part">
-          {i > 0 && <span className="sep"> · </span>}
+          {i > 0 && <span className="sep">{' ·'} </span>}
           {p}
         </span>
       ))}
@@ -288,7 +288,10 @@ function ContactList({ cv }: { cv: Cv }) {
   return (
     <ul className="cv-contact">
       {items.map((node, i) => (
-        <li key={i}>{node}</li>
+        <li key={i}>
+          {node}
+          {i < items.length - 1 && <span className="sep">{' ·'} </span>}
+        </li>
       ))}
     </ul>
   )
@@ -326,10 +329,13 @@ export function CvSource({
   cv,
   suggestions,
   placeholders = false,
+  emptyHint,
 }: {
   cv: Cv
   suggestions?: SuggestionMap
   placeholders?: boolean
+  /** Hiç içerik yokken önizlemede görünen soluk ipucu (baskıda gizli) */
+  emptyHint?: string
 }) {
   const ctx: Ctx = { lang: cv.language, suggestions }
   const two = cv.template.columns === 2
@@ -366,6 +372,11 @@ export function CvSource({
         {main.map((s) => (
           <SectionBlocks key={s.id} section={s} ctx={ctx} />
         ))}
+        {placeholders && emptyHint && sections.length === 0 && (
+          <p className="ph ph-hint" data-block="">
+            {emptyHint}
+          </p>
+        )}
       </div>
     </div>
   )

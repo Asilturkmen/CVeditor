@@ -16,13 +16,6 @@
 
 .tpl-klasik .cv-contact {
   color: var(--muted);
-  gap: 0.6mm 0;
-}
-
-.tpl-klasik .cv-contact li + li::before {
-  content: '·';
-  padding: 0 2.2mm;
-  color: var(--rule);
 }
 
 .tpl-klasik .cv-photo {

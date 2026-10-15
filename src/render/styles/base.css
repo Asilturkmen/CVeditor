@@ -153,16 +153,33 @@ ul {
   list-style: none;
   padding: 0;
   margin-top: 2.5mm;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6mm 4mm;
   font-size: 0.95em;
 }
 
+/* Satır içi liste: ayırıcı önceki öğeye yapışık, satır başında "·" kalmaz */
+.cv-contact li {
+  display: inline;
+}
+
+.cv-contact .sep {
+  padding-right: 1.2mm;
+  color: color-mix(in srgb, var(--muted) 55%, #fff);
+}
+
 .col-side .cv-contact {
-  flex-direction: column;
   margin-top: 0;
-  gap: 1mm;
+}
+
+.col-side .cv-contact li {
+  display: block;
+}
+
+.col-side .cv-contact li + li {
+  margin-top: 1mm;
+}
+
+.col-side .cv-contact .sep {
+  display: none;
 }
 
 a {
@@ -261,6 +278,13 @@ a {
 /* Önizlemeye özgü: yer tutucu, etkileşim, öneri işaretleri. PDF'e basılmaz. */
 .ph {
   color: #b9b9b9;
+}
+
+.ph-hint {
+  margin-top: 2mm;
+  font-size: 1.05em;
+  line-height: 1.5;
+  max-width: 120mm;
 }
 
 body.interactive [data-item-id],

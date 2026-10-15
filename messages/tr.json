@@ -107,6 +107,7 @@
   "import_found_sample": "Bulunan kayıtlar (örnek veri). İstemediğin kayıtların işaretini kaldır.",
 
   "preview_title": "CV önizleme",
+  "preview_empty_hint": "Sağdaki alanları doldurdukça CV'n burada oluşur. Gördüğün, PDF'te çıkacak olanın aynısı.",
   "tab_content": "İçerik",
   "tab_appearance": "Görünüm",
   "editor_panel_tabs": "Düzenleme paneli",

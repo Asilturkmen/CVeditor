@@ -10,11 +10,17 @@ export interface RenderOptions {
   suggestions?: SuggestionMap
   /** Boş ad yerine soluk yer tutucu (yalnız önizleme; baskıda gizli) */
   placeholders?: boolean
+  emptyHint?: string
 }
 
 export function renderCvSource(cv: Cv, options: RenderOptions = {}): string {
   return renderToStaticMarkup(
-    createElement(CvSource, { cv, suggestions: options.suggestions, placeholders: options.placeholders }),
+    createElement(CvSource, {
+      cv,
+      suggestions: options.suggestions,
+      placeholders: options.placeholders,
+      emptyHint: options.emptyHint,
+    }),
   )
 }
 

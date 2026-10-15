@@ -152,6 +152,7 @@ export const PreviewPane = forwardRef<CvFrameHandle, { cv: Cv; readOnly?: boolea
           maxFitScale={1}
           interactive={!readOnly}
           placeholders
+          emptyHint={m.preview_empty_hint()}
           suggestions={suggestionMap}
           focusedItemId={focusedItemId}
           onResult={onResult}

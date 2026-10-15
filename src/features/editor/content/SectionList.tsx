@@ -444,6 +444,8 @@ export function SectionList({ sections, language, cvId }: { sections: Section[];
     el.classList.remove('animate-flash')
     void el.offsetWidth
     el.classList.add('animate-flash')
+    // İlk alana imleç: tıklayıp hemen yazmaya başlanabilsin.
+    el.querySelector<HTMLElement>('input, [contenteditable="true"]')?.focus({ preventScroll: true })
   }, [scrollTarget])
 
   const onDragEnd = ({ active, over }: DragEndEvent) => {

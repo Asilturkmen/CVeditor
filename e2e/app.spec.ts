@@ -183,6 +183,41 @@ test('kaydı başka CV\'ye ekler (aynı çeviri grubuyla)', async ({ page }) => 
   await expect(page.getByText('"Hedef EN" CV\'sine eklendi')).toBeVisible()
 })
 
+test('boş CV önizlemesinde ipucu görünür, içerik girilince kaybolur', async ({ page }) => {
+  await createCv(page)
+  const hint = preview(page).locator('.ph-hint')
+  await expect(hint).toBeVisible()
+  await page.getByLabel('Pozisyon').first().fill('Stajyer')
+  await expect(hint).toHaveCount(0)
+})
+
+test('bölüm sırası sürüklenerek değişir, önizlemeye yansır, geri alınır', async ({ page }) => {
+  await createCv(page, { start: 'sample' })
+  const titles = async () => (await preview(page).locator('.section-title').allInnerTexts()).slice(0, 2)
+  expect(await titles()).toEqual(['ÖZET', 'DENEYİM'])
+  const handles = page.getByRole('button', { name: 'Bölümü sürükleyerek sırala' })
+  await handles.first().scrollIntoViewIfNeeded()
+  const from = (await handles.first().boundingBox())!
+  const to = (await handles.nth(1).boundingBox())!
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
+  await page.mouse.down()
+  for (let i = 1; i <= 20; i++) {
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2 + ((to.y - from.y + 60) * i) / 20)
+  }
+  await page.mouse.up()
+  await expect.poll(titles).toEqual(['DENEYİM', 'ÖZET'])
+  await page.keyboard.press('Control+z')
+  await expect.poll(titles).toEqual(['ÖZET', 'DENEYİM'])
+})
+
+test('yeni kayıt eklenince ilk alana imleç gelir', async ({ page }) => {
+  await createCv(page, { start: 'sample' })
+  await page.getByRole('button', { name: 'Proje ekle' }).click()
+  await expect(page.getByLabel('Proje adı').last()).toBeFocused()
+  await page.keyboard.type('Yeni Proje')
+  await expect(preview(page).getByText('Yeni Proje')).toBeVisible()
+})
+
 test('telefonda editör yerine önizleme ve not görünür', async ({ page }) => {
   await createCv(page)
   await page.setViewportSize({ width: 390, height: 844 })
