@@ -1,9 +1,10 @@
 import { Link, Outlet, useRouterState } from '@tanstack/react-router'
-import { Moon, Settings, Sun } from 'lucide-react'
+import { Info, Moon, Settings, Sun } from 'lucide-react'
 import { useLayoutEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { cn } from '@/lib/cn'
+import { isChromium } from '@/lib/persistence'
 import { usePrefs } from '@/lib/prefs'
 import { m } from '@/paraglide/messages'
 import { Wordmark } from './Wordmark'
@@ -72,10 +73,47 @@ export function ThemeToggle() {
   )
 }
 
+const BROWSER_NOTE_KEY = 'cveditor:browserNoteDismissed'
+
+/** Chromium dışı tarayıcıda bir kez gösterilen sakin not (önizleme = PDF garantisi Chromium'da). */
+function BrowserNote() {
+  const [hidden, setHidden] = useState(() => {
+    try {
+      return isChromium() || localStorage.getItem(BROWSER_NOTE_KEY) === '1'
+    } catch {
+      return isChromium()
+    }
+  })
+  if (hidden) return null
+  return (
+    <div className="border-b border-warn/25 bg-warn-soft">
+      <div className="mx-auto flex max-w-[1240px] items-center gap-3 px-6 py-2 text-[13px]">
+        <Info className="size-4 shrink-0 text-warn" />
+        <p className="flex-1">{m.browser_note()}</p>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => {
+            try {
+              localStorage.setItem(BROWSER_NOTE_KEY, '1')
+            } catch {
+              // yalnız bu oturumda gizlenir
+            }
+            setHidden(true)
+          }}
+        >
+          {m.common_ok()}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 export function AppShell() {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   return (
     <div className="min-h-dvh">
+      <BrowserNote />
       <header className="sticky top-0 z-30 border-b border-line bg-bg">
         <div className="mx-auto flex h-14 max-w-[1240px] items-stretch gap-6 px-6">
           <Link to="/" className="flex items-center" aria-label={m.app_name()}>

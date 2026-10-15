@@ -150,7 +150,7 @@ function deleteItemWithUndo(section: Section, item: AnyItem) {
   if (isItemEmpty(item)) return
   toast({
     message: m.toast_item_deleted({ name: itemLabel(section.type, item) || m.editor_untitled() }),
-    action: { label: m.common_undo(), run: () => restoreItem(section.id, removed.item, removed.index) },
+    action: { label: m.common_undo(), run: () => restoreItem(section.id, removed) },
   })
 }
 
@@ -461,7 +461,7 @@ export function SectionList({ sections, language, cvId }: { sections: Section[];
       if (!removed) return
       toast({
         message: m.toast_section_deleted({ name: sectionTitle(language, section.type, section.title) }),
-        action: { label: m.common_undo(), run: () => restoreSection(removed.section, removed.index, removed.side) },
+        action: { label: m.common_undo(), run: () => restoreSection(removed) },
       })
     },
     [language],

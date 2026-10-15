@@ -10,6 +10,7 @@
   "nav_back_to_list": "CV'lerime dön",
   "theme_to_dark": "Koyu temaya geç",
   "theme_to_light": "Açık temaya geç",
+  "browser_note": "Bu tarayıcı Chromium tabanlı değil. Site çalışır, ama PDF'in önizlemeyle birebir aynı çıkması için Chrome, Edge ya da Brave önerilir.",
 
   "not_found_title": "Bu sayfa yok",
   "not_found_body": "Adres yanlış yazılmış ya da sayfa kaldırılmış olabilir.",
@@ -342,6 +343,8 @@
   "ai_accept": "Kabul et",
   "ai_reject": "Reddet",
   "ai_accepted": "{count} öneri uygulandı · Ctrl+Z ile geri alabilirsin",
+  "ai_stale_skipped": "{count} öneri uygulanmadı: alan öneriden sonra değişmiş",
+  "ai_stale_removed": "Alan değiştiği için {count} öneri kaldırıldı",
   "ai_note_tidy": "Madde başları ve sonları tutarlı hâle getirildi; zayıf kalıplar güçlü fiillerle değişti.",
   "ai_note_sample": "Örnek öneri: özet daha somut yazıldı.",
 

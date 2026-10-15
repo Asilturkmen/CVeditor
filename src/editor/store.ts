@@ -137,8 +137,9 @@ export const useEditor = create<EditorState>((set, get) => {
     },
 
     async flush() {
-      if (saveTimer) {
-        clearTimeout(saveTimer)
+      // Bekleyen kayıt ya da daha önce başarısız olan kayıt varsa şimdi yaz.
+      if (saveTimer || get().saveState === 'error') {
+        if (saveTimer) clearTimeout(saveTimer)
         await persist()
       }
     },

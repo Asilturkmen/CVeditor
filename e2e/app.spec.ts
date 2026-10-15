@@ -218,6 +218,39 @@ test('yeni kayıt eklenince ilk alana imleç gelir', async ({ page }) => {
   await expect(preview(page).getByText('Yeni Proje')).toBeVisible()
 })
 
+test('CV adındaki HTML küçük resimde çalışmaz (XSS)', async ({ page }) => {
+  const evil = '</title><img src=x onerror="window.top.__xss=1">'
+  await createCv(page, { name: evil })
+  await page.goto('/cvler')
+  await expect(page.getByRole('heading', { name: evil })).toBeVisible()
+  await page.waitForTimeout(800)
+  expect(await page.evaluate(() => (window as unknown as { __xss?: number }).__xss)).toBeUndefined()
+})
+
+test('küçük resim gerçek sayfalamayı kullanır (uyarı çerçevesi yok)', async ({ page }) => {
+  const id = await createCv(page, { name: 'Uzun', start: 'sample' })
+  await patchCv(
+    page,
+    id,
+    `const exp = cv.sections.find((s) => s.type === 'experience');
+     const base = exp.items[0];
+     for (let i = 0; i < 6; i++) exp.items.push({ ...base, id: 'k-' + i, translationGroupId: 'g-' + i });`,
+  )
+  await page.goto('/cvler')
+  const thumb = page.frameLocator('iframe[title="Uzun"]')
+  await expect(thumb.locator('.page').first()).toBeVisible()
+  await expect(thumb.locator('.overflow-warning')).toHaveCount(0)
+})
+
+test('PDF al, korumalı önizlemede yazdırmayı başlatır', async ({ page }) => {
+  const messages: string[] = []
+  page.on('console', (msg) => messages.push(msg.text()))
+  await createCv(page, { start: 'sample' })
+  await page.getByRole('button', { name: /^PDF al$/ }).click()
+  await page.waitForTimeout(800)
+  expect(messages.filter((t) => /Ignored call to 'print\(\)'/.test(t))).toEqual([])
+})
+
 test('telefonda editör yerine önizleme ve not görünür', async ({ page }) => {
   await createCv(page)
   await page.setViewportSize({ width: 390, height: 844 })

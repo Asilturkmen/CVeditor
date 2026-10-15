@@ -4,7 +4,7 @@ import { isItemEmpty } from '@/cv/factory'
 import { CONTACT_TITLE, NAME_PLACEHOLDER, sectionTitle } from '@/cv/locale'
 import type { AnyItem, Cv, CvLanguage, Section } from '@/cv/schema'
 import { diffHtml, diffText } from './diff'
-import { displayUrl, isRichTextEmpty, sanitizeRichText, toHref } from './richtext'
+import { displayUrl, isRichTextEmpty, sanitizeDiffHtml, sanitizeRichText, toHref } from './richtext'
 
 /**
  * CV'nin "kaynak" HTML'i. Sayfalama (paginate.ts) bu kaynaktaki blokları
@@ -39,7 +39,7 @@ function Text({ ctx, target, field, value }: { ctx: Ctx; target: string; field: 
 function Rich({ ctx, target, field, value }: { ctx: Ctx; target: string; field: string; value: string }) {
   const sg = ctx.suggestions?.get(`${target}:${field}`)
   if (sg) {
-    const html = diffHtml(sanitizeRichText(sg.before), sanitizeRichText(sg.after))
+    const html = sanitizeDiffHtml(diffHtml(sanitizeRichText(sg.before), sanitizeRichText(sg.after)))
     return <div className="entry-body rich sg sg-block" data-sg-id={sg.id} dangerouslySetInnerHTML={{ __html: html }} />
   }
   if (isRichTextEmpty(value)) return null

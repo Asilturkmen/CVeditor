@@ -48,7 +48,13 @@ export function addItem(sectionId: string): string | null {
   return id
 }
 
-export function removeItem(sectionId: string, itemId: string): { item: AnyItem; index: number } | null {
+export interface RemovedItem {
+  cvId: string
+  item: AnyItem
+  index: number
+}
+
+export function removeItem(sectionId: string, itemId: string): RemovedItem | null {
   const cv = useEditor.getState().cv
   const section = cv?.sections.find((s) => s.id === sectionId)
   const index = (section?.items as AnyItem[] | undefined)?.findIndex((i) => i.id === itemId) ?? -1
@@ -57,14 +63,22 @@ export function removeItem(sectionId: string, itemId: string): { item: AnyItem; 
   update((d) => {
     findSection(d, sectionId)?.items.splice(index, 1)
   })
-  return { item, index }
+  return { cvId: cv!.id, item, index }
 }
 
-export function restoreItem(sectionId: string, item: AnyItem, index: number) {
+/**
+ * Silinen kaydı geri koyar ("Geri al" bildirimi). Kayıt zaten yerindeyse
+ * (ör. arada Ctrl+Z yapıldıysa) ya da başka bir CV açıksa hiçbir şey yapmaz:
+ * aynı id iki kez eklenmesin, kayıt yanlış CV'ye gitmesin.
+ */
+export function restoreItem(sectionId: string, removed: RemovedItem) {
   update((d) => {
+    if (d.id !== removed.cvId) return
     const section = findSection(d, sectionId)
     if (!section) return
-    ;(section.items as AnyItem[]).splice(Math.min(index, section.items.length), 0, item)
+    const items = section.items as AnyItem[]
+    if (items.some((i) => i.id === removed.item.id)) return
+    items.splice(Math.min(removed.index, items.length), 0, removed.item)
   })
 }
 
@@ -110,7 +124,14 @@ export function addSection(type: SectionType): string {
   return section.id
 }
 
-export function removeSection(sectionId: string): { section: Section; index: number; side: boolean } | null {
+export interface RemovedSection {
+  cvId: string
+  section: Section
+  index: number
+  side: boolean
+}
+
+export function removeSection(sectionId: string): RemovedSection | null {
   const cv = useEditor.getState().cv
   const index = cv?.sections.findIndex((s) => s.id === sectionId) ?? -1
   if (!cv || index < 0) return null
@@ -120,13 +141,17 @@ export function removeSection(sectionId: string): { section: Section; index: num
     d.sections.splice(index, 1)
     d.template.sideSections = d.template.sideSections.filter((id) => id !== sectionId)
   })
-  return { section, index, side }
+  return { cvId: cv.id, section, index, side }
 }
 
-export function restoreSection(section: Section, index: number, side: boolean) {
+/** Silinen bölümü geri koyar; restoreItem ile aynı korumalar. */
+export function restoreSection(removed: RemovedSection) {
   update((d) => {
-    d.sections.splice(Math.min(index, d.sections.length), 0, section as Draft<Section>)
-    if (side) d.template.sideSections.push(section.id)
+    if (d.id !== removed.cvId || d.sections.some((s) => s.id === removed.section.id)) return
+    d.sections.splice(Math.min(removed.index, d.sections.length), 0, removed.section as Draft<Section>)
+    if (removed.side && !d.template.sideSections.includes(removed.section.id)) {
+      d.template.sideSections.push(removed.section.id)
+    }
   })
 }
 
@@ -187,11 +212,26 @@ export function switchTemplate(templateId: TemplateId) {
   })
 }
 
-/** Önerileri tek adımda uygular (toplu kabul = tek geri alma adımı). */
-export function applySuggestions(list: Suggestion[]) {
-  if (list.length === 0) return
+/** Önerinin hedef alanının bugünkü değeri; alan yoksa undefined. */
+export function currentSuggestionValue(cv: Cv, s: Suggestion): unknown {
+  if (s.target === 'personal') return (cv.personal as unknown as Record<string, unknown>)[s.field]
+  const section = cv.sections.find((x) => x.id === s.sectionId)
+  const item = (section?.items as unknown as Record<string, unknown>[] | undefined)?.find((i) => i.id === s.target)
+  return item?.[s.field]
+}
+
+/**
+ * Önerileri tek adımda uygular (toplu kabul = tek geri alma adımı).
+ * Öneri üretildikten sonra alan değiştiyse o öneri uygulanmaz: kullanıcının
+ * sonradan yazdığı metin sessizce ezilmesin. Uygulanan öneri sayısını döndürür.
+ */
+export function applySuggestions(list: Suggestion[]): number {
+  const cv = useEditor.getState().cv
+  if (!cv) return 0
+  const fresh = list.filter((s) => currentSuggestionValue(cv, s) === s.before)
+  if (fresh.length === 0) return 0
   update((d) => {
-    for (const s of list) {
+    for (const s of fresh) {
       if (s.target === 'personal') {
         ;(d.personal as unknown as Record<string, unknown>)[s.field] = s.after
       } else if (s.sectionId) {
@@ -200,6 +240,7 @@ export function applySuggestions(list: Suggestion[]) {
       }
     }
   })
+  return fresh.length
 }
 
 /**

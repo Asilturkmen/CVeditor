@@ -69,8 +69,27 @@ describe('geri al / yinele', () => {
     const second = experience.items[1]
     const removed = removeItem(experience.id, second.id)!
     expect(cv().sections.find((s) => s.type === 'experience')!.items).toHaveLength(2)
-    restoreItem(experience.id, removed.item, removed.index)
+    restoreItem(experience.id, removed)
     expect(cv().sections.find((s) => s.type === 'experience')!.items[1].id).toBe(second.id)
+  })
+
+  it('"Geri al" bildirimi, kayıt zaten geri geldiyse ikinci kopya eklemez', () => {
+    const experience = cv().sections.find((s) => s.type === 'experience')!
+    const removed = removeItem(experience.id, experience.items[0].id)!
+    useEditor.getState().undo()
+    restoreItem(experience.id, removed)
+    const items = cv().sections.find((s) => s.type === 'experience')!.items
+    expect(items).toHaveLength(3)
+    expect(new Set(items.map((i) => i.id)).size).toBe(3)
+  })
+
+  it('"Geri al" bildirimi başka bir CV açıkken bir şey yapmaz', () => {
+    const experience = cv().sections.find((s) => s.type === 'experience')!
+    const removed = removeItem(experience.id, experience.items[0].id)!
+    useEditor.getState().load(sampleCv())
+    const before = JSON.stringify(cv())
+    restoreItem(experience.id, removed)
+    expect(JSON.stringify(cv())).toBe(before)
   })
 
   it('bölüm taşıma geri alınabilir', () => {
@@ -121,6 +140,17 @@ describe('düzenleme', () => {
 })
 
 describe('örnek öneriler (V1)', () => {
+  it('öneriden sonra alan değiştiyse öneri uygulanmaz', () => {
+    const experience = cv().sections.find((s) => s.type === 'experience')!
+    const target = experience.items[0]
+    setItemField(experience.id, target.id, 'description', '<ul><li>birinci</li><li>ikinci</li></ul>')
+    const list = generateMockSuggestions(cv(), { kind: 'item', sectionId: experience.id, itemId: target.id })
+    setItemField(experience.id, target.id, 'description', '<ul><li>kullanıcının yeni metni</li></ul>')
+    expect(applySuggestions(list)).toBe(0)
+    const item = cv().sections.find((s) => s.type === 'experience')!.items[0] as { description: string }
+    expect(item.description).toBe('<ul><li>kullanıcının yeni metni</li></ul>')
+  })
+
   it('madde başlarını büyütür ve sonları tutarlı yapar', () => {
     const out = tidyHtml('<ul><li>ilk madde.</li><li>ikinci  madde.</li><li>üçüncü madde</li></ul>', 'tr')
     expect(out).toBe('<ul><li>İlk madde.</li><li>İkinci madde.</li><li>Üçüncü madde.</li></ul>')
@@ -140,7 +170,7 @@ describe('örnek öneriler (V1)', () => {
     expect(scoped.length).toBeGreaterThan(0)
     expect(scoped.every((s) => s.target === target.id)).toBe(true)
 
-    applySuggestions(scoped)
+    expect(applySuggestions(scoped)).toBe(scoped.length)
     expect(useEditor.getState().past.length).toBe(pastBefore + 1)
     const updated = cv().sections.find((s) => s.type === 'experience')!.items[0] as { description: string }
     expect(updated.description).toBe('<ul><li>Birinci</li><li>İkinci</li></ul>')

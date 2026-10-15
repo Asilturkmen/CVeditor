@@ -34,6 +34,18 @@ export function displayUrl(value: string): string {
     .replace(/\/$/, '')
 }
 
+/**
+ * Öneri farkı çıktısı için süzgeç: zengin metin etiketlerine ek olarak
+ * fark işaretleri (del, ins, sg-old/sg-new kutuları) ve class.
+ */
+export function sanitizeDiffHtml(html: string): string {
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: [...ALLOWED_TAGS, 'del', 'ins', 'div'],
+    ALLOWED_ATTR: ['href', 'class'],
+    ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|tel:|[a-z0-9.-]+\.[a-z]{2,})/i,
+  })
+}
+
 export function isRichTextEmpty(html: string): boolean {
   return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim() === ''
 }

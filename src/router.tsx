@@ -1,12 +1,10 @@
-import { createRootRoute, createRoute, createRouter, Navigate, Outlet } from '@tanstack/react-router'
+import { createRootRoute, createRoute, createRouter, lazyRouteComponent, Navigate, Outlet } from '@tanstack/react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Toaster } from '@/components/ui/Toaster'
 import { TooltipProvider } from '@/components/ui/Tooltip'
 import { db } from '@/db/db'
 import { AppShell } from '@/features/shell/AppShell'
 import { CvListPage } from '@/features/cv-list/CvListPage'
-import { EditorPage } from '@/features/editor/EditorPage'
-import { SettingsPage } from '@/features/settings/SettingsPage'
 import { TemplatesPage } from '@/features/templates/TemplatesPage'
 import { NotFound } from '@/features/shell/NotFound'
 
@@ -33,12 +31,17 @@ const shellRoute = createRoute({ getParentRoute: () => rootRoute, id: 'shell', c
 
 const listRoute = createRoute({ getParentRoute: () => shellRoute, path: '/cvler', component: CvListPage })
 const templatesRoute = createRoute({ getParentRoute: () => shellRoute, path: '/sablonlar', component: TemplatesPage })
-const settingsRoute = createRoute({ getParentRoute: () => shellRoute, path: '/ayarlar', component: SettingsPage })
+const settingsRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: '/ayarlar',
+  component: lazyRouteComponent(() => import('@/features/settings/SettingsPage'), 'SettingsPage'),
+})
 
 export const editorRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/editor/$cvId',
-  component: EditorPage,
+  // Editör (TipTap, sürükle-bırak) ayrı parça: ilk açılış hafif kalsın.
+  component: lazyRouteComponent(() => import('@/features/editor/EditorPage'), 'EditorPage'),
 })
 
 const routeTree = rootRoute.addChildren([

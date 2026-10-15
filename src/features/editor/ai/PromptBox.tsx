@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from '@/components/ui/Menu'
 import { toast } from '@/components/ui/Toaster'
 import { Tooltip } from '@/components/ui/Tooltip'
-import { applySuggestions } from '@/editor/actions'
+import { applySuggestions, currentSuggestionValue } from '@/editor/actions'
 import { generateMockSuggestions } from '@/editor/mockSuggestions'
 import { useEditorUi, type AiScope, type Suggestion } from '@/editor/ui'
 import { cn } from '@/lib/cn'
@@ -40,9 +40,10 @@ function SuggestionReview({ cv }: { cv: Cv }) {
   const focusItem = useEditorUi((s) => s.focusItem)
 
   const accept = (list: Suggestion[]) => {
-    applySuggestions(list)
+    const applied = applySuggestions(list)
     remove(list.map((s) => s.id))
-    toast({ message: m.ai_accepted({ count: list.length }) })
+    if (applied < list.length) toast({ message: m.ai_stale_skipped({ count: list.length - applied }) })
+    if (applied > 0) toast({ message: m.ai_accepted({ count: applied }) })
   }
   const reject = (list: Suggestion[]) => remove(list.map((s) => s.id))
 
@@ -114,6 +115,15 @@ export function PromptBox({ cv }: { cv: Cv }) {
   useEffect(() => () => {
     if (timer.current) clearTimeout(timer.current)
   }, [])
+
+  // Öneri bekleyen alan sonradan değiştiyse (elle yazma, geri al) o öneri artık geçersiz.
+  useEffect(() => {
+    if (suggestions.length === 0) return
+    const stale = suggestions.filter((s) => currentSuggestionValue(cv, s) !== s.before)
+    if (stale.length === 0) return
+    useEditorUi.getState().removeSuggestions(stale.map((s) => s.id))
+    toast({ message: m.ai_stale_removed({ count: stale.length }) })
+  }, [cv, suggestions])
 
   // Kapsamdaki bölüm/kayıt silinirse Tüm CV'ye dön.
   useEffect(() => {

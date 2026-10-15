@@ -2,6 +2,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { Cv, TemplateSettings } from '@/cv/schema'
 import { CvSource, type SuggestionMap } from './CvMarkup'
+import { escapeHtml } from './diff'
 import { FONTS, fontFaceCss } from './fonts'
 import baseCss from './styles/base.css?raw'
 import { getTemplate } from './templates'
@@ -60,5 +61,5 @@ export function cvStyles(cv: Cv): string {
  * #cv-source'a yazılır ve paginate() ile #cv-pages'e dağıtılır.
  */
 export function documentShell(options: { lang: string; fontBase?: string; title?: string }): string {
-  return `<!doctype html><html lang="${options.lang}"><head><meta charset="utf-8"><title>${options.title ?? 'CV'}</title><style id="cv-fonts">${fontFaceCss(options.fontBase)}</style><style id="cv-styles"></style><style id="cv-host"></style></head><body><div id="cv-source"></div><div id="cv-pages"></div></body></html>`
+  return `<!doctype html><html lang="${escapeHtml(options.lang)}"><head><meta charset="utf-8"><title>${escapeHtml(options.title ?? 'CV')}</title><style id="cv-fonts">${fontFaceCss(options.fontBase)}</style><style id="cv-styles"></style><style id="cv-host"></style></head><body><div id="cv-source"></div><div id="cv-pages"></div></body></html>`
 }

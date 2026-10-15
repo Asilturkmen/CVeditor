@@ -67,7 +67,9 @@ export const CvFrame = forwardRef<CvFrameHandle, Props>(function CvFrame(
 ) {
   const containerRef = useRef<HTMLDivElement>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
-  const [ready, setReady] = useState(false)
+  // Her yüklemede artar; iframe yeniden bağlanırsa içerik yeniden çizilir.
+  const [loadCount, setLoadCount] = useState(0)
+  const ready = loadCount > 0
   const [contentHeight, setContentHeight] = useState(PAGE_HEIGHT_PX)
   const [containerWidth, setContainerWidth] = useState(0)
   const pageCountRef = useRef(0)
@@ -107,7 +109,9 @@ export const CvFrame = forwardRef<CvFrameHandle, Props>(function CvFrame(
     const styleEl = doc.getElementById('cv-styles')!
     if (styleEl.textContent !== styles) styleEl.textContent = styles
     doc.getElementById('cv-host')!.textContent = firstPageOnly
-      ? '#cv-pages{gap:0}.page:not(:first-child){display:none}'
+      ? // Yalnız ilk sayfa görünür: iframe bir sayfa yüksekliğinde, gerisi taşar. Sayfaları gizlemek
+        // ölçümü bozardı (gizli sayfada her şey 0 yükseklik).
+        'html,body{overflow:hidden}#cv-pages{gap:0}'
       : '#cv-pages{--sheet-gap:24px;--sheet-shadow:0 1px 2px rgba(0,0,0,.06),0 6px 24px rgba(0,0,0,.08)}'
 
     // Yazı tipleri ölçümden önce yüklenmeli; yoksa satır kırılımı sonradan değişir.
@@ -122,7 +126,9 @@ export const CvFrame = forwardRef<CvFrameHandle, Props>(function CvFrame(
     const result = paginate(doc, { previousPageCount: pageCountRef.current })
     pageCountRef.current = result.pageCount
     if (focusedItemId) {
-      doc.querySelectorAll(`[data-item-id="${focusedItemId}"]`).forEach((el) => el.classList.add('is-focused'))
+      doc
+        .querySelectorAll(`[data-item-id="${CSS.escape(focusedItemId)}"]`)
+        .forEach((el) => el.classList.add('is-focused'))
     }
     const pagesEl = doc.getElementById('cv-pages')!
     setContentHeight(firstPageOnly ? PAGE_HEIGHT_PX : pagesEl.scrollHeight)
@@ -133,7 +139,7 @@ export const CvFrame = forwardRef<CvFrameHandle, Props>(function CvFrame(
     if (!ready) return
     const frame = requestAnimationFrame(() => void render())
     return () => cancelAnimationFrame(frame)
-  }, [ready, render])
+  }, [ready, loadCount, render])
 
   // Tıklanan kaydı editöre bildir.
   useEffect(() => {
@@ -152,7 +158,7 @@ export const CvFrame = forwardRef<CvFrameHandle, Props>(function CvFrame(
     }
     doc.addEventListener('click', onClick)
     return () => doc.removeEventListener('click', onClick)
-  }, [ready, interactive])
+  }, [ready, loadCount, interactive])
 
   useImperativeHandle(
     ref,
@@ -193,7 +199,9 @@ export const CvFrame = forwardRef<CvFrameHandle, Props>(function CvFrame(
             ref={iframeRef}
             title={title ?? 'CV önizleme'}
             srcDoc={srcDoc}
-            onLoad={() => setReady(true)}
+            onLoad={() => setLoadCount((n) => n + 1)}
+            // Betik çalışmaz (içerik yalnız dışarıdan yazılır); yazdırmak için allow-modals.
+            sandbox="allow-same-origin allow-modals"
             tabIndex={interactive ? 0 : -1}
             style={{
               width: PAGE_WIDTH_PX,
