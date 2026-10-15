@@ -23,7 +23,8 @@ PDF: editörde **PDF al** (Ctrl+P) → yazdır penceresinde "Hedef: PDF olarak k
 - **Görünüm:** 8 hazır vurgu rengi + özel renk, 5 yazı tipi (hepsi latin-ext, PDF'e gömülü), boyut, boşluk, başlık hizası, sütun, fotoğraf.
 - **Veri:** IndexedDB (Dexie) + Zod şeması + şema göç altyapısı. Otomatik kayıt (450 ms), Ctrl+Z / Ctrl+Shift+Z ortak geçmiş (TipTap'in kendi geçmişi kapalı). JSON yedek (tek CV ya da hepsi), geri yükleme (çakışmada "ikisini de tut / değiştir"). Kalıcı depolama izni, yedek hatırlatması.
 - **Yapay zekâ ekranları (örnek veri):** prompt + kapsam (Tüm CV / bölüm / seçili kayıt). Öneri CV'de sarı zeminle işaretlenir: küçük değişiklik kelime düzeyinde, büyük değişiklik eski/yeni blok olarak. Tek tek ya da toplu kabul/ret; toplu kabul tek geri alma adımı. Öneri beklerken PDF alınmaz. İçe aktarma önizlemesi kayıt kayıt seçilir. Hiçbir istek atılmaz.
-- **Testler:** 37 birim testi (Vitest), 17 uçtan uca test (Playwright, Chromium).
+- **Testler:** 40 birim testi (Vitest), 20 uçtan uca test (Playwright, Chromium). `npm run check` hepsini çalıştırır.
+- **Bağımsız kod incelemesi:** ikinci bir ajan kodu okuyup 9 sorun buldu, hepsi düzeltildi. Aralarında CV adından XSS, "Geri al" bildiriminin Ctrl+Z sonrası kaydı ikinci kez eklemesi, öneri kabulünün sonradan yazılanı ezmesi ve küçük resimlerde yanlış sayfalama vardı. Önizleme iframe'i artık betik çalıştıramaz (sandbox).
 
 ## Senin kararını bekleyenler (gece varsayılanla ilerledim)
 
