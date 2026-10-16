@@ -1,24 +1,58 @@
 import { AlertTriangle, Minus, MonitorSmartphone, Plus } from 'lucide-react'
-import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { AnyItem, Cv } from '@/cv/schema'
+import { forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import type { Cv } from '@/cv/schema'
 import { Button } from '@/components/ui/Button'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { useEditorUi } from '@/editor/ui'
 import { cn } from '@/lib/cn'
 import { m } from '@/paraglide/messages'
-import { CvFrame, PAGE_WIDTH_PX, type CvFrameHandle, type CvFrameTarget } from '@/render/CvFrame'
+import { CvFrame, PAGE_HEIGHT_PX, PAGE_WIDTH_PX, type CvFrameHandle, type CvFrameTarget } from '@/render/CvFrame'
 import type { AddedItemSuggestion, SuggestionMap } from '@/render/CvMarkup'
 import type { PaginateResult } from '@/render/paginate'
-import { itemLabel } from './labels'
+import { oversizedLabels } from './oversizedLabels'
 
 const ZOOM_STEPS = [0.5, 0.67, 0.75, 0.9, 1, 1.1, 1.25, 1.5]
 
-export function oversizedLabels(cv: Cv, oversized: { itemId: string | null; sectionId: string | null }[]) {
-  return oversized.map((o) => {
-    const section = cv.sections.find((s) => s.id === o.sectionId)
-    const item = section ? (section.items as AnyItem[]).find((i) => i.id === o.itemId) : undefined
-    return { id: o.itemId, label: section && item ? itemLabel(section.type, item) || m.editor_untitled() : m.editor_untitled() }
-  })
+/** Sayfanın üstünde/altında (ve yanlarında en az) bırakılan boşluk: py-8 = 2rem (kök 14px) = 28px. */
+const FIT_GAP = 28
+const FIT_MIN = 0.2
+/** Sığdır büyütmenin üst sınırı = en büyük yakınlaştırma adımı (2560x1440'ta ~%115 olur, 4K'da %150'de durur). */
+const FIT_MAX = ZOOM_STEPS.at(-1)!
+
+/**
+ * "Sığdır" ölçeği: bir A4 sayfanın tamamı önizleme alanına hem enine hem boyuna
+ * sığar; üstte ve altta FIT_GAP kadar nefes payı kalır. Kural min(enine, boyuna):
+ * büyük ekranda %100'ün üstüne çıkabilir (koca alanda minik sayfa kötü durur),
+ * ama sayfa hiçbir zaman alandan taşmaz. Yuvarlama ve sayfa yüksekliğinin tam
+ * piksele yuvarlanması gereksiz kaydırma çubuğu açmasın diye 1px pay ve aşağı yuvarlama.
+ * `byWidthOnly`: yalnız enine sığdır (telefonu yatay tutunca sayfa minicik kalmasın).
+ */
+function pageFitScale(width: number, height: number, byWidthOnly = false): number {
+  if (width <= 0 || height <= 0) return 0
+  // Telefonda yanlarda daha dar pay (16px): dar ekranda her piksel sayfaya.
+  const gapX = width < 600 ? 16 : FIT_GAP
+  const byWidth = (width - 2 * gapX) / PAGE_WIDTH_PX
+  const byHeight = (height - 2 * FIT_GAP - 1) / (PAGE_HEIGHT_PX + 1)
+  const scale = byWidthOnly ? byWidth : Math.min(byWidth, byHeight)
+  return Math.min(FIT_MAX, Math.max(FIT_MIN, Math.floor(scale * 1000) / 1000))
+}
+
+/** Kaydırma kabının iç ölçüsü; pencere, bölücü, sağ panel ya da uyarı bandı değişince güncellenir. */
+function useBoxSize(ref: RefObject<HTMLElement | null>) {
+  const [size, setSize] = useState({ width: 0, height: 0 })
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const measure = () =>
+      setSize((prev) =>
+        prev.width === el.clientWidth && prev.height === el.clientHeight ? prev : { width: el.clientWidth, height: el.clientHeight },
+      )
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [ref])
+  return size
 }
 
 /** Önizlemenin altında ince çubuk: sayfanın üstüne binmez. Yüzdeye tıklamak %100'e döndürür. */
@@ -114,8 +148,10 @@ export const PreviewPane = forwardRef<
   const clipped = useEditorUi((s) => s.clipped)
   const reveal = useEditorUi((s) => s.reveal)
   const flash = useEditorUi((s) => s.flash)
-  const [fitScale, setFitScale] = useState(1)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const box = useBoxSize(scrollRef)
+  // Telefonda (salt okunur) dikey tutuşta sayfa bütün görünür; yatay tutuşta enine sığar, kaydırılır.
+  const fitScale = pageFitScale(box.width, box.height, readOnly && box.width > box.height)
   const suggestionMap = useSuggestionMap()
 
   const onResult = useCallback(
@@ -205,12 +241,14 @@ export const PreviewPane = forwardRef<
               </div>
             </div>
           )}
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
+      {/* Kaydırma çubuğu yeri iki yanda da ayrılır: çubuk açılıp kapanınca sayfa kaymaz, ortada kalır. */}
+      <div ref={scrollRef} data-preview-scroll className="min-h-0 flex-1 overflow-auto [scrollbar-gutter:stable_both-edges]">
         <CvFrame
           ref={ref}
           cv={cv}
-          scale={zoom}
-          maxFitScale={1}
+          // Sığdır modunda ölçek burada hesaplanır (alanın hem eni hem boyu); elle seçilen yakınlaştırmayı
+          // pencere/bölücü değişimi ezmez, "Sığdır"a basılana kadar kalır.
+          scale={zoom === 'fit' ? fitScale : zoom}
           interactive={!readOnly}
           placeholders
           emptyHint={m.preview_empty_hint()}
@@ -221,8 +259,7 @@ export const PreviewPane = forwardRef<
           crossfadeKey={`${cv.templateId}:${cv.template.columns}`}
           onResult={onResult}
           onTargetClick={readOnly ? undefined : onTargetClick}
-          onScaleChange={zoom === 'fit' ? setFitScale : undefined}
-          className="py-6"
+          className="py-8"
           title={m.preview_title()}
         />
       </div>

@@ -4,6 +4,7 @@
   "imp_drop_hint": "or drop the file here",
   "imp_drop_here": "Drop it, we'll read it",
   "imp_privacy": "Your file is read in this browser and never sent anywhere. PDF only for now; Word (DOCX) is coming in a later version.",
+  "imp_privacy_live": "Your file is read in this browser and isn't sent itself. Only its text goes out to split it into entries, with your name and contact details masked. PDF only for now; Word (DOCX) is coming in a later version.",
   "imp_reading_pdf": "Reading PDF…",
   "imp_parsing": "Splitting into entries…",
   "imp_cancel": "Cancel",
@@ -111,7 +112,7 @@
   "rv_open_editor": "Open in editor",
   "rv_drop_title": "Drop the PDF here",
   "rv_drop_button": "Choose PDF",
-  "rv_drop_hint": "The file is read in your browser and never sent anywhere.",
+  "rv_drop_hint": "The file is read in your browser. Nothing is sent unless you ask for AI feedback.",
   "rv_pdf_reading": "Reading PDF…",
   "rv_pdf_pages": [
     {
@@ -197,7 +198,20 @@
   "rv_edit": "Edit",
   "rv_edit_label": "Edit: {title}",
   "rv_kw_title": "Compared with the ad",
-  "rv_kw_note": "Rough match: looks for the ad's frequent and technical words in your CV, ignoring suffixes and plurals. It doesn't know synonyms; meaning-based comparison will come once AI is connected.",
+  "rv_kw_note": "Rough match: looks for the ad's frequent and technical words in your CV, ignoring suffixes and plurals. It doesn't know synonyms; use the button below for a meaning-based comparison.",
+  "rv_kw_ai_title": "Meaning-based comparison",
+  "rv_kw_ai_body": "It also recognises synonyms and abbreviations. The ad and your CV's text are sent only when you ask.",
+  "rv_kw_ai_body_demo": "For now a small synonym list makes a sample comparison; nothing is sent.",
+  "rv_kw_ai_run": "Compare by meaning",
+  "rv_kw_ai_again": "Compare again",
+  "rv_kw_ai_running": "Comparing",
+  "rv_kw_ai_related": "Present under another name",
+  "rv_kw_ai_related_hint": "The ad's term appears in your CV with different wording. An ATS may look for the exact term; if it fits, use the ad's wording too.",
+  "rv_kw_ai_pair": "“{term}” in the ad, “{cvTerm}” in your CV",
+  "rv_kw_ai_none": "No terms were found to compare.",
+  "rv_kw_ai_stale": "The job ad has changed; compare again for an up-to-date result.",
+  "rv_kw_ai_payload_desc": "Below is everything this comparison would send.",
+  "rv_kw_ai_payload_rules": "The job ad is sent as is. In your CV's text, your name, emails and phone numbers, your location, links of yours and your references' names are masked with ⟦…⟧ placeholders; the terms the rule-based comparison found are sent too.",
   "rv_kw_missing": "Missing",
   "rv_kw_present": "Found",
   "rv_kw_missing_hint": "In the ad, not in your CV. If you really know these, add them where they fit.",
@@ -220,9 +234,45 @@
   ],
   "rv_text_title": "Text the ATS sees",
   "rv_text_hint": "The PDF's text in reading order. Most ATSs use this order; anything that looks jumbled here looks jumbled to the ATS too.",
+  "rv_text_hint_cv": "The order your text will be read in once your CV is printed to PDF, template and page breaks included. Most ATSs use this order; anything that looks jumbled here looks jumbled to the ATS too.",
   "rv_text_page": "Page {page}",
   "rv_ai_title": "AI feedback",
-  "rv_ai_body": "Content feedback such as bullet impact, verb choice and fit with the ad will appear here once AI is connected. The checks above are rule-based.",
+  "rv_ai_body": "Feedback on bullet impact, verb choice and fit with the ad. The checks above are rule-based; this feedback comes from AI. Your CV's text is sent only when you ask.",
+  "rv_ai_body_demo": "For now you'll see sample feedback; nothing is sent.",
+  "rv_ai_request": "Get feedback",
+  "rv_ai_again": "Ask again",
+  "rv_ai_running": "Preparing feedback",
+  "rv_ai_with_ad": "The job ad you pasted is sent too.",
+  "rv_ai_kind_strength": "Strength",
+  "rv_ai_kind_improve": "Improve",
+  "rv_ai_kind_job_fit": "Fit with the ad",
+  "rv_ai_empty": "There was nothing to comment on.",
+  "rv_ai_stale": "The job ad has changed; ask again for up-to-date feedback.",
+  "rv_ai_list_label": "AI feedback",
+  "rv_ai_payload_desc": "Below is everything this feedback request would send.",
+  "rv_ai_payload_rules": "For your own CV, your name and contact fields are never sent. In the text (an uploaded PDF too), your name, emails and phone numbers, your location, links of yours and your references' names are masked with ⟦…⟧ placeholders and put back only in your browser when the reply arrives. Hidden sections and entries of your own CV aren't sent. The job ad is sent as is.",
+  "rv_ai_name_missing": "Your name couldn't be found in the PDF, so if it appears in the text it will be sent unmasked. Check “What's sent?” before sending.",
+  "rv_ai_name_missing_payload": "Your name couldn't be found in the PDF. If it appears in the text, you'll see it below as is, and it will be sent that way.",
+  "rv_ai_mock_summary_ok": "You have a summary, so readers get who you are in the first lines.",
+  "rv_ai_mock_summary_missing": "There's no summary. Write two or three sentences on what you do and what you're looking for.",
+  "rv_ai_mock_numbers": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} bullet has no numbers. Add a duration, amount or scope to show its impact.",
+        "countPlural=other": "{count} bullets have no numbers. Add a duration, amount or scope to a few to show their impact."
+      }
+    }
+  ],
+  "rv_ai_mock_numbers_ok": "Your bullets include concrete numbers that show your impact.",
+  "rv_ai_mock_weak": "There's a weak phrase like “{phrase}”. Use a strong verb that says what you did.",
+  "rv_ai_mock_job": "The ad emphasises: {terms}. Give concrete examples of these in your experience bullets.",
   "rv_editor_menu": "Review this CV",
   "rv_group_passed": [
     {
@@ -596,7 +646,7 @@
   "start_copy": "Copy an existing CV",
   "start_copy_desc": "The content is copied and the new template applied.",
   "start_copy_none": "No CVs to copy yet.",
-  "start_copy_language_note": "The CV you chose is in another language. Content is copied as is; automatic AI translation is coming in a later version.",
+  "start_copy_language_note": "The CV you chose is in another language. Content is copied as is. For a translated copy, use \"Translate to the other language\" in the editor's CV menu.",
   "import_title": "Import an old CV",
   "import_pick_title": "Choose your old CV's PDF",
   "import_pick_body": "Only the content is imported; the look comes from the template you chose.",
@@ -911,7 +961,17 @@
   "ap_photo_none": "Upload a photo in your personal details on the Content tab first.",
   "ap_photo_show": "Show photo on the CV",
   "ap_order": "Section order",
-  "ap_order_hint": "Reorder sections and entries on the Content tab by dragging the handle (⠿).",
+  "ap_order_hint": "Drag the handle (⠿), or focus it and move with Space and the arrow keys. The order changes on the Content tab too.",
+  "ap_order_drag": "Drag to reorder {name}",
+  "ph_award_desc": "Why did you win it, and among how many? Keep it short and concrete.",
+  "ph_volunteer_desc": "What did you do, and who did it help? e.g. weekly coding workshop for 40 students",
+  "ph_custom_desc": "Describe this entry briefly: what, where, and what came of it?",
+  "ph_certificate_url": "e.g. verification link",
+  "browser_note_safari": "Safari may delete data for sites you haven’t visited in 7 days. Back up your CVs as JSON regularly (Settings), or use Chrome, Edge or Brave.",
+  "settings_browser_safari": "Safari may delete data for sites that haven’t been visited in 7 days (Intelligent Tracking Prevention). Your CVs live only in this browser, so back them up as JSON regularly or use a Chromium-based browser.",
+  "print_menu_oversized": "This CV has an entry longer than one page; you need to confirm before saving the PDF. Close this window and the confirmation will open.",
+  "print_menu_pending": "You have pending suggestions. Accept or reject them first, then press “Export PDF”.",
+  "print_menu_not_ready": "The preview isn’t ready yet. Close this window and print again in a few seconds, or press “Export PDF”.",
   "ai_label": "Ask AI",
   "ai_placeholder": "What would you like to change in your CV? e.g. \"Make my experience bullets more measurable\"",
   "ai_scope_label": "Scope",
@@ -924,7 +984,8 @@
   "ai_working": "Preparing suggestions",
   "ai_enter_hint": "Enter to send",
   "ai_preview_note": "Preview: nothing is sent; the suggestions are samples.",
-  "ai_no_suggestions": "No sample suggestions for this scope.",
+  "ai_no_suggestions": "Nothing to change in this scope. Try wording your request differently.",
+  "ai_no_suggestions_demo": "No sample suggestions for this scope.",
   "ai_review_title": [
     {
       "declarations": [
@@ -996,10 +1057,19 @@
   "ai2_note_sample_bullet": "Sample suggestion: a measurable bullet was added.",
   "ai2_kind_add": "New entry",
   "ai2_kind_remove": "To remove",
-  "ai2_error_invalid": "The response didn't come back in the expected format, so no suggestions were shown. Try again.",
+  "ai2_error_invalid": "The response wasn't in the expected format, so it wasn't shown. Try again.",
   "ai2_error_network": "Couldn't connect. Check your internet connection and try again.",
   "ai2_error_rate": "Too many requests in a short time. Wait a moment and try again.",
-  "ai2_error_unknown": "Couldn't get suggestions. Try again.",
+  "ai2_error_unknown": "The request couldn't be completed. Try again.",
+  "ai2_error_unauthorized": "The request wasn't sent because no password was entered. Try again and you'll be asked for it.",
+  "ai2_error_unavailable": "AI isn't available right now; the daily limit may have been reached. Try again later.",
+  "ai_auth_title": "Password required",
+  "ai_auth_desc": "AI features are password-protected. Enter the password and your request carries on.",
+  "ai_auth_label": "Password",
+  "ai_auth_note": "Your password isn't stored in this browser; the sign-in stays valid for a while.",
+  "ai_auth_submit": "Continue",
+  "ai_auth_checking": "Checking…",
+  "ai_auth_wrong": "Wrong password. Try again.",
   "ai2_dropped": [
     {
       "declarations": [
@@ -1018,7 +1088,7 @@
   "ai2_what_is_sent": "What's sent?",
   "ai2_payload_title": "What's sent to the AI?",
   "ai2_payload_desc": "Below is everything that would be sent for this request and scope.",
-  "ai2_payload_rules": "Your name is never sent. Emails, phone numbers and links in the text are masked with ⟦…⟧ placeholders and put back only in your browser when the reply arrives. Contact details are sent only if the request is about them.",
+  "ai2_payload_rules": "Your name field is never sent. In the text, your name, email addresses, phone numbers, your location, links of yours (including any that contain your name) and your references' names are masked with ⟦…⟧ placeholders and put back only in your browser when the reply arrives. Other links (e.g. project URLs) are sent as is. Contact details are sent only if the request is about them.",
   "ai2_payload_demo": "A sample provider is running right now: this data isn't sent anywhere.",
   "ai2_live_note": "Only the selected scope is sent; suggestions apply only when you accept them.",
   "ai2_oversized_mobile": [
@@ -1105,7 +1175,7 @@
   "clear_submit": "Delete everything",
   "clear_done": "All data deleted",
   "settings_about": "About",
-  "settings_about_body": "CVeditör {version} · V1 (interface running in the browser). Open source, MIT licensed. For now, PDFs are made with the browser's print dialog; one-click PDF and AI come in later versions.",
+  "settings_about_body": "CVeditör {version}. Open source, MIT licensed. Your CVs are stored only in this browser. For now, PDFs are made with the browser's print dialog.",
   "restore_title": "Restore from backup",
   "restore_found": [
     {

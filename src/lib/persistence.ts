@@ -29,3 +29,21 @@ export function isChromium(): boolean {
   if (brands) return brands.some((b) => /Chromium|Google Chrome|Microsoft Edge|Brave/i.test(b.brand))
   return /Chrome\//.test(navigator.userAgent) && !/Edg\/|OPR\//.test(navigator.userAgent)
 }
+
+/**
+ * Gerçek Safari mi (macOS/iOS)? Safari (Akıllı İzleme Önleme) 7 gün ziyaret
+ * edilmeyen sitenin verilerini silebilir. iOS'taki Chrome/Firefox/Edge/Opera da
+ * WebKit'tir ve UA'larında "Safari" geçer; kendi işaretleri (CriOS, FxiOS, EdgiOS,
+ * OPiOS…) varsa Safari sayılmaz. Ana ekrana eklenmiş web uygulaması (standalone)
+ * bu sayaçtan muaf olduğundan o da sayılmaz.
+ */
+export function isSafari(
+  ua: string = navigator.userAgent,
+  vendor: string = navigator.vendor ?? '',
+  standalone: boolean = (navigator as Navigator & { standalone?: boolean }).standalone === true,
+): boolean {
+  if (standalone) return false
+  if (!/Apple/i.test(vendor)) return false
+  if (!/Safari\//.test(ua) || !/Version\/\d/.test(ua)) return false
+  return !/Chrome|Chromium|CriOS|FxiOS|EdgiOS|EdgA|OPiOS|OPR|YaBrowser|GSA\/|DuckDuckGo|Brave|Android/i.test(ua)
+}

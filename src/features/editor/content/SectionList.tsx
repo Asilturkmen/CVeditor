@@ -1,8 +1,7 @@
-import { DndContext, type DragEndEvent, type Modifier, type UniqueIdentifier } from '@dnd-kit/core'
-import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
-import { Copy, Eye, EyeOff, GripVertical, MoreHorizontal, PenLine, Plus, RotateCcw, Send, Trash2 } from 'lucide-react'
-import { memo, useCallback, useEffect, useRef, useState, type HTMLAttributes, type ReactNode } from 'react'
+import { DndContext, type DragEndEvent, type UniqueIdentifier } from '@dnd-kit/core'
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { Copy, Eye, EyeOff, MoreHorizontal, PenLine, Plus, RotateCcw, Send, Trash2 } from 'lucide-react'
+import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { isItemEmpty } from '@/cv/factory'
 import { sectionTitle } from '@/cv/locale'
 import type { AnyItem, CvLanguage, DateRange, Section, SectionType, YearMonth } from '@/cv/schema'
@@ -11,7 +10,7 @@ import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
 import { Field, Input } from '@/components/ui/Field'
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from '@/components/ui/Menu'
-import { toast } from '@/components/ui/Toaster'
+import { toast } from '@/components/ui/toast'
 import { Tooltip } from '@/components/ui/Tooltip'
 import {
   addItem,
@@ -34,38 +33,12 @@ import { m } from '@/paraglide/messages'
 import { itemLabel } from '../labels'
 import { CopyToCvDialog } from './CopyToCvDialog'
 import { DateRangeField, YearMonthField } from './DateFields'
-import { dndScreenReaderInstructions, dndText, useDndAnnouncements } from './dndA11y'
+import { dndScreenReaderInstructions, useDndAnnouncements } from './dndA11y'
 import { ADD_ITEM_LABELS, ITEM_FIELDS, SECTION_LABELS, type FieldDef } from './fieldDefs'
 import { useSortDnd } from './keyboardSort'
 import { RichTextField } from './RichTextField'
-
-const verticalOnly: Modifier = ({ transform }) => ({ ...transform, x: 0 })
-
-function useSortableStyle(id: string) {
-  const sortable = useSortable({ id, attributes: { roleDescription: dndText.roleDescription } })
-  const style = {
-    transform: CSS.Translate.toString(sortable.transform),
-    transition: sortable.transition,
-    zIndex: sortable.isDragging ? 20 : undefined,
-    position: 'relative' as const,
-  }
-  return { ...sortable, style }
-}
-
-function DragHandle({ label, ...props }: HTMLAttributes<HTMLButtonElement> & { label: string }) {
-  return (
-    <Tooltip content={label}>
-      <button
-        type="button"
-        aria-label={label}
-        className="flex h-7 w-5 shrink-0 cursor-grab touch-none items-center justify-center rounded text-faint transition-colors hover:bg-surface-2 hover:text-muted active:cursor-grabbing"
-        {...props}
-      >
-        <GripVertical className="size-4" />
-      </button>
-    </Tooltip>
-  )
-}
+import { DragHandle } from './sortable'
+import { useSortableStyle, verticalOnly } from './sortableStyle'
 
 function HideToggle({ hidden, onToggle, label }: { hidden: boolean; onToggle: () => void; label: string }) {
   const text = hidden ? m.common_show() : m.common_hide()

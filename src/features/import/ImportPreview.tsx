@@ -12,6 +12,9 @@ import { m } from '@/paraglide/messages'
 import { ITEM_FIELDS } from '@/features/editor/content/fieldDefs'
 import { itemLabel } from '@/features/editor/labels'
 import { MAX_PDF_PAGES } from '@/ai/pdfText'
+import { getAiProvider } from '@/ai/provider'
+import { AiError } from '@/ai/types'
+import { aiErrorMessage } from '@/features/ai/aiErrorMessage'
 import { importErrorCode, readCvPdf, type ImportErrorCode, type ImportOutcome } from './runImport'
 
 export interface ImportSelection {
@@ -22,7 +25,8 @@ export interface ImportSelection {
 type Phase =
   | { kind: 'idle' }
   | { kind: 'reading'; fileName: string; step: 'pdf' | 'parse' }
-  | { kind: 'error'; code: ImportErrorCode }
+  /** detail: yapay zekâ hatasının iletisi (ağ, hız sınırı, parola…) */
+  | { kind: 'error'; code: ImportErrorCode; detail?: string }
   | { kind: 'ready'; outcome: ImportOutcome | null }
 
 const ERRORS: Record<ImportErrorCode, { title: () => string; body: () => string }> = {
@@ -77,7 +81,11 @@ export function ImportPreview({
       } catch (error) {
         if (controller.signal.aborted) return
         console.warn('[içe aktarma]', error)
-        setPhase({ kind: 'error', code: importErrorCode(error) })
+        setPhase(
+          error instanceof AiError
+            ? { kind: 'error', code: 'parse', detail: aiErrorMessage(error, m.imp_err_parse_body()) }
+            : { kind: 'error', code: importErrorCode(error) },
+        )
       }
     },
     [language],
@@ -153,7 +161,7 @@ export function ImportPreview({
           </Button>
           <span className="text-sm text-faint">{m.imp_drop_hint()}</span>
         </div>
-        <p className="max-w-sm text-xs text-faint">{m.imp_privacy()}</p>
+        <p className="max-w-sm text-xs text-faint">{getAiProvider().isDemo ? m.imp_privacy() : m.imp_privacy_live()}</p>
         <Button variant="ghost" size="sm" onClick={showSample}>
           {m.import_sample_button()}
         </Button>
@@ -185,7 +193,7 @@ export function ImportPreview({
           <TriangleAlert className="mt-0.5 size-4 shrink-0 text-danger" />
           <div className="min-w-0 text-[13px]">
             <p className="font-semibold text-text">{error.title()}</p>
-            <p className="mt-0.5 text-muted">{error.body()}</p>
+            <p className="mt-0.5 text-muted">{phase.detail ?? error.body()}</p>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">

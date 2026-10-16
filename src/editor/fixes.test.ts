@@ -3,7 +3,7 @@ import { createCv, duplicateCv } from '@/cv/factory'
 import { samplePersonal, sampleSections } from '@/cv/sample'
 import type { AnyItem, Cv } from '@/cv/schema'
 import { db } from '@/db/db'
-import { openInEditor } from '@/features/review/openInEditor'
+import { addMissing, openInEditor } from '@/features/review/openInEditor'
 import { findLinkedItem } from '@/features/translate/linkedItems'
 import { templateSettingsFor } from '@/render/templates'
 import { copyItemToCv } from './actions'
@@ -134,5 +134,76 @@ describe('İnceleme → Düzenle odağı', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('eksik bölüm: yükleme sonrası tek adımda eklenir, ilk kaydına odaklanılır; özet en başa', async () => {
+    const cv = sampleCv()
+    cv.sections = cv.sections.filter((s) => s.type !== 'education' && s.type !== 'summary')
+    openInEditor(vi.fn() as never, cv.id, { addSection: 'education' })
+    useEditor.getState().load(structuredClone(cv))
+    await Promise.resolve()
+    let state = useEditor.getState()
+    const edu = state.cv!.sections.find((s) => s.type === 'education')!
+    expect(edu.items).toHaveLength(1)
+    expect(useEditorUi.getState().focusedItemId).toBe(edu.items[0].id)
+    expect(state.past).toHaveLength(1)
+    state.undo()
+    expect(useEditor.getState().cv!.sections.some((s) => s.type === 'education')).toBe(false)
+
+    openInEditor(vi.fn() as never, cv.id, { addSection: 'summary' })
+    useEditor.getState().load(structuredClone(cv))
+    await Promise.resolve()
+    state = useEditor.getState()
+    expect(state.cv!.sections[0].type).toBe('summary')
+    expect(useEditorUi.getState().focusedItemId).toBe(state.cv!.sections[0].items[0].id)
+  })
+
+  it('kaydı olmayan bölüme ilk kayıt eklenir; Görünüm hedefi sekmeyi açar', async () => {
+    const cv = sampleCv()
+    const skills = cv.sections.find((s) => s.type === 'skills')!
+    skills.items = []
+    openInEditor(vi.fn() as never, cv.id, { addSection: 'skills' })
+    useEditor.getState().load(structuredClone(cv))
+    await Promise.resolve()
+    const after = useEditor.getState().cv!.sections.filter((s) => s.type === 'skills')
+    expect(after).toHaveLength(1)
+    expect(after[0].items).toHaveLength(1)
+    expect(useEditorUi.getState().focusedItemId).toBe(after[0].items[0].id)
+
+    openInEditor(vi.fn() as never, cv.id, { tab: 'appearance' })
+    useEditor.getState().load(structuredClone(cv))
+    expect(useEditorUi.getState().tab).toBe('appearance')
+  })
+
+  it('çift tıklama: yalnız son istek bekler; eksik bölüm bir kez, tek adımda eklenir', async () => {
+    const cv = sampleCv()
+    cv.sections = cv.sections.filter((s) => s.type !== 'education')
+    const navigate = vi.fn()
+    openInEditor(navigate as never, cv.id, { addSection: 'education' })
+    openInEditor(navigate as never, cv.id, { addSection: 'education' })
+    expect(navigate).toHaveBeenCalledTimes(2)
+    useEditor.getState().load(structuredClone(cv))
+    await Promise.resolve()
+    await Promise.resolve()
+    const state = useEditor.getState()
+    const edu = state.cv!.sections.filter((s) => s.type === 'education')
+    expect(edu).toHaveLength(1)
+    expect(edu[0].items).toHaveLength(1)
+    expect(state.past).toHaveLength(1)
+    expect(useEditorUi.getState().focusedItemId).toBe(edu[0].items[0].id)
+  })
+
+  it('eksik bölüm eklemesi tekrarlanınca ikinci boş kayıt eklenmez, var olan boş kayda odaklanılır', () => {
+    const cv = sampleCv()
+    const skills = cv.sections.find((s) => s.type === 'skills')!
+    skills.items = []
+    useEditor.getState().load(structuredClone(cv))
+    addMissing(cv.id, 'skills')
+    addMissing(cv.id, 'skills')
+    const state = useEditor.getState()
+    const items = state.cv!.sections.find((s) => s.type === 'skills')!.items
+    expect(items).toHaveLength(1)
+    expect(state.past).toHaveLength(1)
+    expect(useEditorUi.getState().focusedItemId).toBe(items[0].id)
   })
 })

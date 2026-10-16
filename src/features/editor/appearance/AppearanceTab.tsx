@@ -1,17 +1,23 @@
+import { DndContext, type DragEndEvent, type UniqueIdentifier } from '@dnd-kit/core'
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { Check } from 'lucide-react'
 import { useMemo, type ReactNode } from 'react'
 import { sectionTitle } from '@/cv/locale'
-import { FONT_IDS, type Cv, type TemplateSettings } from '@/cv/schema'
+import { FONT_IDS, type Cv, type CvLanguage, type Section, type TemplateSettings } from '@/cv/schema'
 import { Segmented } from '@/components/ui/Segmented'
 import { Switch } from '@/components/ui/Switch'
-import { setTemplateSetting, switchTemplate, toggleSideSection } from '@/editor/actions'
+import { moveSection, setTemplateSetting, switchTemplate, toggleSideSection } from '@/editor/actions'
 import { cn } from '@/lib/cn'
 import { m } from '@/paraglide/messages'
 import { CvFrame } from '@/render/CvFrame'
 import { FONTS } from '@/render/fonts'
 import { defaultSideSections, getTemplate, TEMPLATE_LIST, TEMPLATES, type TemplateId } from '@/render/templates'
-import { visibleSections } from '@/render/CvMarkup'
-import { TEMPLATE_TEXT } from '@/features/templates/TemplatesPage'
+import { visibleSections } from '@/render/visibleSections'
+import { TEMPLATE_TEXT } from '@/features/templates/templateText'
+import { dndScreenReaderInstructions, useDndAnnouncements } from '../content/dndA11y'
+import { useSortDnd } from '../content/keyboardSort'
+import { DragHandle } from '../content/sortable'
+import { useSortableStyle, verticalOnly } from '../content/sortableStyle'
 
 /** CV vurgu renkleri; ekran okuyucu için Türkçe adlarıyla. */
 const ACCENT_PRESETS: { color: string; name: () => string }[] = [
@@ -83,6 +89,65 @@ function TemplateChoice({ cv, id }: { cv: Cv; id: TemplateId }) {
         <p className="text-xs text-muted">{TEMPLATE_TEXT[id].layout()}</p>
       </div>
     </button>
+  )
+}
+
+function SectionOrderRow({ section, language }: { section: Section; language: CvLanguage }) {
+  const { attributes, listeners, setNodeRef, style, isDragging } = useSortableStyle(section.id)
+  const title = sectionTitle(language, section.type, section.title)
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        'flex items-center gap-1.5 bg-surface py-1.5 pr-3 pl-1.5 transition-[box-shadow,border-radius] duration-200',
+        isDragging && 'rounded-lg shadow-lg ring-1 ring-accent-line',
+      )}
+    >
+      <DragHandle label={m.ap_order_drag({ name: title })} {...attributes} {...listeners} />
+      <span className={cn('min-w-0 flex-1 truncate text-[13px]', section.hidden && 'text-muted')}>{title}</span>
+      {section.hidden && (
+        <span className="rounded-full bg-surface-2 px-1.5 py-px text-[11px] font-medium text-muted">{m.common_hidden()}</span>
+      )}
+    </li>
+  )
+}
+
+/**
+ * Bölüm sırası: İçerik sekmesindeki sürükle-bırak ile aynı eylem (moveSection), her
+ * bırakış tek geri alma adımı. Klavye: tutamakta Boşluk, oklar, Boşluk (Escape vazgeçer).
+ */
+function SectionOrder({ sections, language }: { sections: Section[]; language: CvLanguage }) {
+  const dnd = useSortDnd()
+  const announcements = useDndAnnouncements((id: UniqueIdentifier) => {
+    const s = sections.find((x) => x.id === id)
+    return s ? sectionTitle(language, s.type, s.title) : ''
+  })
+  const onDragEnd = ({ active, over }: DragEndEvent) => {
+    dnd.reset()
+    if (!over || active.id === over.id) return
+    const from = sections.findIndex((s) => s.id === active.id)
+    const to = sections.findIndex((s) => s.id === over.id)
+    if (from >= 0 && to >= 0) moveSection(from, to)
+  }
+  return (
+    <DndContext
+      sensors={dnd.sensors}
+      collisionDetection={dnd.collisionDetection}
+      modifiers={[verticalOnly]}
+      accessibility={{ announcements, screenReaderInstructions: dndScreenReaderInstructions }}
+      onDragStart={dnd.reset}
+      onDragCancel={dnd.reset}
+      onDragEnd={onDragEnd}
+    >
+      <SortableContext items={sections.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+        <ul aria-label={m.ap_order()} className="flex flex-col divide-y divide-line rounded-lg border border-line" data-section-order>
+          {sections.map((section) => (
+            <SectionOrderRow key={section.id} section={section} language={language} />
+          ))}
+        </ul>
+      </SortableContext>
+    </DndContext>
   )
 }
 
@@ -252,8 +317,8 @@ export function AppearanceTab({ cv }: { cv: Cv }) {
         </label>
       </Group>
 
-      <Group title={m.ap_order()}>
-        <p className="text-[13px] text-muted">{m.ap_order_hint()}</p>
+      <Group title={m.ap_order()} hint={m.ap_order_hint()}>
+        <SectionOrder sections={cv.sections} language={cv.language} />
       </Group>
     </div>
   )

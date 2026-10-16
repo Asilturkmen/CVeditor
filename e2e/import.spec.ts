@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'
-import { enCvPdf, fakePdf, imageOnlyPdf, trCvPdf } from './fixtures/pdfs.ts'
+import { encryptedPdf, enCvPdf, fakePdf, imageOnlyPdf, trCvPdf } from './fixtures/pdfs.ts'
 import { createCv, preview } from './helpers.ts'
 
 /** Şablonlar → Klasik → (dil) → "Eski CV'yi içe aktar" → PDF seçimi ekranı */
@@ -91,6 +91,16 @@ test('metni görsel olan PDF açık hata verir; PDF olmayan dosya da', async ({ 
 
   await pick(page, 'not.pdf', fakePdf())
   await expect(page.getByRole('alert')).toContainText('Bu dosya PDF değil')
+})
+
+test('parolalı PDF açık "parolalı" hatası verir; CV oluşturulamaz', async ({ page }) => {
+  const tr = JSON.parse(readFileSync(new URL('../messages/tr.json', import.meta.url), 'utf8')) as Record<string, string>
+  await openImport(page)
+  await pick(page, 'parolali.pdf', encryptedPdf())
+  const alert = page.getByRole('alert')
+  await expect(alert).toContainText(tr.imp_err_encrypted_title)
+  await expect(alert).toContainText(tr.imp_err_encrypted_body)
+  await expect(page.getByRole('button', { name: "CV'yi oluştur" })).toBeDisabled()
 })
 
 test('JSON Resume dışa aktarılır ve aynı dosyadan yeni CV oluşturulur', async ({ page }) => {

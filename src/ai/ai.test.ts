@@ -25,6 +25,8 @@ function sampleCv(): Cv {
 const sectionOf = (cv: Cv, type: string) => cv.sections.find((s) => s.type === type)!
 const itemsOf = (cv: Cv, type: string) => sectionOf(cv, type).items as AnyItem[]
 const rec = (item: AnyItem) => item as unknown as Record<string, unknown>
+/** Payload'un kimliksiz JSON'u: içerik araması rastgele UUID'lere takılmasın. */
+const payloadText = (payload: unknown) => JSON.stringify(payload, (key, value) => (key === 'id' || key === 'sectionId' || key === 'itemId' ? undefined : value))
 
 describe('payload: kapsam', () => {
   it('Tüm CV: görünür bölümler, gizli kayıt ve bölüm yok, tarihler yalnız bağlam', () => {
@@ -60,11 +62,15 @@ describe('payload: kapsam', () => {
 
 describe('payload: gizlilik', () => {
   it('ad hiç gitmez, iletişim alanları istekle ilgili değilse gitmez', () => {
-    const { payload } = buildEditPayload(sampleCv(), { kind: 'all' }, 'Deneyim maddelerini daha ölçülebilir yaz')
+    const cv = sampleCv()
+    const { payload } = buildEditPayload(cv, { kind: 'all' }, 'Deneyim maddelerini daha ölçülebilir yaz')
     const json = JSON.stringify(payload)
-    expect(json).not.toContain('Deniz Aksoy')
-    expect(json).not.toContain('deniz.aksoy@example.com')
-    expect(json).not.toContain('555')
+    expect(json).not.toContain(cv.personal.fullName)
+    expect(json).not.toContain(cv.personal.email)
+    expect(json).not.toContain(cv.personal.phone)
+    expect(json).not.toContain(cv.personal.location)
+    // Rakam araması kimliksiz metinde: rastgele UUID'ler "555" içerebilir.
+    expect(payloadText(payload)).not.toMatch(/555/)
     expect(Object.keys(payload.personal)).toEqual(['headline'])
   })
 
@@ -97,8 +103,10 @@ describe('payload: gizlilik', () => {
     expect(payload.placeholders).not.toContain('⟦WEBSITE⟧')
     // Geri koyma: her yazım özgün hâliyle döner.
     expect(unmask(sent)).toBe(rec(summary).content)
-    // Model metinde geçmeyen bir yer tutucu yazarsa kişisel bilgideki değer konur.
-    expect(unmask('Site: ⟦WEBSITE⟧')).toBe('Site: denizaksoy.example.com')
+    // Model metinde geçmeyen bir yer tutucu yazarsa (istek o alanla ilgili değil) geri konmaz: uydurma.
+    expect(unmask('Site: ⟦WEBSITE⟧')).toBe('Site: ⟦WEBSITE⟧')
+    // İstek web sitesiyle ilgiliyse kişisel bilgideki değer konur (o değer zaten açıkça gitti).
+    expect(buildEditPayload(cv, { kind: 'all' }, 'Web sitemi özete ekle').unmask('Site: ⟦WEBSITE⟧')).toBe('Site: denizaksoy.example.com')
     expect(unmask('⟦BILINMEYEN⟧')).toBe('⟦BILINMEYEN⟧')
     expect(hasPlaceholder(unmask('⟦BILINMEYEN⟧'))).toBe(true)
   })
@@ -145,8 +153,8 @@ describe('payload: gizlilik', () => {
     const masker = createMasker(buildContactMasks({ fullName: 'Ayşe Yılmaz' }))
     const text = 'AYŞE YILMAZ · ayşe   yılmaz · AYSE YILMAZ · Ayşe\nYılmaz · ayşe yilmaz · Kayşe Yılmazlar'
     const masked = masker.mask(text)
-    // "AYSE" (ş yok) başka yazım; sözcük içi eşleşme yok. Her yazım ayrı yer tutucu alır.
-    expect(masked).toBe('⟦NAME⟧ · ⟦NAME_2⟧ · AYSE YILMAZ · ⟦NAME_3⟧ · ⟦NAME_4⟧ · Kayşe Yılmazlar')
+    // Türkçe harfsiz yazım ("AYSE") da aynı ad; sözcük içi eşleşme yok. Her yazım ayrı yer tutucu alır.
+    expect(masked).toBe('⟦NAME⟧ · ⟦NAME_2⟧ · ⟦NAME_3⟧ · ⟦NAME_4⟧ · ⟦NAME_5⟧ · Kayşe Yılmazlar')
     expect(masker.unmask(masked)).toBe(text)
 
     const ali = createMasker(buildContactMasks({ fullName: 'Ali İnce' }))
@@ -169,7 +177,9 @@ describe('payload: gizlilik', () => {
 
     const plain = buildEditPayload(cv, { kind: 'all' }, 'Referansları düzenle')
     const sentRef = plain.payload.sections.find((s) => s.type === 'references')!.items[0]
-    expect(sentRef).toMatchObject({ name: 'Ece Kaya', position: 'Takım Lideri' })
+    // Referansın adı da maskeli gider.
+    expect(sentRef).toMatchObject({ name: '⟦REFNAME⟧', position: 'Takım Lideri' })
+    expect(JSON.stringify(plain.payload)).not.toContain('Ece Kaya')
     expect(sentRef).not.toHaveProperty('email')
     expect(sentRef).not.toHaveProperty('phone')
     expect(JSON.stringify(plain.payload)).not.toContain('ece@example.com')
@@ -199,10 +209,124 @@ describe('payload: gizlilik', () => {
 
   it('kişisel bilgi boşsa maske yok', () => {
     const cv = sampleCv()
-    cv.personal = { ...cv.personal, fullName: '', email: '', phone: '', linkedin: '', github: '', website: '' }
+    cv.personal = { ...cv.personal, fullName: '', email: '', phone: '', location: '', linkedin: '', github: '', website: '' }
     const { payload, unmask } = buildEditPayload(cv, { kind: 'all' }, 'x')
     expect(payload.placeholders).toEqual([])
     expect(unmask('aynı metin')).toBe('aynı metin')
+  })
+})
+
+describe('payload: konum ve referans maskesi', () => {
+  const summaryOf = (cv: Cv) => rec(itemsOf(cv, 'summary')[0])
+
+  it('kişinin konumu (tamamı ve parçaları) metinlerde maskelenir; ülke tek başına ve başka şehir maskelenmez', () => {
+    const cv = sampleCv() // konum: "İzmir, Türkiye"
+    summaryOf(cv).content =
+      "<p>İzmir, Türkiye'de yaşıyorum. IZMIR ve izmir merkezli ekiplerle, İstanbul'daki müşterilerle çalıştım. Türkiye'nin önde gelen ajanslarından birindeyim.</p>"
+    const { payload, unmask } = buildEditPayload(cv, { kind: 'all' }, 'Özeti düzelt')
+    const sent = payload.sections.find((s) => s.type === 'summary')!.items[0].content as string
+    expect(sent).not.toMatch(/[iİı]zm[iİı]r/i)
+    expect(sent).toContain("⟦LOCATION⟧'de yaşıyorum")
+    expect(sent).toContain("İstanbul'daki")
+    expect(sent).toContain("Türkiye'nin önde gelen")
+    expect(unmask(sent)).toBe(summaryOf(cv).content)
+    // Kaydın kendi konum alanı: kişinin şehriyle aynıysa maskeli, başka şehir olduğu gibi.
+    const exp = payload.sections.find((s) => s.type === 'experience')!
+    expect(exp.items[0].location).toMatch(/^⟦LOCATION(?:_\d+)?⟧$/)
+    expect(unmask(exp.items[0].location as string)).toBe('İzmir')
+    expect(exp.items[1].location).toBe('İstanbul')
+    // Konum istenmedikçe kişisel bilgide de yok; hiçbir yerde açık metin olarak geçmez.
+    expect(payload.personal).not.toHaveProperty('location')
+    expect(payloadText(payload)).not.toMatch(/[iİı]zm[iİı]r/i)
+    expect(payload.placeholders).toContain('⟦LOCATION⟧')
+  })
+
+  it('konum istendiğinde kişisel alanda özgün değeriyle gider; model yer tutucuyu yazarsa tam değer konur', () => {
+    const cv = sampleCv()
+    for (const type of ['experience', 'education']) for (const item of itemsOf(cv, type)) rec(item).location = ''
+    const { payload, unmask } = buildEditPayload(cv, { kind: 'all' }, 'Adresimi güncelle')
+    expect(payload.personal.location).toBe('İzmir, Türkiye')
+    expect(unmask('⟦LOCATION⟧')).toBe('İzmir, Türkiye')
+    const ops = operationsToSuggestions(cv, { operations: [{ op: 'set', target: 'personal', field: 'location', value: 'Bornova, ⟦LOCATION⟧' }] }, unmask, payload)
+    expect(ops.suggestions[0]).toMatchObject({ kind: 'field', field: 'location', after: 'Bornova, İzmir, Türkiye' })
+  })
+
+  it('açık adres: sokak, ilçe, il parçaları; Türkçe harfsiz ve büyük harfli yazım da yakalanır', () => {
+    const cv = sampleCv()
+    cv.personal.location = 'Atatürk Cad. No:5 D:3, Kadıköy/İstanbul'
+    summaryOf(cv).content = "<p>KADIKÖY'de, Kadikoy sahilinde, ATATURK CAD. NO:5 D:3 adresinde; istanbul ve İSTANBUL ofislerinde.</p>"
+    const { payload, unmask } = buildEditPayload(cv, { kind: 'all' }, 'Özeti düzelt')
+    const sent = payload.sections.find((s) => s.type === 'summary')!.items[0].content as string
+    expect(sent).not.toMatch(/kad[iı]k[oö]y|atat[uü]rk|[iİ]stanbul/i)
+    expect(unmask(sent)).toBe(summaryOf(cv).content)
+    // Stajın konumu (İstanbul) artık kişinin şehri: maskeli gider, yerelde geri konur.
+    const intern = payload.sections.find((s) => s.type === 'experience')!.items[1]
+    expect(unmask(intern.location as string)).toBe('İstanbul')
+    expect(intern.location).not.toBe('İstanbul')
+  })
+
+  it('kısa yer adı yalnız büyük harfle başlıyorsa; yalnız ülke ya da "Uzaktan" hiç maskelenmez', () => {
+    const van = createMasker(buildContactMasks({ location: 'Van' }))
+    expect(van.mask('Moved from Van; drove a van; VAN office')).toBe('Moved from ⟦LOCATION⟧; drove a van; ⟦LOCATION_2⟧ office')
+    // Yalnız genel e-posta/telefon desenleri kalır; konum maskesi yok.
+    const own = (location: string) => buildContactMasks({ location }).filter((m) => !m.generic)
+    expect(own('Türkiye')).toEqual([])
+    expect(own('Remote')).toEqual([])
+    expect(own('Uzaktan, Türkiye')).toEqual([])
+    // Ülke parçası tam değerin içinde maskelenir, tek başına değil.
+    const izmir = createMasker(buildContactMasks({ location: 'İzmir, Türkiye' }))
+    expect(izmir.mask('İzmir, Türkiye · Türkiye')).toBe('⟦LOCATION⟧ · Türkiye')
+  })
+
+  it('referans kişinin adı her yazımıyla (büyük harf, noktalı/noktasız i) maskelenir ve geri konur', () => {
+    const cv = sampleCv()
+    const refs = createSection('references', 2)
+    Object.assign(refs.items[0], { name: 'Ece Kaya', position: 'Takım Lideri', email: 'ece@example.com', phone: '+90 555 111 22 33' })
+    Object.assign(refs.items[1], { name: 'İpek Işık', position: 'Yönetici' })
+    cv.sections.push(refs)
+    summaryOf(cv).content =
+      '<p>ECE KAYA ve ece kaya ile çalıştım; İPEK IŞIK, IPEK ISIK, ipek ışık, i̇pek işik bana rehberlik etti. Ulaşmak için ece@example.com ya da 0555 111 22 33.</p>'
+    const { payload, unmask } = buildEditPayload(cv, { kind: 'all' }, 'Özeti düzelt')
+    const sent = payload.sections.find((s) => s.type === 'summary')!.items[0].content as string
+    expect(sent).not.toMatch(/ece|kaya|[iİı]pek|[iİı][sş][iİı]k|111 22 33/i)
+    expect(sent).toContain('⟦REFNAME')
+    expect(sent).toContain('⟦REFEMAIL⟧')
+    expect(sent).toContain('⟦REFPHONE⟧')
+    expect(unmask(sent)).toBe(summaryOf(cv).content)
+    const sentRefs = payload.sections.find((s) => s.type === 'references')!.items
+    expect(sentRefs.map((r) => unmask(r.name as string))).toEqual(['Ece Kaya', 'İpek Işık'])
+    expect(sentRefs.every((r) => /^⟦REFNAME(?:_\d+)?⟧$/.test(r.name as string))).toBe(true)
+    // Sözcük sınırıyla: "Beceriler" içindeki "ece" ad değildir.
+    expect(payloadText(payload)).not.toMatch(/(?<!\p{L})(?:ece|kaya|[iİı]pek|[iİı][sş][iİı]k)(?!\p{L})/iu)
+
+    // Yanıttaki yer tutucular geri konur; birden çok referans olduğu için bilinmeyen REFNAME geri konamaz → atılır.
+    const ref = refs.items[0]
+    const nameTag = sentRefs[0].name as string
+    const result = operationsToSuggestions(
+      cv,
+      {
+        operations: [
+          { op: 'set', target: ref.id, field: 'position', value: `Kıdemli Takım Lideri (${nameTag} ekibi)` },
+          { op: 'set', target: itemsOf(cv, 'summary')[0].id, field: 'content', value: '<p>⟦REFNAME_9⟧ ile çalıştım.</p>' },
+        ],
+      },
+      unmask,
+      payload,
+    )
+    expect(result.suggestions).toHaveLength(1)
+    expect(result.suggestions[0]).toMatchObject({ field: 'position', after: 'Kıdemli Takım Lideri (Ece Kaya ekibi)' })
+    expect(result.dropped).toBe(1)
+  })
+
+  it('kişinin adı büyük harf ve noktalı/noktasız i farkıyla maskelenir (düzenleme)', () => {
+    const cv = sampleCv()
+    cv.personal.fullName = 'Ayşe Yılmaz'
+    summaryOf(cv).content = '<p>AYŞE YILMAZ · Ayşe YILMAZ · ayşe yilmaz · AYŞE YİLMAZ · ayşe yi̇lmaz</p>'
+    const { payload, unmask } = buildEditPayload(cv, { kind: 'all' }, 'AYŞE YILMAZ adını özette kullanma')
+    const sent = payload.sections.find((s) => s.type === 'summary')!.items[0].content as string
+    expect(sent).not.toMatch(/ay[sş]e|y[iİı]̇?lmaz/i)
+    expect(payload.prompt).toBe('⟦NAME⟧ adını özette kullanma')
+    expect(unmask(sent)).toBe(summaryOf(cv).content)
   })
 })
 
@@ -250,6 +374,7 @@ describe('işlemler → öneriler', () => {
   it('geçerli alan önerisi: zengin metin süzülür, yer tutucu geri konur', () => {
     const cv = sampleCv()
     const item = itemsOf(cv, 'experience')[0]
+    // İstek e-postayla ilgili: metinde geçmeyen ⟦EMAIL⟧ kişisel bilgideki değerle doldurulur.
     const { suggestions, dropped } = run(cv, {
       operations: [
         {
@@ -260,7 +385,7 @@ describe('işlemler → öneriler', () => {
           reason: 'Daha net',
         },
       ],
-    })
+    }, { kind: 'all' }, 'E-posta adresimi deneyime ekle')
     expect(dropped).toBe(0)
     expect(suggestions).toHaveLength(1)
     const s = suggestions[0]

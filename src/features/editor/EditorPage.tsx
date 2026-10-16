@@ -22,7 +22,7 @@ import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from '@/components/ui/Menu'
 import { Segmented } from '@/components/ui/Segmented'
-import { toast } from '@/components/ui/Toaster'
+import { toast } from '@/components/ui/toast'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { useEditor } from '@/editor/store'
 import { useEditorUi } from '@/editor/ui'
@@ -32,14 +32,18 @@ import { ThemeToggle } from '@/features/shell/AppShell'
 import { TranslateCvDialog } from '@/features/translate/TranslateCvDialog'
 import { Wordmark } from '@/features/shell/Wordmark'
 import { cn } from '@/lib/cn'
+import { useChanged } from '@/lib/useChanged'
 import { useMediaQuery } from '@/lib/useMediaQuery'
 import { m } from '@/paraglide/messages'
-import type { CvFrameHandle } from '@/render/CvFrame'
+import { OWN_PRINT_ATTR, type CvFrameHandle } from '@/render/CvFrame'
+import { whenPrintEnds } from '@/render/printEnd'
+import { buildPrintNotice, PRINT_MIRROR_ID, warmMirrorFonts } from '@/render/printMirror'
 import { AppearanceTab } from './appearance/AppearanceTab'
 import { PromptBox } from './ai/PromptBox'
 import { PersonalForm } from './content/PersonalForm'
 import { SectionList } from './content/SectionList'
-import { oversizedLabels, PreviewPane } from './PreviewPane'
+import { oversizedLabels } from './oversizedLabels'
+import { PreviewPane } from './PreviewPane'
 
 const PANEL_KEY = 'cveditor:panelWidth'
 const PANEL_MIN = 380
@@ -184,6 +188,66 @@ function useEditorShortcuts(onPrint: () => void) {
   }, [onPrint])
 }
 
+/**
+ * Tarayıcının kendi Yazdır menüsü (Ctrl+P'yi editör zaten yakalar). beforeprint
+ * baskıyı iptal edemez ve beklemez; bu yüzden en sadık yol, o anda önizlemenin
+ * sayfalanmış kopyasını üst belgeye koymak (printMirror.ts) ve @media print'te
+ * yalnız onu basmaktır. "PDF al" ile aynı kurallar: uzun kayıt varsa CV sessizce
+ * basılmaz; baskıya kısa bir not girer ve pencere kapanınca onay penceresi açılır.
+ * Bekleyen öneri varsa da not basılır (öneri işaretleri PDF'e girmesin).
+ */
+function useBrowserMenuPrint(frameRef: React.RefObject<CvFrameHandle | null>, onNeedsConfirm: () => void) {
+  useEffect(() => {
+    let state: { host: HTMLElement; title: string; lang: string; confirm: boolean; stopWatching: () => void } | null = null
+    const cleanup = () => {
+      if (!state) return
+      state.stopWatching()
+      state.host.remove()
+      document.title = state.title
+      document.documentElement.lang = state.lang
+      state = null
+    }
+    const onBefore = () => {
+      // "PDF al" iframe'i basıyorsa ayna gerekmez.
+      if (document.documentElement.hasAttribute(OWN_PRINT_ATTR)) return
+      cleanup()
+      document.getElementById(PRINT_MIRROR_ID)?.remove()
+      const cv = useEditor.getState().cv
+      if (!cv) return
+      const ui = useEditorUi.getState()
+      const pending = ui.suggestions.length > 0
+      const confirm = !pending && ui.oversized.length > 0
+      const mirror = pending || confirm ? null : frameRef.current?.printMirror()
+      // İlk çizim bitmeden (ayna yok) editör arayüzü basılmasın: kısa not basılır.
+      const host = pending
+        ? buildPrintNotice(m.print_menu_pending())
+        : confirm
+          ? buildPrintNotice(m.print_menu_oversized())
+          : (mirror ?? buildPrintNotice(m.print_menu_not_ready()))
+      const html = document.documentElement
+      state = { host, title: document.title, lang: html.lang, confirm, stopWatching: () => {} }
+      if (mirror) {
+        document.title = printTitle(cv)
+        // Basılan belgenin dili CV dilidir (arayüz dili değil).
+        html.lang = mirror.lang || cv.language
+      }
+      document.body.append(host)
+      // afterprint gelmezse ayna, başlık ve dil sayfa yeniden odak alınca ya da etkileşimde geri alınır.
+      state.stopWatching = whenPrintEnds([window], onAfter)
+    }
+    const onAfter = () => {
+      const confirm = state?.confirm ?? false
+      cleanup()
+      if (confirm) onNeedsConfirm()
+    }
+    window.addEventListener('beforeprint', onBefore)
+    return () => {
+      window.removeEventListener('beforeprint', onBefore)
+      cleanup()
+    }
+  }, [frameRef, onNeedsConfirm])
+}
+
 function PdfConfirmDialog({
   cv,
   open,
@@ -197,9 +261,7 @@ function PdfConfirmDialog({
 }) {
   const oversized = useEditorUi((s) => s.oversized)
   const [agreed, setAgreed] = useState(false)
-  useEffect(() => {
-    if (open) setAgreed(false)
-  }, [open])
+  if (useChanged(open, false) && open) setAgreed(false)
   const labels = oversizedLabels(cv, oversized)
   return (
     <Dialog
@@ -271,7 +333,9 @@ export function EditorPage() {
   const setTab = useEditorUi((s) => s.setTab)
   const pageCount = useEditorUi((s) => s.pageCount)
   const resetUi = useEditorUi((s) => s.reset)
-  const [status, setStatus] = useState<'loading' | 'ready' | 'missing' | 'broken'>('loading')
+  // Yükleme sonucu hangi CV için: cvId değişince yenisi gelene dek 'loading'.
+  const [loaded, setLoaded] = useState<{ cvId: string; status: 'ready' | 'missing' | 'broken' } | null>(null)
+  const status = loaded?.cvId === cvId ? loaded.status : 'loading'
   const [savedPanelWidth, setSavedPanelWidth] = useState(readSavedPanelWidth)
   const viewport = useViewportWidth()
   const maxPanel = panelMax(viewport)
@@ -285,19 +349,18 @@ export function EditorPage() {
   useEffect(() => {
     let cancelled = false
     resetUi()
-    setStatus('loading')
     void getCv(cvId).then((raw) => {
       if (cancelled) return
       if (!raw) {
-        setStatus('missing')
+        setLoaded({ cvId, status: 'missing' })
         return
       }
       try {
         load(migrateCv(raw))
-        setStatus('ready')
+        setLoaded({ cvId, status: 'ready' })
       } catch (error) {
         console.error(error)
-        setStatus('broken')
+        setLoaded({ cvId, status: 'broken' })
       }
     })
     return () => {
@@ -342,6 +405,13 @@ export function EditorPage() {
   }, [doPrint])
 
   useEditorShortcuts(requestPrint)
+  const openConfirm = useCallback(() => setConfirmPdf(true), [])
+  useBrowserMenuPrint(frameRef, openConfirm)
+  // Menü baskısında aynanın yazı tipleri hazır olsun (beforeprint yüklemeyi beklemez).
+  const font = cv?.template.font
+  useEffect(() => {
+    if (font) warmMirrorFonts(font)
+  }, [font])
 
   if (status === 'missing' || status === 'broken') {
     return (

@@ -259,3 +259,43 @@
     transition-duration: 1ms !important;
   }
 }
+
+/*
+ * Tarayıcının "Yazdır" menüsü (editörde): uygulama gizlenir, yalnız CV aynası
+ * basılır (src/render/printMirror.ts). Ayna yalnız beforeprint–afterprint
+ * arasında belgededir; ekranda hiç görünmez.
+ */
+#cv-print-mirror {
+  display: none;
+}
+
+@page cv {
+  size: A4;
+  margin: 0;
+}
+
+@media print {
+  html:has(> body > #cv-print-mirror),
+  html:has(> body > #cv-print-mirror) body {
+    background: none !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  body:has(> #cv-print-mirror) > :not(#cv-print-mirror) {
+    display: none !important;
+  }
+
+  #cv-print-mirror {
+    display: block;
+    page: cv;
+  }
+
+  #cv-print-mirror[data-notice] {
+    page: auto;
+    padding: 20mm;
+    color: #1c1c1e;
+    font-size: 12pt;
+    line-height: 1.5;
+  }
+}

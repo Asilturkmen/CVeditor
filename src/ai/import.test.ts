@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { importResultToCv, parseImportDate, toRichText } from './importConvert'
-import { findDates, headingOf, heuristicImport, looksLikeName } from './importHeuristics'
+import { findDates, headingOf, heuristicImport, looksLikeName, referenceNames } from './importHeuristics'
 import {
   completeImportResult,
   detectLanguage,
   extractContacts,
   maskContacts,
   maskName,
+  maskPersonal,
   unmaskImportResult,
   unmaskText,
 } from './importText'
@@ -268,6 +269,37 @@ describe('maskeleme', () => {
       { contacts: { email: 'yerel@example.com', phone: '0532 000 00 00' }, nameHint: 'Ece Yıldırım' },
     )
     expect(out.personal).toEqual({ email: 'model@example.com', phone: '0532 000 00 00', fullName: 'Ece Yıldırım' })
+  })
+})
+
+describe('maskeleme: ad ve konum ikinci adımı (maskPersonal)', () => {
+  it('konum parçaları gövdede de maskelenir; kurallı ayrıştırma sonucu maskesiz akışla aynıdır', () => {
+    const text = `${TR_CV}\nİSTANBUL ofisinde ve istanbul ekibinde gönüllü çalıştım.`
+    const contacts = extractContacts(text)
+    const plain = maskContacts(text, contacts)
+    const masked = maskPersonal(plain, { name: 'Ece Yıldırım', location: contacts.location })
+    expect(masked.text).not.toMatch(/(?<!\p{L})(?:[iİı]stanbul|ece|yıldırım)(?!\p{L})/iu)
+    expect(unmaskText(masked.text, masked.map)).toBe(text)
+    const withNames = unmaskImportResult(heuristicImport({ text: masked.text, language: 'tr' }), masked.map)
+    const without = unmaskImportResult(heuristicImport({ text: plain.text, language: 'tr' }), plain.map)
+    expect(withNames.personal).toEqual(without.personal)
+    expect(withNames.sections.map((s) => s.type)).toEqual(without.sections.map((s) => s.type))
+  })
+
+  it('referans bölümündeki kişi adları (en iyi çaba): unvan ve kurum satırı ad sayılmaz', () => {
+    const text = [
+      'Deneyim',
+      'Mehmet Demir ile çalıştım',
+      'REFERANSLAR',
+      '• Mehmet Demir, ABC A.Ş.',
+      'Prof. Dr. Zeynep Kara – Örnek Üniversitesi',
+      'Proje Müdürü, XYZ Ltd.',
+      '⟦EMAIL_2⟧ · ⟦PHONE_2⟧',
+      'Referanslar istek üzerine verilecektir',
+      'Beceriler',
+      'Ali Veli Yazılım',
+    ].join('\n')
+    expect(referenceNames(text)).toEqual(['Mehmet Demir', 'Zeynep Kara'])
   })
 })
 

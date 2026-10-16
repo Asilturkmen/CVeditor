@@ -1,7 +1,10 @@
 import { Check } from 'lucide-react'
+import type { PdfText } from '@/ai/pdfText'
+import type { Cv } from '@/cv/schema'
 import { cn } from '@/lib/cn'
 import { m } from '@/paraglide/messages'
 import type { Keyword, KeywordMatch } from '@/review/keywords'
+import { KeywordAiMatch } from './KeywordAiMatch'
 
 function Chip({ keyword, present }: { keyword: Keyword; present: boolean }) {
   return (
@@ -38,8 +41,17 @@ function Group({ title, items, present, hint }: { title: string; items: Keyword[
   )
 }
 
-/** İlan ↔ CV anahtar kelime karşılaştırması: Eksik ve Var, önem sırasıyla. */
-export function KeywordPanel({ match }: { match: KeywordMatch }) {
+/**
+ * İlan ↔ CV anahtar kelime karşılaştırması: Eksik ve Var, önem sırasıyla.
+ * `ai` verilirse altında anlamına göre karşılaştırma (yapay zekâ) düğmesi durur.
+ */
+export function KeywordPanel({
+  match,
+  ai,
+}: {
+  match: KeywordMatch
+  ai?: { cv: Cv | null; pdf: PdfText | null; jobAd: string }
+}) {
   const total = match.present.length + match.missing.length
   return (
     <section aria-labelledby="rv-kw" className="rounded-xl border border-line bg-surface p-4">
@@ -56,6 +68,7 @@ export function KeywordPanel({ match }: { match: KeywordMatch }) {
           <Group title={m.rv_kw_present()} items={match.present} present />
         </div>
       )}
+      {ai && total > 0 && <KeywordAiMatch match={match} cv={ai.cv} pdf={ai.pdf} jobAd={ai.jobAd} />}
     </section>
   )
 }

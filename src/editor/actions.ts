@@ -29,6 +29,22 @@ export function setPersonal<K extends keyof Personal>(field: K, value: Personal[
   }, `personal:${field}`)
 }
 
+/**
+ * Fotoğraf yükleme tek geri alma adımıdır: fotoğraf ve (kapalıysa) "fotoğrafı göster"
+ * birlikte değişir. Gösterim bu adımda açıldıysa true döner.
+ */
+export function setPhoto(photo: string): boolean {
+  let turnedOn = false
+  update((d) => {
+    d.personal.photo = photo
+    if (!d.template.showPhoto) {
+      d.template.showPhoto = true
+      turnedOn = true
+    }
+  })
+  return turnedOn
+}
+
 export function setItemField(sectionId: string, itemId: string, field: string, value: unknown) {
   update((d) => {
     const item = findItem(d, sectionId, itemId)
@@ -115,10 +131,11 @@ export function moveItem(sectionId: string, from: number, to: number) {
   })
 }
 
-export function addSection(type: SectionType): string {
+/** Bölüm ekler (ilk kaydıyla); `index` verilmezse sona. */
+export function addSection(type: SectionType, index?: number): string {
   const section = createSection(type, 1)
   update((d) => {
-    d.sections.push(section as Draft<Section>)
+    d.sections.splice(index ?? d.sections.length, 0, section as Draft<Section>)
     if ((DEFAULT_SIDE_TYPES as readonly string[]).includes(type)) d.template.sideSections.push(section.id)
   })
   return section.id

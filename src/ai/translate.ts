@@ -15,8 +15,9 @@ import { AiError, TranslateResultSchema, type TranslateRequest, type TranslateRe
  * bölüm başlıkları CV diline göre zaten kendiliğinden değişir (locale.ts).
  *
  * Gizlilik (düzenleme yoluyla aynı): gizli bölüm ve kayıtlar gönderilmez
- * (yeni CV'ye çevrilmeden, olduğu gibi kopyalanır); metinlerde geçen ad ve
- * iletişim bilgileri ⟦…⟧ ile maskelenir, yanıtta yerelde geri konur. Yer
+ * (yeni CV'ye çevrilmeden, olduğu gibi kopyalanır); metinlerde geçen ad,
+ * iletişim bilgileri ve konum (verilirse referans kişiler de) ⟦…⟧ ile
+ * maskelenir, yanıtta yerelde geri konur. Yer
  * tutucusu geri konamayan alan kaynak metniyle kalır ve işaretlenir.
  *
  * Anahtar biçimi: `${itemId}:${field}`, `personal:${field}`, `section:${id}:title`.
@@ -111,7 +112,11 @@ export interface PreparedTranslation {
   sent: Map<string, string>
 }
 
-/** Sağlayıcıya gidecek istek: her metinde kişinin adı ve iletişim bilgileri maskelenir. */
+/**
+ * Sağlayıcıya gidecek istek: her metinde kişinin adı, iletişim bilgileri ve
+ * konumu maskelenir (kurallar mask.ts'te). `maskSourceOf(cv)` verilirse
+ * referans kişilerin adı ve iletişim bilgileri de maskelenir.
+ */
 export function buildTranslateRequest(from: CvLanguage, to: CvLanguage, entries: TranslationEntry[], personal: MaskSource): PreparedTranslation {
   const masker = createMasker(buildContactMasks(personal))
   const sent = new Map<string, string>()

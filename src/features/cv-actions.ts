@@ -4,7 +4,7 @@ import { createBackup } from '@/cv/migrate'
 import type { Cv } from '@/cv/schema'
 import { db } from '@/db/db'
 import { deleteCv, META_LAST_BACKUP, saveCv, setMeta } from '@/db/repo'
-import { toast } from '@/components/ui/Toaster'
+import { toast } from '@/components/ui/toast'
 import { downloadText, fileSafe, todayStamp } from '@/lib/download'
 import { m } from '@/paraglide/messages'
 

@@ -2,7 +2,7 @@ import { isItemEmpty } from '@/cv/factory'
 import { CONTACT_FIELDS, PERSONAL_TEXT_FIELDS, TEXT_FIELDS, type TextField } from '@/cv/fields'
 import { sectionTitle } from '@/cv/locale'
 import type { AnyItem, Cv, DateRange, Section, YearMonth } from '@/cv/schema'
-import { buildContactMasks, createMasker } from './mask'
+import { buildContactMasks, createMasker, maskSourceOf } from './mask'
 import type { AiScope, EditPayload } from './types'
 
 export { hasPlaceholder } from './mask'
@@ -13,11 +13,30 @@ export { hasPlaceholder } from './mask'
  * - ad soyad hiç gitmez; iletişim alanları (kişinin ve referansların) yalnız
  *   istek iletişimle ilgiliyse
  * - unvan yalnız "Tüm CV" kapsamında gider (yalnız orada değiştirilebilir)
- * - metinlerde geçen ad / e-posta / telefon / bağlantılar ⟦…⟧ yer tutucusuyla
- *   maskelenir (mask.ts); `unmask` yanıttaki yer tutucuları yerelde geri koyar.
+ * - metinlerde geçen ad (parçaları ve bağlantıdaki bitişik biçimi dahil), her
+ *   e-posta adresi ve telefon numarası, kişinin bağlantıları, konum ve referans
+ *   kişilerin adı / e-postası / telefonu ⟦…⟧ yer tutucusuyla maskelenir
+ *   (kurallar mask.ts'te); referansın ad alanı da maskeli gider. `unmask`
+ *   yanıttaki yer tutucuları yerelde geri koyar.
+ * - istekle açılan iletişim alanı (kişinin ya da referansın) özgün değeriyle
+ *   gider ki model onu görüp düzeltebilsin; metinlerdeki geçişleri yine maskeli.
+ * - yanıtta yalnız gönderilen yer tutucular geri konur; model metinde geçmeyen
+ *   bir yer tutucu uydurursa (ör. ⟦PHONE⟧) o değer atılır. İstisna: istekle
+ *   açılan kişisel iletişim alanının yer tutucusu (ör. "e-postamı ekle" →
+ *   ⟦EMAIL⟧) kişisel bilgideki değerle doldurulur; o değer zaten açıkça gitti.
  */
 
 type ContactField = (typeof CONTACT_FIELDS)[number]
+
+/** İstekle açılan iletişim alanının yer tutucusu (metinde geçmese de geri konabilir) */
+const FALLBACK_PLACEHOLDER: Record<ContactField, string> = {
+  email: '⟦EMAIL⟧',
+  phone: '⟦PHONE⟧',
+  location: '⟦LOCATION⟧',
+  website: '⟦WEBSITE⟧',
+  linkedin: '⟦LINKEDIN⟧',
+  github: '⟦GITHUB⟧',
+}
 
 // JavaScript'in \b'si yalnız ASCII harf tanır ("şehir"de çalışmaz); harf sınırı elle yazılır.
 const B = '(?<![\\p{L}\\p{N}])'
@@ -74,7 +93,8 @@ function itemPayload(
   for (const f of TEXT_FIELDS[section.type]) {
     if (!sendsContactField(f, contacts)) continue
     const value = record[f.key]
-    if (typeof value === 'string') out[f.key] = mask(value)
+    // İstekle açılan referans e-postası/telefonu özgün değeriyle gider (kişisel iletişim alanları gibi).
+    if (typeof value === 'string') out[f.key] = f.contact ? value : mask(value)
   }
   // Tarihler yalnız bağlam için (değiştirilemez alanlar).
   const range = record.dates as DateRange | undefined
@@ -90,9 +110,9 @@ function itemPayload(
 }
 
 export function buildEditPayload(cv: Cv, scope: AiScope, prompt: string): { payload: EditPayload; unmask: (s: string) => string } {
-  const masker = createMasker(buildContactMasks(cv.personal))
-  const { mask } = masker
   const contacts = contactFieldsForPrompt(prompt)
+  const masker = createMasker(buildContactMasks(maskSourceOf(cv)), { fallback: contacts.map((f) => FALLBACK_PLACEHOLDER[f]) })
+  const { mask } = masker
 
   const sections: EditPayload['sections'] = []
   for (const section of cv.sections) {

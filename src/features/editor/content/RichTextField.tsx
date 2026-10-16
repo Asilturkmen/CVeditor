@@ -3,9 +3,10 @@ import { EditorContent, useEditor, useEditorState } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { Bold, Italic, Link2, List, Unlink } from 'lucide-react'
 import { Popover } from 'radix-ui'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { Button } from '@/components/ui/Button'
-import { controlClass, Input } from '@/components/ui/Field'
+import { controlClass } from '@/components/ui/controlClass'
+import { Input } from '@/components/ui/Field'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { cn } from '@/lib/cn'
 import { m } from '@/paraglide/messages'
@@ -29,8 +30,11 @@ export function RichTextField({
   id?: string
   label: string
 }) {
+  // Düzenleyici bir kez kurulur; onUpdate her zaman en son onChange'i çağırsın.
   const onChangeRef = useRef(onChange)
-  onChangeRef.current = onChange
+  useLayoutEffect(() => {
+    onChangeRef.current = onChange
+  })
 
   const editor = useEditor({
     extensions: [

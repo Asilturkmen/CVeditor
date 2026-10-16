@@ -5,14 +5,15 @@ import {
   detectLanguage,
   extractContacts,
   maskContacts,
-  maskName,
+  maskPersonal,
   unmaskImportResult,
   type DetectedLanguage,
 } from '@/ai/importText'
 import { extractPdfText, largestLine, MAX_PDF_BYTES } from '@/ai/pdfText'
 import { getAiProvider } from '@/ai/provider'
-import { ImportResultSchema } from '@/ai/types'
+import { parseImportResult } from '@/ai/validate'
 import type { CvLanguage } from '@/cv/schema'
+import { withAiAuth } from '@/features/ai/aiAuth'
 
 export { MAX_PDF_BYTES }
 
@@ -52,9 +53,10 @@ export async function readCvPdf(
   const nameHint = largest && looksLikeName(largest) ? largest : null
   const contactMasked = maskContacts(pdf.text, contacts)
   const localName = nameHint ?? heuristicImport({ text: contactMasked.text, language }).personal.fullName
-  const masked = maskName(contactMasked, localName)
+  // Ad ve konum (parçalarıyla, metnin her yerinde) düzenlemedeki kurallarla maskelenir.
+  const masked = maskPersonal(contactMasked, { name: localName, location: contacts.location })
   const provider = getAiProvider()
-  const raw = ImportResultSchema.parse(await provider.parseImport({ text: masked.text, language }, signal))
+  const raw = parseImportResult(await withAiAuth(() => provider.parseImport({ text: masked.text, language }, signal), signal))
   const result = completeImportResult(unmaskImportResult(raw, masked.map), { contacts, nameHint })
   const detected = detectLanguage(pdf.text)
   // Geri konan ad PDF'teki yazımıyla gelir; tümü büyük harfse ("AYŞE YILMAZ") düzeltilir.

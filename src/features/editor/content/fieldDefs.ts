@@ -53,20 +53,20 @@ export const ITEM_FIELDS: Record<Exclude<SectionType, 'summary'>, FieldDef[]> = 
     { key: 'name', kind: 'text', label: () => m.f_certificate(), placeholder: () => m.ph_certificate() },
     { key: 'issuer', kind: 'text', label: () => m.f_issuer(), placeholder: () => m.ph_issuer() },
     { key: 'date', kind: 'month', label: () => m.f_date() },
-    { key: 'url', kind: 'url', label: () => m.f_url(), placeholder: () => m.ph_url() },
+    { key: 'url', kind: 'url', label: () => m.f_url(), placeholder: () => m.ph_certificate_url() },
   ],
   awards: [
     { key: 'title', kind: 'text', label: () => m.f_award(), placeholder: () => m.ph_award() },
     { key: 'issuer', kind: 'text', label: () => m.f_issuer(), placeholder: () => m.ph_issuer() },
     { key: 'date', kind: 'month', label: () => m.f_date() },
-    { key: 'description', kind: 'rich', label: () => m.f_description(), wide: true },
+    { key: 'description', kind: 'rich', label: () => m.f_description(), placeholder: () => m.ph_award_desc(), wide: true },
   ],
   volunteer: [
     { key: 'role', kind: 'text', label: () => m.f_role(), placeholder: () => m.ph_volunteer_role() },
     { key: 'organization', kind: 'text', label: () => m.f_organization(), placeholder: () => m.ph_organization() },
     { key: 'location', kind: 'text', label: () => m.f_location(), placeholder: () => m.ph_location() },
     { key: 'dates', kind: 'range', label: () => m.f_dates(), wide: true },
-    { key: 'description', kind: 'rich', label: () => m.f_description(), wide: true },
+    { key: 'description', kind: 'rich', label: () => m.f_description(), placeholder: () => m.ph_volunteer_desc(), wide: true },
   ],
   references: [
     { key: 'name', kind: 'text', label: () => m.f_full_name(), placeholder: () => m.ph_reference_name() },
@@ -81,7 +81,7 @@ export const ITEM_FIELDS: Record<Exclude<SectionType, 'summary'>, FieldDef[]> = 
     { key: 'location', kind: 'text', label: () => m.f_location(), placeholder: () => m.ph_location() },
     { key: 'url', kind: 'url', label: () => m.f_url(), placeholder: () => m.ph_url() },
     { key: 'dates', kind: 'range', label: () => m.f_dates(), wide: true },
-    { key: 'description', kind: 'rich', label: () => m.f_description(), wide: true },
+    { key: 'description', kind: 'rich', label: () => m.f_description(), placeholder: () => m.ph_custom_desc(), wide: true },
   ],
 }
 

@@ -3,8 +3,8 @@ import { memo, useRef } from 'react'
 import type { Personal } from '@/cv/schema'
 import { Button } from '@/components/ui/Button'
 import { Field, Input } from '@/components/ui/Field'
-import { toast } from '@/components/ui/Toaster'
-import { setPersonal, setTemplateSetting } from '@/editor/actions'
+import { toast } from '@/components/ui/toast'
+import { setPersonal, setPhoto } from '@/editor/actions'
 import { m } from '@/paraglide/messages'
 
 const FIELDS: { key: Exclude<keyof Personal, 'photo'>; type: string; label: () => string; placeholder: () => string; autoComplete?: string }[] = [
@@ -44,11 +44,8 @@ export const PersonalForm = memo(function PersonalForm({ personal, showPhoto }: 
       return
     }
     try {
-      setPersonal('photo', await resizePhoto(file))
-      if (!showPhoto) {
-        setTemplateSetting('showPhoto', true)
-        toast({ message: m.photo_shown_toast() })
-      }
+      // Tek geri alma adımı: Ctrl+Z fotoğrafı ve açılan gösterimi birlikte geri alır.
+      if (setPhoto(await resizePhoto(file))) toast({ message: m.photo_shown_toast() })
     } catch {
       toast({ message: m.photo_failed(), tone: 'error' })
     }

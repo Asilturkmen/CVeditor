@@ -3,24 +3,24 @@ import { Check, Link2, Loader2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { getAiProvider } from '@/ai/provider'
 import { applyToItem, buildTranslateRequest, collectItemTexts, mergeTranslations, type TranslatedEntry } from '@/ai/translate'
+import { maskSourceOf } from '@/ai/mask'
+import { parseTranslateResult } from '@/ai/validate'
 import type { AnyItem, Cv, SectionType } from '@/cv/schema'
 import { db } from '@/db/db'
 import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
 import { Segmented } from '@/components/ui/Segmented'
-import { toast } from '@/components/ui/Toaster'
+import { toast } from '@/components/ui/toast'
 import { copyItemToCv } from '@/editor/actions'
 import { useEditor } from '@/editor/store'
 import { findLinkedItem, replaceLinkedItem } from '@/features/translate/linkedItems'
-import {
-  DemoTranslateNote,
-  initialReview,
-  reviewValues,
-  TranslationReview,
-  type ReviewState,
-} from '@/features/translate/TranslationReview'
+import { initialReview, reviewValues, type ReviewState } from '@/features/translate/reviewState'
+import { DemoTranslateNote, TranslationReview } from '@/features/translate/TranslationReview'
 import { cn } from '@/lib/cn'
+import { useChanged } from '@/lib/useChanged'
 import { m } from '@/paraglide/messages'
+import { withAiAuth } from '@/features/ai/aiAuth'
+import { aiErrorMessage } from '@/features/ai/aiErrorMessage'
 import { itemLabel } from '../labels'
 
 type Step = 'pick' | 'running' | 'review' | 'error'
@@ -47,30 +47,31 @@ export function CopyToCvDialog({
   )
   const fromLanguage = useEditor((s) => s.cv?.language ?? 'tr')
   const provider = getAiProvider()
-  const [target, setTarget] = useState<string | null>(null)
+  const [chosenTarget, setTarget] = useState<string | null>(null)
+  // Seçilen CV yoksa (hiç seçilmedi ya da silindi) en son düzenlenen
+  const target = chosenTarget && others.some((c) => c.id === chosenTarget) ? chosenTarget : (others[0]?.id ?? null)
   const [translate, setTranslate] = useState(true)
   const [linkMode, setLinkMode] = useState<'update' | 'new'>('update')
   const [step, setStep] = useState<Step>('pick')
   const [entries, setEntries] = useState<TranslatedEntry[]>([])
   const [review, setReview] = useState<ReviewState>({})
   const [busy, setBusy] = useState(false)
+  const [errorText, setErrorText] = useState('')
   const controller = useRef<AbortController | null>(null)
 
-  useEffect(() => {
-    if (!payload) {
-      controller.current?.abort()
-      return
-    }
+  // Her açılışta baştan başlanır.
+  if (useChanged(payload, null) && payload) {
     setStep('pick')
     setTranslate(true)
     setLinkMode('update')
     setBusy(false)
     setEntries([])
-  }, [payload])
+  }
 
+  // Kapanınca süren çeviri isteği iptal edilir.
   useEffect(() => {
-    if (payload && (!target || !others.some((c) => c.id === target))) setTarget(others[0]?.id ?? null)
-  }, [payload, others]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!payload) controller.current?.abort()
+  }, [payload])
 
   useEffect(() => () => controller.current?.abort(), [])
 
@@ -98,6 +99,7 @@ export function CopyToCvDialog({
     } catch (error) {
       console.error(error)
       setBusy(false)
+      setErrorText(m.tr8_translate_error())
       setStep('error')
     }
   }
@@ -108,10 +110,13 @@ export function CopyToCvDialog({
     controller.current = abort
     setStep('running')
     try {
-      // Metinde geçen ad ve iletişim bilgileri kaynak CV'nin kişisel bilgileriyle maskelenir.
-      const personal = useEditor.getState().cv?.personal ?? {}
-      const prepared = buildTranslateRequest(fromLanguage, targetCv.language, translatable, personal)
-      const result = await provider.translate(prepared.request, abort.signal)
+      // Metinde geçen ad ve iletişim bilgileri (referanslarınki dahil) kaynak CV'ye göre maskelenir.
+      const current = useEditor.getState().cv
+      const masks = current ? maskSourceOf(current) : {}
+      const prepared = buildTranslateRequest(fromLanguage, targetCv.language, translatable, masks)
+      const result = parseTranslateResult(
+        await withAiAuth(() => provider.translate(prepared.request, abort.signal), abort.signal),
+      )
       if (abort.signal.aborted) return
       const merged = mergeTranslations(translatable, result, prepared)
       setEntries(merged)
@@ -120,6 +125,7 @@ export function CopyToCvDialog({
     } catch (error) {
       if (abort.signal.aborted) return
       console.error(error)
+      setErrorText(aiErrorMessage(error, m.tr8_translate_error()))
       setStep('error')
     }
   }
@@ -269,7 +275,7 @@ export function CopyToCvDialog({
           )}
           {step === 'error' && (
             <p role="alert" className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">
-              {m.tr8_translate_error()}
+              {errorText || m.tr8_translate_error()}
             </p>
           )}
 

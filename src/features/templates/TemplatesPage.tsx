@@ -1,37 +1,14 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { ArrowRight } from 'lucide-react'
-import { useMemo, useState } from 'react'
-import { createCv } from '@/cv/factory'
-import { samplePersonal, sampleSections } from '@/cv/sample'
+import { useState } from 'react'
 import { db } from '@/db/db'
 import { cn } from '@/lib/cn'
 import { m } from '@/paraglide/messages'
-import { getLocale } from '@/paraglide/runtime'
 import { CvFrame } from '@/render/CvFrame'
-import { TEMPLATE_LIST, templateSettingsFor, type TemplateDef, type TemplateId } from '@/render/templates'
+import { TEMPLATE_LIST, type TemplateDef, type TemplateId } from '@/render/templates'
 import { NewCvDialog } from './NewCvDialog'
-
-export const TEMPLATE_TEXT: Record<TemplateId, { name: () => string; description: () => string; layout: () => string }> = {
-  klasik: { name: () => m.template_klasik_name(), description: () => m.template_klasik_desc(), layout: () => m.ux_layout_default_one() },
-  modern: { name: () => m.template_modern_name(), description: () => m.template_modern_desc(), layout: () => m.ux_layout_default_two() },
-}
-
-/** Galeride gösterilen uydurma örnek CV (gerçek kişi değil). */
-export function useSampleCv(templateId: TemplateId) {
-  return useMemo(() => {
-    // Galeri örneği arayüz diliyle yazılır (dil değişince sayfa yeniden yüklenir).
-    const language = getLocale() === 'en' ? 'en' : 'tr'
-    const sections = sampleSections(language)
-    return createCv({
-      name: m.badge_sample(),
-      language,
-      templateId,
-      template: templateSettingsFor(templateId, sections),
-      personal: samplePersonal(language),
-      sections,
-    })
-  }, [templateId])
-}
+import { TEMPLATE_TEXT } from './templateText'
+import { useSampleCv } from './useSampleCv'
 
 function TemplateCard({ template, onChoose }: { template: TemplateDef; onChoose: () => void }) {
   const sample = useSampleCv(template.id)

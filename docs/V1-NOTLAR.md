@@ -2,6 +2,8 @@
 
 V1 = çalışan arayüz, A-Z. Bu dosya ne yapıldığını, senin onayını bekleyen kararları ve bilinen eksikleri anlatır. V2'ye (sunucu) geçilmedi.
 
+> **Bu dosya V1 gecesinin kaydıdır.** Sonradan yapılanlar `(sonradan yapıldı)` diye işaretli. Güncel durum: `docs/DURUM.md`.
+
 ## Nasıl denenir
 
 ```bash
@@ -35,15 +37,15 @@ PDF: editörde **PDF al** (Ctrl+P) → yazdır penceresinde "Hedef: PDF olarak k
 5. **Bir sayfadan uzun kayıt:** önizlemede de bölünmüş gösteriliyor (önizleme = PDF). Uyarı + PDF onayı senin kararındaki gibi.
 6. **Yedek hatırlatması:** hiç yedek yoksa ilk CV'den 1 gün sonra; yedek varsa 7 gün geçmiş ve yedekten sonra değişiklik yapılmışsa.
 7. **Örnek öneri üreticisi:** gerçek yapay zekâ yerine zararsız biçim düzeltmeleri yapıyor (madde başı büyük harf, nokta tutarlılığı, birkaç zayıf kalıp). Düzeltilecek bir şey yoksa özete örnek bir metin önerir. Ekranın gerçek CV'de denenebilmesi için böyle yaptım; "Örnek" rozeti taşır.
-8. **Kaydı başka CV'ye ekle** çalışıyor (çevirmeden, aynı çeviri grubuyla). "Çevirerek ekle" ve "CV'yi diğer dile çevir" V3 olarak kapalı.
-9. **Eski CV içe aktarma (V1):** PDF seçilebiliyor ama okunmuyor; örnek kayıtlar gösteriliyor. Ekranda bu açıkça yazıyor.
+8. **Kaydı başka CV'ye ekle** çalışıyor (çevirmeden, aynı çeviri grubuyla). "Çevirerek ekle" ve "CV'yi diğer dile çevir" V3 olarak kapalı. *(sonradan yapıldı: ikisi de örnek çevirmenle çalışıyor.)*
+9. **Eski CV içe aktarma (V1):** PDF seçilebiliyor ama okunmuyor; örnek kayıtlar gösteriliyor. Ekranda bu açıkça yazıyor. *(sonradan yapıldı: PDF tarayıcıda okunuyor, kayıtlar kuralla ayrılıyor.)*
 
 ## Bilinen eksikler / sonraki adımlar
 
-- **DESIGN.md yok.** Referans siteleri verince arayüzü ona göre geçeriz. Şimdiki tasarım nottaki "AI slop yasak listesi" ve animasyon ilkesine göre yapıldı.
+- **DESIGN.md yok.** Referans siteleri verince arayüzü ona göre geçeriz. Şimdiki tasarım nottaki "AI slop yasak listesi" ve animasyon ilkesine göre yapıldı. *(sonradan yapıldı: DESIGN.md taslağı var.)*
 - **PDF tek tuşla değil** (yazdır penceresi). Tek tuş V2'de (Playwright Chromium, aynı `src/render` paketi).
-- **ATS okuma sırası testi** henüz PDF metni üzerinden yapılmıyor (V2). Şimdilik DOM sırası birim testiyle doğrulanıyor.
-- **JSON Resume içe/dışa eşleyici** yazılmadı (V1 listesinde yoktu).
-- **Klavyeyle sürükleme** kod olarak açık, ama kaydırılabilir panelde ilk ok tuşu önce paneli kaydırıyor. Fareyle sorunsuz.
+- **ATS okuma sırası testi** henüz PDF metni üzerinden yapılmıyor (V2). Şimdilik DOM sırası birim testiyle doğrulanıyor. *(sonradan yapıldı: `e2e/ats.spec.ts`.)*
+- **JSON Resume içe/dışa eşleyici** yazılmadı (V1 listesinde yoktu). *(sonradan yapıldı.)*
+- **Klavyeyle sürükleme** kod olarak açık, ama kaydırılabilir panelde ilk ok tuşu önce paneli kaydırıyor. Fareyle sorunsuz. *(sonradan yapıldı.)*
 - `npm run build` ana parçası ~300 kB gzip; editör ayrı parça (~170 kB gzip).
 - Uzaktaki GitHub reposuna **push yapılmadı**; commit'ler yerelde. Public repo olduğu için önce senin bakman daha doğru. İçinde gerçek kişisel veri yok; örnek kişi uydurma (Deniz Aksoy, example.com).

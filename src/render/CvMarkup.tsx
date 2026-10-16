@@ -5,6 +5,7 @@ import { NAME_PLACEHOLDER, sectionTitle } from '@/cv/locale'
 import type { AnyItem, Cv, CvLanguage, Section } from '@/cv/schema'
 import { diffHtml, diffText } from './diff'
 import { displayUrl, isRichTextEmpty, sanitizeDiffHtml, sanitizeRichText, toHref } from './richtext'
+import { visibleSections } from './visibleSections'
 
 /**
  * CV'nin "kaynak" HTML'i. Sayfalama (paginate.ts) bu kaynaktaki blokları
@@ -376,12 +377,6 @@ function Header({ cv, ctx, placeholders }: { cv: Cv; ctx: Ctx; placeholders: boo
         <ContactList cv={cv} ctx={ctx} />
       </div>
     </header>
-  )
-}
-
-export function visibleSections(cv: Cv): Section[] {
-  return cv.sections.filter(
-    (s) => !s.hidden && (s.items as AnyItem[]).some((i) => !i.hidden && !isItemEmpty(i)),
   )
 }
 

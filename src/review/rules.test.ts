@@ -301,6 +301,199 @@ describe('reviewCv: biçim ve düzen', () => {
   })
 })
 
+// ---------------------------------------------------------------- Düzenle hedefleri
+
+/** Bulgu kimliğindeki kayıt/bölüm id'leri "*" olur: "date-inverted-*" gibi bulgu türü kalır. */
+const kind = (id: string) => id.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '*')
+
+/** Her biri birkaç kuralı tetikleyen bozuk CV'ler; birlikte bütün düzeltilecek bulgu türlerini kapsar. */
+const BROKEN: { name: string; build: () => Cv; pages?: number }[] = [
+  {
+    name: 'kişisel bilgiler eksik',
+    build: () => {
+      const cv = sampleCv()
+      Object.assign(cv.personal, { fullName: ' ', headline: '', email: '', phone: '', location: '', linkedin: '' })
+      return cv
+    },
+  },
+  {
+    name: 'kişisel bilgiler ve bağlantılar hatalı',
+    build: () => {
+      const cv = sampleCv()
+      Object.assign(cv.personal, {
+        fullName: 'Deniz  Aksoy',
+        headline: 'KIDEMLİ YAZILIM GELİŞTİRİCİ',
+        email: 'deniz@example',
+        phone: '0555 000 00 00 (akşam)',
+        website: 'benim sitem',
+        linkedin: 'github.com/deniz',
+        github: 'gitlab.com/deniz',
+      })
+      section(cv, 'projects').items[0].url = 'javascript:alert(1)'
+      return cv
+    },
+  },
+  {
+    name: 'ülke kodu yok',
+    build: () => {
+      const cv = sampleCv()
+      cv.personal.phone = '0555 000 00 00'
+      return cv
+    },
+  },
+  {
+    name: 'temel bölümler yok, gizli bölüm ve kayıt',
+    build: () => {
+      const cv = sampleCv()
+      cv.sections = cv.sections.filter((s) => !['experience', 'education', 'skills', 'summary'].includes(s.type))
+      section(cv, 'projects').hidden = true
+      section(cv, 'languages').items[0].hidden = true
+      return cv
+    },
+  },
+  {
+    name: 'başlık, tarihler',
+    build: () => {
+      const cv = sampleCv()
+      const exp = section(cv, 'experience')
+      exp.title = 'Kariyer Yolculuğum'
+      exp.items[0].dates = { start: null, end: null, current: true }
+      exp.items[1].dates = { start: { year: 2023, month: 6 }, end: null, current: false }
+      exp.items[2].dates = { start: { year: 2024, month: 1 }, end: { year: 2020, month: 1 }, current: false }
+      section(cv, 'projects').items[0].dates = { start: { year: 2024, month: 1 }, end: { year: 2020, month: 1 }, current: false }
+      section(cv, 'education').items[0].dates = { start: { year: 2020, month: null }, end: { year: 2024, month: null }, current: false }
+      return cv
+    },
+  },
+  {
+    name: 'sıra',
+    build: () => {
+      const cv = sampleCv()
+      section(cv, 'experience').items.reverse()
+      return cv
+    },
+  },
+  {
+    name: 'içerik ve biçim',
+    build: () => {
+      const cv = sampleCv()
+      section(cv, 'summary').items[0].content = `<p>${'kelime '.repeat(120)}</p>`
+      const [a, b, c] = section(cv, 'experience').items
+      a.description = ''
+      b.description = `<p>Ben ${'rezervasyon akışında form doğrulamalarını tek kütüphaneye taşıdım ve testler yazdım. '.repeat(4)}</p>`
+      b.position = 'KIDEMLİ YAZILIM GELİŞTİRİCİ'
+      b.company = 'Martı  Teknoloji'
+      c.description = `<ul><li>${'Çok uzun bir madde '.repeat(14)}</li></ul>`
+      section(cv, 'projects').items.forEach((i) => (i.description = '<ul><li>Arayüz geliştirdim.</li></ul>'))
+      return cv
+    },
+    pages: 3,
+  },
+  {
+    name: 'kısa özet, iki sayfa',
+    build: () => {
+      const cv = sampleCv()
+      section(cv, 'summary').items[0].content = '<p>Frontend geliştirici.</p>'
+      return cv
+    },
+    pages: 2,
+  },
+  {
+    name: 'iki sütun',
+    build: () => {
+      const cv = sampleCv('tr', 'modern')
+      const exp = section(cv, 'experience')
+      cv.template.sideSections.push(exp.id)
+      exp.items[0].description = `<ul>${'<li>Yan sütunda uzun bir madde, ATS sütunları karıştırırsa okunmaz.</li>'.repeat(20)}</ul>`
+      return cv
+    },
+  },
+  {
+    name: 'İngilizce iki sütunlu CV, fotoğraf',
+    build: () => {
+      const cv = sampleCv('en', 'modern')
+      cv.personal.photo = 'data:image/jpeg;base64,AAAA'
+      cv.template.showPhoto = true
+      return cv
+    },
+  },
+]
+
+describe('reviewCv: her düzeltilecek bulgunun Düzenle hedefi var', () => {
+  const all = BROKEN.flatMap(({ build, pages }) => {
+    const cv = build()
+    return review(cv, pages).map((f) => ({ cv, f }))
+  })
+
+  it('geçmeyen her bulgu editörde bir yeri hedefler', () => {
+    const missing = all.filter(({ f }) => f.severity !== 'ok' && !f.target).map(({ f }) => f.id)
+    expect(missing).toEqual([])
+  })
+
+  it('bütün bulgu türleri kapsandı', () => {
+    const kinds = new Set(all.filter(({ f }) => f.severity !== 'ok').map(({ f }) => kind(f.id)))
+    // Yeni bir kural eklenince buraya da eklenir; testteki bozuk CV'ler onu tetiklemeli.
+    const expected = [
+      'layout-side-*', 'layout-side-long', 'layout',
+      'name', 'headline', 'email', 'phone', 'location', 'link-website', 'link-linkedin', 'link-github', 'link-*', 'linkedin',
+      'title-*', 'need-experience', 'need-education', 'need-skills', 'hidden-*', 'hidden-items',
+      'date-start-*', 'date-end-*', 'date-inverted-*', 'date-order-*', 'dates-format',
+      'summary', 'empty-*', 'paragraph-*', 'long-*', 'pronoun-*', 'numbers',
+      'double-personal', 'caps-personal', 'double-*', 'caps-*', 'bullet-end', 'pages', 'photo',
+    ]
+    expect([...kinds].sort()).toEqual([...expected].sort())
+  })
+
+  it('hedefler CV\'de var olan kayıt ve bölümlere işaret eder', () => {
+    for (const { cv, f } of all) {
+      const t = f.target
+      if (!t) continue
+      if (t.sectionId) expect(cv.sections.some((s) => s.id === t.sectionId), f.id).toBe(true)
+      if (t.itemId) {
+        const owner = cv.sections.find((s) => (s.items as { id: string }[]).some((i) => i.id === t.itemId))
+        expect(owner, f.id).toBeDefined()
+        if (t.sectionId) expect(owner?.id, f.id).toBe(t.sectionId)
+      }
+    }
+  })
+
+  it('eksik bölüm: yoksa eklenir, boş ya da gizliyse var olana gidilir', () => {
+    const cv = sampleCv()
+    cv.sections = cv.sections.filter((s) => s.type !== 'education' && s.type !== 'summary')
+    const exp = section(cv, 'experience')
+    exp.hidden = true
+    const skills = section(cv, 'skills')
+    skills.items = []
+    const f = review(cv)
+    expect(byId(f, 'need-education')?.target).toEqual({ addSection: 'education' })
+    expect(byId(f, 'summary')?.target).toEqual({ addSection: 'summary' })
+    expect(byId(f, 'need-experience')?.target).toEqual({ sectionId: exp.id, itemId: exp.items[0].id })
+    expect(byId(f, 'need-skills')?.target).toEqual({ addSection: 'skills' })
+  })
+
+  it('karışık biçimlerde azınlıktaki ilk kayda gidilir; sayfa sayısı Görünüm sekmesine', () => {
+    const cv = sampleCv()
+    const edu = section(cv, 'education').items[0]
+    edu.dates = { start: { year: 2020, month: null }, end: { year: 2024, month: null }, current: false }
+    const [, b] = section(cv, 'experience').items
+    // Örnekteki maddeler noktayla biter: azınlık bu noktasız madde
+    b.description = '<ul><li>Noktasız madde</li></ul>'
+    const f = review(cv, 2)
+    expect(byId(f, 'dates-format')?.target).toEqual({ sectionId: section(cv, 'education').id, itemId: edu.id })
+    expect(byId(f, 'pages')?.target).toEqual({ tab: 'appearance' })
+    const ends = byId(f, 'bullet-end')
+    expect(ends?.severity).toBe('info')
+    expect(ends?.target?.itemId).toBe(b.id)
+  })
+})
+
+describe('reviewPdfText: hedef yok', () => {
+  it('yüklenen PDF bulgularında Düzenle hedefi olmaz', () => {
+    const f = reviewPdfText(pdf(['Deniz Aksoy', 'Deneyim', '03/2021 – Mar 2024'], 3))
+    expect(f.every((x) => !x.target)).toBe(true)
+  })
+})
+
 // ---------------------------------------------------------------- PDF
 
 function pdf(lines: (string | Partial<PdfTextLine>)[], pageCount = 1): PdfText {

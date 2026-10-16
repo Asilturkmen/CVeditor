@@ -4,7 +4,7 @@ import { useLayoutEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { cn } from '@/lib/cn'
-import { isChromium } from '@/lib/persistence'
+import { isChromium, isSafari } from '@/lib/persistence'
 import { usePrefs } from '@/lib/prefs'
 import { m } from '@/paraglide/messages'
 import { Wordmark } from './Wordmark'
@@ -86,11 +86,16 @@ function BrowserNote() {
     }
   })
   if (hidden) return null
+  // Safari ayrıca 7 gün ziyaret edilmeyen sitenin verisini silebilir (ITP): yedek hatırlatması.
+  const safari = isSafari()
   return (
     <div className="border-b border-warn/25 bg-warn-soft">
       <div className="mx-auto flex max-w-[1240px] items-center gap-3 px-6 py-2 text-[13px]">
         <Info className="size-4 shrink-0 text-warn" />
-        <p className="flex-1">{m.browser_note()}</p>
+        <p className="flex-1">
+          {m.browser_note()}
+          {safari && <span className="mt-0.5 block font-medium">{m.browser_note_safari()}</span>}
+        </p>
         <Button
           size="sm"
           variant="ghost"

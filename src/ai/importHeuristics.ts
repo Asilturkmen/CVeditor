@@ -274,6 +274,46 @@ export function looksLikeName(text: string): boolean {
   return words.every((w) => /^\p{Lu}[\p{L}'’.-]*$/u.test(w) && w.length >= 2) && !KNOWN_LANGUAGES.has(fold(words[0]))
 }
 
+/** Ad olmayan (unvan, kurum, "istek üzerine") ama ad gibi büyük harfle yazılan sözcükler (katlanmış) */
+const NOT_NAME_WORDS = new Set(
+  (
+    'mudur muduru manager engineer muhendis muhendisi director direktor direktoru lead lider lideri yonetici yoneticisi ' +
+    'uzman uzmani specialist developer gelistirici baskan baskani head ceo cto cfo coo founder kurucu kurucusu professor ' +
+    'profesor ogretim uyesi danisman danismani consultant sorumlu sorumlusu sef chief officer team takim proje project ' +
+    'senior kidemli analist analyst teknoloji technology holding as ltd sti inc llc gmbh universitesi university ' +
+    'fakultesi bolumu department sirketi company group grup yazilim software available request talep istek upon uzerine ' +
+    'referans referanslar references reference'
+  ).split(' '),
+)
+const NAME_TITLE = /^(?:prof|doç|doc|dr|av|müh|muh|mr|mrs|ms|bay|bayan|sn)\.?\s+/iu
+
+/**
+ * Yüklenen PDF'in referans bölümündeki kişi adları (en iyi çaba; inceleme
+ * isteğinde maskelemek için): "Referanslar" başlığından sonraki bölüm
+ * başlığına kadar, satırın ilk parçası ("Mehmet Demir, ABC A.Ş." → "Mehmet
+ * Demir"; "Dr." gibi unvan atılır) ad gibi görünüyorsa. Unvan ya da kurum
+ * sözcüğü içeren parça ad sayılmaz ("Proje Müdürü").
+ */
+export function referenceNames(text: string): string[] {
+  const names: string[] = []
+  let inReferences = false
+  for (const raw of text.split('\n')) {
+    const line = raw.trim()
+    if (!line) continue
+    const heading = headingOf(line)
+    if (heading) {
+      inReferences = heading.kind === 'references'
+      continue
+    }
+    if (!inReferences) continue
+    let first = line.replace(/^[•▪●◦*·-]\s*/, '').split(/\s*[,|(;]\s*|\s+[-–—]\s+/)[0].trim()
+    while (NAME_TITLE.test(first)) first = first.replace(NAME_TITLE, '')
+    const words = fold(first).replace(/\./g, '').split(/\s+/)
+    if (looksLikeName(first) && !words.some((w) => NOT_NAME_WORDS.has(w)) && !names.includes(first)) names.push(first)
+  }
+  return names
+}
+
 function joinWrapped(a: string, b: string): string {
   if (/\p{L}-$/u.test(a) && startsLower(b)) return a + b
   return `${a} ${b}`

@@ -223,7 +223,7 @@ Bileşenler `src/components/ui/` altında, elle yazılmış (Radix + Tailwind; s
 - **Seçenek kartı (`NewCvDialog` başlangıç seçimi):** radio gibi davranan kart; seçilince `border-accent bg-accent-soft`, ikonu vurguya döner, ek alanlar altında açılır.
 - **`PromptBox`:** panelin altında sabit. `rounded-xl border bg-bg` kutu, 2 satır metin, solda "Kapsam: Tüm CV ⌄" menüsü (varsayılan Tüm CV; bölüm ya da odaklı kayda daraltılır), sağda Enter ipucu ve gönder (`icon-sm primary`, ↑). Çalışırken dönen yükleyici + Durdur. Altında tek satır not + gizlilik balonu. Öneri gelince kutunun yerini **öneri listesi** alır: Tümünü reddet (`ghost`) / Tümünü kabul et (`primary`), satır başına ✕ / ✓. Öneriler CV üstünde işaretli görünür; yapay zekâ hiçbir şeyi doğrudan değiştirmez.
 - **Kaydetme göstergesi (`SaveIndicator`):** üst çubukta küçük, `faint`; kaydedilince yaylı ✓. Ayrı "Kaydet" düğmesi yok (otomatik kayıt; Ctrl+S yalnız hemen yazar).
-- **Kodla fark:** "+ Yeni CV" ve boş durum düğmesi `Link` üstüne `primary` sınıflarını elle tekrar yazıyor; `Button` sınıflarını paylaşan bir yardımcı (`buttonClass`) çıkarılmalı.
+- **Bağlantı görünümlü düğme:** "+ Yeni CV" ve boş durum düğmesi `Link` olarak kalır, sınıflarını `buttonClass()`'tan (`src/components/ui/buttonClass.ts`) alır; `Button` ile aynı görünür.
 
 ## Motion
 

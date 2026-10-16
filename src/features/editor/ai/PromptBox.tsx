@@ -1,21 +1,22 @@
 import { ArrowUp, Check, ChevronDown, Loader2, Square, X } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { buildEditPayload } from '@/ai/payload'
 import { operationsToSuggestions } from '@/ai/ops'
 import { getAiProvider } from '@/ai/provider'
-import { AiError } from '@/ai/types'
 import { parseEditResult } from '@/ai/validate'
 import { sectionTitle } from '@/cv/locale'
 import type { AnyItem, Cv } from '@/cv/schema'
 import { Button } from '@/components/ui/Button'
-import { Dialog } from '@/components/ui/Dialog'
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from '@/components/ui/Menu'
-import { toast } from '@/components/ui/Toaster'
+import { toast } from '@/components/ui/toast'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { applySuggestions, isSuggestionFresh } from '@/editor/actions'
 import { pendingMarkerCss, suggestionTargetId, useEditorUi, type AiScope, type Suggestion } from '@/editor/ui'
 import { cn } from '@/lib/cn'
 import { m } from '@/paraglide/messages'
+import { withAiAuth } from '@/features/ai/aiAuth'
+import { aiErrorMessage, isAiAbort } from '@/features/ai/aiErrorMessage'
+import { AiPayloadDialog, DemoBadge, WhatIsSentButton } from '@/features/ai/AiPayloadDialog'
 import { ITEM_FIELDS } from '../content/fieldDefs'
 import { itemLabel } from '../labels'
 
@@ -109,11 +110,7 @@ function SuggestionReview({ cv, demo }: { cv: Cv; demo: boolean }) {
       <div className="flex items-center gap-2 px-4 pt-3 pb-2">
         <p className="flex-1 text-[13px] font-semibold">
           {m.ai_review_title({ count: suggestions.length })}
-          {demo && (
-            <span className="ml-2 rounded-full bg-warn-soft px-1.5 py-px text-[11px] font-medium text-warn">
-              {m.badge_sample()}
-            </span>
-          )}
+          {demo && <DemoBadge className="ml-2" />}
         </p>
         <Button size="sm" variant="ghost" onClick={() => reject(suggestions)}>
           {m.ai_reject_all()}
@@ -170,42 +167,6 @@ function SuggestionReview({ cv, demo }: { cv: Cv; demo: boolean }) {
   )
 }
 
-/** "Ne gönderilir?": bu istek ve kapsam için sağlayıcıya gidecek verinin tamamı. */
-function PayloadDialog({ cv, scope, prompt, demo, open, onClose }: { cv: Cv; scope: AiScope; prompt: string; demo: boolean; open: boolean; onClose: () => void }) {
-  const json = useMemo(() => (open ? JSON.stringify(buildEditPayload(cv, scope, prompt).payload, null, 2) : ''), [open, cv, scope, prompt])
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => !next && onClose()}
-      title={m.ai2_payload_title()}
-      description={m.ai2_payload_desc()}
-      className="w-[min(92vw,640px)]"
-    >
-      <p className="mb-3 text-[13px] leading-relaxed text-muted">
-        {m.ai2_payload_rules()}
-        {demo && <span className="mt-1.5 block font-medium text-text">{m.ai2_payload_demo()}</span>}
-      </p>
-      <pre
-        data-testid="ai-payload"
-        className="max-h-[52vh] overflow-auto rounded-lg border border-line bg-surface-2 p-3 font-mono text-[11.5px] leading-relaxed whitespace-pre-wrap break-words text-text"
-      >
-        {json}
-      </pre>
-    </Dialog>
-  )
-}
-
-function errorMessage(error: unknown): string {
-  const code = error instanceof AiError ? error.code : 'unknown'
-  if (code === 'invalid_response') return m.ai2_error_invalid()
-  if (code === 'network') return m.ai2_error_network()
-  if (code === 'rate_limited') return m.ai2_error_rate()
-  return m.ai2_error_unknown()
-}
-
-const isAbort = (error: unknown) =>
-  (error instanceof AiError && error.code === 'aborted') || (error instanceof Error && error.name === 'AbortError')
-
 /**
  * Sağ altta sabit prompt kutusu. Kapsam varsayılanı Tüm CV; istenirse bölüm
  * ya da tek kayda daraltılır. İstek ai/ katmanından geçer: payload (yalnız
@@ -258,18 +219,18 @@ export function PromptBox({ cv }: { cv: Cv }) {
     request.current = controller
     setBusy(true)
     try {
-      const result = parseEditResult(await provider.edit(payload, controller.signal))
+      const result = parseEditResult(await withAiAuth(() => provider.edit(payload, controller.signal), controller.signal))
       if (controller.signal.aborted) return
       const { suggestions: list, dropped } = operationsToSuggestions(snapshot, result, unmask, payload)
       if (dropped > 0) toast({ message: m.ai2_dropped({ count: dropped }) })
       if (list.length === 0) {
-        toast({ message: m.ai_no_suggestions() })
+        toast({ message: provider.isDemo ? m.ai_no_suggestions_demo() : m.ai_no_suggestions() })
         return
       }
       setSuggestions(list)
       setPrompt('')
     } catch (error) {
-      if (!isAbort(error)) toast({ message: errorMessage(error), tone: 'error' })
+      if (!isAiAbort(error) && !controller.signal.aborted) toast({ message: aiErrorMessage(error), tone: 'error' })
     } finally {
       if (request.current === controller) {
         request.current = null
@@ -367,21 +328,15 @@ export function PromptBox({ cv }: { cv: Cv }) {
       </div>
       <p className="mt-1.5 flex items-center gap-1.5 px-1 text-[11.5px] text-faint">
         <span className="min-w-0 flex-1">{provider.isDemo ? m.ai_preview_note() : m.ai2_live_note()}</span>
-        <button
-          type="button"
-          onClick={() => setShowPayload(true)}
-          className="shrink-0 rounded font-medium text-muted underline decoration-line-strong underline-offset-2 transition-colors hover:text-text"
-        >
-          {m.ai2_what_is_sent()}
-        </button>
+        <WhatIsSentButton onClick={() => setShowPayload(true)} />
       </p>
-      <PayloadDialog
-        cv={cv}
-        scope={scope}
-        prompt={prompt}
-        demo={provider.isDemo}
+      <AiPayloadDialog
         open={showPayload}
         onClose={() => setShowPayload(false)}
+        build={() => buildEditPayload(cv, scope, prompt).payload}
+        description={m.ai2_payload_desc()}
+        rules={m.ai2_payload_rules()}
+        demo={provider.isDemo}
       />
     </div>
   )

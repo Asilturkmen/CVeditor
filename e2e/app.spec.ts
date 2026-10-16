@@ -200,12 +200,19 @@ test('bölüm sırası sürüklenerek değişir, önizlemeye yansır, geri alın
   await handles.first().scrollIntoViewIfNeeded()
   const from = (await handles.first().boundingBox())!
   const to = (await handles.nth(1).boundingBox())!
-  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
+  const live = (text: string) => page.locator('[id^="DndLiveRegion"]').filter({ hasText: text })
+  const x = from.x + from.width / 2
+  const y = from.y + from.height / 2
+  // Ara adımlı hareket: aralıksız tek sıçrama dnd-kit'te kaydolmayabilir. Önce eşik (4px)
+  // aşılır ve sürüklemenin başladığı duyuruyla doğrulanır, sonra hedefe yürünür.
+  await page.mouse.move(x, y)
   await page.mouse.down()
-  for (let i = 1; i <= 20; i++) {
-    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2 + ((to.y - from.y + 60) * i) / 20)
-  }
+  await page.mouse.move(x, y + 12, { steps: 4 })
+  await expect(live('Tuttun: Özet')).toHaveCount(1)
+  await page.mouse.move(x, y + (to.y - from.y) + 60, { steps: 20 })
+  await expect(live('Özet: sıra 2 /')).toHaveCount(1)
   await page.mouse.up()
+  await expect(live('Bıraktın: Özet')).toHaveCount(1)
   await expect.poll(titles).toEqual(['DENEYİM', 'ÖZET'])
   await page.keyboard.press('Control+z')
   await expect.poll(titles).toEqual(['ÖZET', 'DENEYİM'])

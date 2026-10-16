@@ -5,17 +5,19 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Cv } from '@/cv/schema'
 import { db } from '@/db/db'
 import { getMeta, META_LAST_BACKUP } from '@/db/repo'
-import { Button, buttonClass } from '@/components/ui/Button'
+import { Button } from '@/components/ui/Button'
+import { buttonClass } from '@/components/ui/buttonClass'
 import { Dialog } from '@/components/ui/Dialog'
 import { Input } from '@/components/ui/Field'
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from '@/components/ui/Menu'
 import { deleteWithUndo, duplicate, exportAllJson, exportCvJson, exportJsonResume, rename } from '@/features/cv-actions'
 import { cn } from '@/lib/cn'
+import { useChanged } from '@/lib/useChanged'
 import { daysSince, formatDateTime, relativeTime } from '@/lib/time'
 import { m } from '@/paraglide/messages'
 import { CvFrame } from '@/render/CvFrame'
 import { getTemplate } from '@/render/templates'
-import { TEMPLATE_TEXT } from '@/features/templates/TemplatesPage'
+import { TEMPLATE_TEXT } from '@/features/templates/templateText'
 
 const BACKUP_REMIND_DAYS = 7
 
@@ -84,9 +86,8 @@ function CvCard({ cv, onRename, onDelete }: { cv: Cv; onRename: () => void; onDe
 
 function RenameDialog({ cv, onClose }: { cv: Cv | null; onClose: () => void }) {
   const [value, setValue] = useState('')
-  useEffect(() => {
-    if (cv) setValue(cv.name)
-  }, [cv])
+  // Açılınca ad kutusu CV'nin güncel adıyla dolar.
+  if (useChanged(cv, null) && cv) setValue(cv.name)
   const submit = async () => {
     if (!cv) return
     await rename(cv, value)

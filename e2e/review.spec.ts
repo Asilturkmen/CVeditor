@@ -138,3 +138,78 @@ test('20 MB\'tan büyük ya da çok uzun PDF anlaşılır bir sorun olarak gör�
   await expect(page.locator('[data-finding="pdf-error-too_long"]')).toContainText('PDF çok uzun', { timeout: 20_000 })
   await expect(page.locator('[data-finding="pdf-error-too_long"]')).toContainText('30 sayfalık')
 })
+
+test("kendi CV'nde ATS'nin gördüğü metin basılacak sırayla görünür", async ({ page }) => {
+  const { cvId } = await seedBrokenCv(page)
+  await page.goto(`/inceleme?cv=${cvId}`)
+  await page.getByRole('button', { name: "ATS'nin gördüğü metin" }).click()
+  const text = page.getByTestId('ats-text')
+  await expect(text).toBeVisible()
+  await expect(page.getByText(/PDF'e basıldığında/)).toBeVisible()
+  // Örnek CV iki sayfa: metin sayfa sayfa
+  await expect(text.getByText('Sayfa 2', { exact: true })).toBeVisible()
+  const lines = (await text.locator('p.whitespace-pre-wrap').allInnerTexts()).map((l) => l.trim())
+  // Başlık, iletişim (madde işaretsiz), sonra bölümler DOM sırasıyla
+  expect(lines[0]).toBe('Deniz Aksoy')
+  expect(lines.find((l) => l.includes('deniz.aksoy@example.com'))).not.toMatch(/^•/)
+  // Basılan metin: CSS büyük harfi Türkçe kuralıyla (İ), unvan ile tarih aynı satırda geniş boşlukla
+  const heading = lines.indexOf('KARİYER YOLCULUĞUM')
+  expect(heading).toBeGreaterThan(0)
+  expect(lines).toContain('Frontend Geliştirici   Şub 2024 – Günümüz')
+  expect(lines.some((l) => l.startsWith('• Müşteri panelini React 19'))).toBe(true)
+  expect(lines.indexOf('EĞİTİM')).toBeGreaterThan(heading)
+})
+
+test('Düzenle eksik bölümü ekleyip ilk kaydına, sayfa sayısında Görünüm sekmesine gider', async ({ page }) => {
+  const { cvId } = await seedBrokenCv(page)
+  await page.evaluate(async (id) => {
+    const db = (window as unknown as { __cveditorDb: { cvs: { get: (id: string) => Promise<{ sections: { type: string }[] }>; put: (cv: unknown) => Promise<unknown> } } }).__cveditorDb
+    const cv = await db.cvs.get(id)
+    cv.sections = cv.sections.filter((s) => s.type !== 'education')
+    await db.cvs.put(cv)
+  }, cvId)
+  await page.goto(`/inceleme?cv=${cvId}`)
+  const need = page.locator('[data-finding="need-education"]')
+  await need.getByRole('button', { name: /Düzenle/ }).click()
+  await page.waitForURL(`**/editor/${cvId}`)
+  const section = page.getByRole('region', { name: 'Eğitim' })
+  await expect(section).toBeVisible()
+  await expect(section.locator('input').first()).toBeFocused()
+  await expect(section.locator('[id^="item-"]')).toHaveCount(1)
+  // Tek geri alma adımı: geri alınca bölüm gider
+  await page.keyboard.press('Escape')
+  await page.locator('body').click({ position: { x: 5, y: 5 } })
+  await page.keyboard.press('Control+z')
+  await expect(section).toHaveCount(0)
+
+  // Örnek CV iki sayfa: sayfa sayısı bulgusu Görünüm sekmesini açar
+  await page.goto(`/inceleme?cv=${cvId}`)
+  const pages = page.locator('[data-finding="pages"]')
+  await expect(pages).toContainText('CV 2 sayfa')
+  await pages.getByRole('button', { name: /Düzenle/ }).click()
+  await page.waitForURL(`**/editor/${cvId}`)
+  await expect(page.getByRole('radio', { name: 'Görünüm' })).toBeChecked()
+})
+
+test('Düzenle çift tıklanınca eksik bölüm bir kez eklenir (tek kayıt, tek geri alma adımı)', async ({ page }) => {
+  const { cvId } = await seedBrokenCv(page)
+  await page.evaluate(async (id) => {
+    const db = (window as unknown as { __cveditorDb: { cvs: { get: (id: string) => Promise<{ sections: { type: string }[] }>; put: (cv: unknown) => Promise<unknown> } } }).__cveditorDb
+    const cv = await db.cvs.get(id)
+    cv.sections = cv.sections.filter((s) => s.type !== 'education')
+    await db.cvs.put(cv)
+  }, cvId)
+  await page.goto(`/inceleme?cv=${cvId}`)
+  await page.locator('[data-finding="need-education"]').getByRole('button', { name: /Düzenle/ }).dblclick()
+  await page.waitForURL(`**/editor/${cvId}`)
+  const section = page.getByRole('region', { name: 'Eğitim' })
+  await expect(section).toBeVisible()
+  await expect(section.locator('input').first()).toBeFocused()
+  await page.waitForTimeout(300)
+  await expect(page.getByRole('region', { name: 'Eğitim' })).toHaveCount(1)
+  await expect(section.locator('[id^="item-"]')).toHaveCount(1)
+  await page.keyboard.press('Escape')
+  await page.locator('body').click({ position: { x: 5, y: 5 } })
+  await page.keyboard.press('Control+z')
+  await expect(section).toHaveCount(0)
+})

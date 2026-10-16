@@ -5,7 +5,8 @@ export const preview = (page: Page): FrameLocator => page.frameLocator('iframe[t
 /** Şablonlar ekranından yeni CV oluşturur ve editörü açar. */
 export async function createCv(
   page: Page,
-  options: { template?: 'Klasik' | 'Modern'; name?: string; language?: 'Türkçe' | 'İngilizce'; start?: 'blank' | 'sample' } = {},
+  /** `template`: şablonun arayüzdeki (Türkçe) adı, ör. "Klasik" */
+  options: { template?: string; name?: string; language?: 'Türkçe' | 'İngilizce'; start?: 'blank' | 'sample' } = {},
 ) {
   const { template = 'Klasik', name, language, start = 'blank' } = options
   await page.goto('/sablonlar')

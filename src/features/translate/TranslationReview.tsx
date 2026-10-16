@@ -1,6 +1,6 @@
 import { Info } from 'lucide-react'
 import { useState } from 'react'
-import type { TranslatedEntry, TranslationValues } from '@/ai/translate'
+import type { TranslatedEntry } from '@/ai/translate'
 import { stripHtml } from '@/cv/factory'
 import { sectionTitle } from '@/cv/locale'
 import type { AnyItem, CvLanguage, Section } from '@/cv/schema'
@@ -13,39 +13,13 @@ import { sanitizeRichText } from '@/render/richtext'
 import { RichTextField } from '@/features/editor/content/RichTextField'
 import { ITEM_FIELDS } from '@/features/editor/content/fieldDefs'
 import { itemLabel } from '@/features/editor/labels'
+import type { ReviewRow, ReviewState } from './reviewState'
 
 /**
  * Çeviri onay listesi: her alan önce → sonra, kaydetmeden önce satır içinde
  * düzeltilebilir; "Çevirme" anahtarı alanı kaynaktaki gibi bırakır.
  * CV çevirisi ve kayıt düzeyinde çeviri aynı bileşeni kullanır.
  */
-
-export interface ReviewRow {
-  value: string
-  keep: boolean
-}
-export type ReviewState = Record<string, ReviewRow>
-
-export function initialReview(entries: TranslatedEntry[]): ReviewState {
-  return Object.fromEntries(entries.map((e) => [e.key, { value: e.translated, keep: false }]))
-}
-
-/** Onaylanan son metinler: "Çevirme" seçilen alan kaynak metniyle kalır. */
-export function reviewValues(entries: TranslatedEntry[], state: ReviewState): TranslationValues {
-  return Object.fromEntries(
-    entries.map((e) => {
-      const row = state[e.key]
-      return [e.key, !row || row.keep ? e.text : row.value]
-    }),
-  )
-}
-
-export function changedCount(entries: TranslatedEntry[], state: ReviewState): number {
-  return entries.filter((e) => {
-    const row = state[e.key]
-    return row && !row.keep && row.value !== e.text
-  }).length
-}
 
 function fieldLabel(entry: TranslatedEntry): string {
   if (!entry.sectionType) return entry.field === 'headline' ? m.f_headline() : entry.field

@@ -1,7 +1,7 @@
 import { useNavigate } from '@tanstack/react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { ArrowLeft, Braces, Copy, FileText, FileUp } from 'lucide-react'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { createCv, defaultSections, duplicateCv } from '@/cv/factory'
 import type { Cv, CvLanguage, Section } from '@/cv/schema'
 import { db } from '@/db/db'
@@ -11,11 +11,12 @@ import { Dialog } from '@/components/ui/Dialog'
 import { Field, Input, Select } from '@/components/ui/Field'
 import { Segmented } from '@/components/ui/Segmented'
 import { cn } from '@/lib/cn'
+import { useChanged } from '@/lib/useChanged'
 import { m } from '@/paraglide/messages'
 import { getTemplate, templateSettingsFor, type TemplateId } from '@/render/templates'
 import { ImportPreview, type ImportSelection } from '@/features/import/ImportPreview'
 import { JsonResumeImport } from '@/features/import/JsonResumeImport'
-import { TEMPLATE_TEXT } from './TemplatesPage'
+import { TEMPLATE_TEXT } from './templateText'
 
 type Step = 'details' | 'start' | 'import'
 type StartMode = 'blank' | 'import' | 'copy' | 'json'
@@ -88,27 +89,24 @@ export function NewCvDialog({ templateId, onClose }: { templateId: TemplateId | 
   const [name, setName] = useState<string>(defaultName('tr'))
   const [nameTouched, setNameTouched] = useState(false)
   const [mode, setMode] = useState<StartMode>('blank')
-  const [copyFrom, setCopyFrom] = useState<string>('')
+  const [chosenCopyFrom, setCopyFrom] = useState<string>('')
+  // Seçilmediyse en son düzenlenen CV
+  const copyFrom = chosenCopyFrom || (cvs[0]?.id ?? '')
   const [importSelection, setImportSelection] = useState<ImportSelection | null>(null)
   const [jsonSelection, setJsonSelection] = useState<ImportSelection | null>(null)
   const [busy, setBusy] = useState(false)
 
-  useEffect(() => {
-    if (templateId) {
-      setStep('details')
-      setLanguage('tr')
-      setName(defaultName('tr'))
-      setNameTouched(false)
-      setMode('blank')
-      setImportSelection(null)
-      setJsonSelection(null)
-      setBusy(false)
-    }
-  }, [templateId])
-
-  useEffect(() => {
-    if (!copyFrom && cvs.length > 0) setCopyFrom(cvs[0].id)
-  }, [cvs, copyFrom])
+  // Her şablon seçiminde baştan başlanır.
+  if (useChanged(templateId, null) && templateId) {
+    setStep('details')
+    setLanguage('tr')
+    setName(defaultName('tr'))
+    setNameTouched(false)
+    setMode('blank')
+    setImportSelection(null)
+    setJsonSelection(null)
+    setBusy(false)
+  }
 
   if (!templateId) return null
   const template = getTemplate(templateId)

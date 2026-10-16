@@ -1,5 +1,6 @@
 import type { CvLanguage } from '@/cv/schema'
-import { buildContactMasks, createMasker } from './mask'
+import { buildContactMasks, createMasker, EMAIL_RE, phonesIn, type ReferenceMaskSource } from './mask'
+import { CITIES, COUNTRIES, fold } from './places'
 import type { ImportResult } from './types'
 
 /**
@@ -17,78 +18,25 @@ export interface ExtractedContacts {
   location?: string
 }
 
-/** Karşılaştırma için katlama: Türkçe büyük/küçük harf ve aksanlar tek biçime iner ("DENEYİM" → "deneyim"). */
-export function fold(value: string): string {
-  return value
-    .replace(/[İIı]/g, 'i')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
-}
+export { fold }
+export { EMAIL_RE, phonesIn }
 
 // ---------------------------------------------------------------- Kalıplar
 
-export const EMAIL_RE = /[\p{L}\d._%+-]+@[\p{L}\d.-]+\.[a-z]{2,}/giu
 const LINKEDIN_RE = /(?:https?:\/\/)?(?:[a-z]{2,3}\.)?linkedin\.com\/(?:in|pub)\/[\p{L}\d%_.-]+\/?/giu
 const GITHUB_RE = /(?:https?:\/\/)?(?:www\.)?github\.com\/[\w-]+(?:\/[\w.-]+)?\/?/gi
 const URL_RE =
   /(?:https?:\/\/)?(?:www\.)?(?:[a-z\d](?:[a-z\d-]*[a-z\d])?\.)+(?:com|net|org|dev|io|me|app|co|tr|info|xyz|site|tech|design|page|blog|art|studio|online|eu|de|uk)(?:\.[a-z]{2})?(?:\/[^\s,;|)⟧]*)?/gi
-/** +90 532 123 45 67 · 0532 123 45 67 · (0532) 123-45-67 · +1 (415) 555-0132 · +44 20 7946 0958 */
-const PHONE_RE = /(?:\+\d{1,3}[\s.-]?)?(?:\(\d{1,4}\)[\s.-]?)?\d{2,4}(?:[\s.-]?\d{2,4}){1,4}/g
-
-function isPhone(candidate: string, before: string): boolean {
-  const digits = candidate.replace(/\D/g, '')
-  if (digits.length < 10 || digits.length > 15) return false
-  // Tarih aralığı ya da yıl dizisi değil: "2019 - 2023 2024"
-  if (/^(?:19|20)\d{2}\b/.test(candidate) && !candidate.startsWith('+')) return false
-  if (/[\p{L}\d]$/u.test(before)) return false
-  const start = candidate.trimStart()[0]
-  return start === '+' || start === '(' || start === '0' || (digits.length === 10 && digits.startsWith('5'))
-}
 
 /** Satır sonunda bölünmüş bağlantıları birleştirir: "linkedin.com/in/ada-" + "yilmaz". */
 export function joinWrappedUrls(text: string): string {
   return text.replace(/((?:linkedin|github)\.com\/\S*[-/_])\n(?=[\w-]+(?:\n|$))/gi, '$1')
 }
 
-export function phonesIn(text: string): string[] {
-  const out: string[] = []
-  for (const match of text.matchAll(PHONE_RE)) {
-    const value = match[0].trim()
-    const before = text.slice(Math.max(0, match.index - 1), match.index)
-    if (isPhone(value, before)) out.push(value)
-  }
-  return out
-}
-
 const cleanUrl = (value: string) => value.replace(/[.,;:)]+$/, '').replace(/\/$/, '')
 const stripProtocol = (value: string) => cleanUrl(value).replace(/^https?:\/\//i, '').replace(/^www\./i, '')
 
 // ---------------------------------------------------------------- Konum
-
-const CITIES = new Set(
-  [
-    'istanbul', 'ankara', 'izmir', 'bursa', 'antalya', 'kocaeli', 'eskisehir', 'konya', 'adana', 'gaziantep',
-    'kayseri', 'trabzon', 'samsun', 'mersin', 'diyarbakir', 'sakarya', 'tekirdag', 'denizli', 'manisa', 'mugla',
-    'aydin', 'balikesir', 'edirne', 'canakkale', 'malatya', 'erzurum', 'van', 'hatay', 'sivas', 'bolu', 'duzce',
-    'isparta', 'afyonkarahisar', 'kutahya', 'zonguldak', 'rize', 'ordu', 'giresun', 'elazig', 'sanliurfa',
-    'mardin', 'batman', 'kahramanmaras', 'osmaniye', 'nevsehir', 'aksaray', 'karaman', 'yalova', 'bodrum',
-    'gebze', 'kadikoy', 'besiktas', 'sisli', 'uskudar', 'atasehir', 'maslak', 'levent', 'cankaya', 'bornova',
-    'lefkosa', 'girne', 'magusa', 'baku', 'london', 'berlin', 'munich', 'munih', 'hamburg', 'frankfurt',
-    'amsterdam', 'rotterdam', 'paris', 'madrid', 'barcelona', 'lisbon', 'dublin', 'vienna', 'viyana', 'zurich',
-    'stockholm', 'oslo', 'copenhagen', 'helsinki', 'warsaw', 'prague', 'budapest', 'brussels', 'milan', 'rome',
-    'new york', 'san francisco', 'seattle', 'boston', 'austin', 'chicago', 'los angeles', 'toronto', 'vancouver',
-    'dubai', 'doha', 'singapore', 'tokyo', 'sydney', 'manchester', 'edinburgh', 'cambridge', 'oxford',
-    'remote', 'uzaktan', 'hybrid', 'hibrit',
-  ],
-)
-const COUNTRIES = new Set([
-  'turkiye', 'turkey', 'kktc', 'trnc', 'germany', 'almanya', 'united kingdom', 'uk', 'ingiltere', 'netherlands',
-  'hollanda', 'usa', 'us', 'united states', 'abd', 'canada', 'kanada', 'france', 'fransa', 'spain', 'ispanya',
-  'italy', 'italya', 'ireland', 'irlanda', 'austria', 'avusturya', 'switzerland', 'isvicre', 'sweden', 'isvec',
-  'norway', 'denmark', 'finland', 'poland', 'portugal', 'belgium', 'azerbaijan', 'azerbaycan', 'uae', 'bae',
-  'qatar', 'katar', 'japan', 'australia',
-])
 
 /** "İstanbul", "İstanbul, Türkiye", "Berlin, Germany", "Remote" gibi parçalar. */
 export function looksLikeLocation(part: string): boolean {
@@ -270,8 +218,22 @@ export function maskContacts(input: string, contacts: ExtractedContacts = {}): M
  * tutucu alır (⟦NAME_2⟧), geri koyma kayıpsızdır.
  */
 export function maskName(masked: MaskedText, name: string | null | undefined): MaskedText {
-  if (!name?.trim()) return masked
-  const masker = createMasker(buildContactMasks({ fullName: name }))
+  return maskPersonal(masked, { name })
+}
+
+/**
+ * `maskContacts`'tan sonra ikinci adım: ad, konum ve referans kişilerin adı
+ * düzenlemedeki kurallarla (mask.ts) maskelenir: ad parçaları ve bağlantıdaki
+ * bitişik ad, konumun parçaları ("İstanbul ofisinde"), Türkçe büyük/küçük ve
+ * harfsiz yazım. Önceki adımın yer tutucuları korunur, çakışmaz.
+ */
+export function maskPersonal(
+  masked: MaskedText,
+  source: { name?: string | null; location?: string; references?: ReferenceMaskSource[] },
+): MaskedText {
+  if (!source.name?.trim() && !source.location?.trim() && !source.references?.length) return masked
+  const masks = buildContactMasks({ fullName: source.name ?? '', location: source.location, references: source.references })
+  const masker = createMasker(masks, { reserved: Object.keys(masked.map) })
   const text = masker.mask(masked.text)
   return { text, map: { ...masked.map, ...masker.map() } }
 }
@@ -282,8 +244,14 @@ function escapeRe(value: string) {
 
 const PLACEHOLDER_RE = /⟦[A-Z]+(?:_\d+)?⟧/g
 
+/** İçe aktarma: bilinmeyen (uydurma) yer tutucu silinir; alan boş kalır. */
 export function unmaskText(text: string, map: Record<string, string>): string {
   return text.replace(PLACEHOLDER_RE, (ph) => map[ph] ?? '')
+}
+
+/** Bilinen yer tutucuları geri koyar; bilinmeyen olduğu gibi kalır (çağıran `hasPlaceholder` ile yakalayıp atar). */
+export function restoreText(text: string, map: Record<string, string>): string {
+  return text.replace(PLACEHOLDER_RE, (ph) => map[ph] ?? ph)
 }
 
 /** Sağlayıcı yanıtındaki bütün metinlerde yer tutucuları yerelde asıl değerlere çevirir. */

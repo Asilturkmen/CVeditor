@@ -1,8 +1,11 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { Cv } from '@/cv/schema'
+import { readingText, type ReadingText } from './atsText'
 import type { SuggestionMap } from './CvMarkup'
 import { FONTS } from './fonts'
 import { paginate, type PaginateResult } from './paginate'
+import { whenPrintEnds } from './printEnd'
+import { buildPrintMirror, shadowCopyOfPages } from './printMirror'
 import { createRenderGate } from './renderGate'
 import { cvStyles, documentShell, renderCvSource } from './renderCv'
 
@@ -18,7 +21,15 @@ export interface CvFrameTarget {
 
 export interface CvFrameHandle {
   print: (title: string) => Promise<void>
+  /** Tarayıcı menüsünden yazdırma için son çizimin kopyası (bkz. printMirror.ts) */
+  printMirror: () => HTMLElement | null
 }
+
+/** "PDF al" iframe'i yazdırırken üst belgede işaret: menü baskısı aynası devreye girmesin. */
+export const OWN_PRINT_ATTR = 'data-cv-own-print'
+
+/** Menü baskısı aynasının son çizimden ne kadar sonra hazırlanacağı (yazarken her tuşta kurulmasın). */
+const MIRROR_DELAY_MS = 250
 
 interface Props {
   cv: Cv
@@ -36,6 +47,8 @@ interface Props {
   /** Değişince eski görünüm yenisinin üstünde solar (şablon/sütun geçişi) */
   crossfadeKey?: string
   onResult?: (result: PaginateResult) => void
+  /** Her çizimden sonra basılacak metin, okunma sırasıyla (CV İnceleme) */
+  onReadingText?: (text: ReadingText) => void
   onTargetClick?: (target: CvFrameTarget) => void
   onScaleChange?: (scale: number) => void
   className?: string
@@ -63,6 +76,7 @@ export const CvFrame = forwardRef<CvFrameHandle, Props>(function CvFrame(
     flash = null,
     crossfadeKey,
     onResult,
+    onReadingText,
     onTargetClick,
     onScaleChange,
     className,
@@ -81,13 +95,30 @@ export const CvFrame = forwardRef<CvFrameHandle, Props>(function CvFrame(
   const [containerWidth, setContainerWidth] = useState(0)
   const pageCountRef = useRef(0)
   const [gate] = useState(createRenderGate)
-  const callbacks = useRef({ onResult, onTargetClick })
-  callbacks.current = { onResult, onTargetClick }
+  const callbacks = useRef({ onResult, onReadingText, onTargetClick })
   // Vurgu ve parlama yeniden çizim gerektirmez; her çizimden sonra da yeniden uygulanır.
   const marks = useRef({ focusedItemId, flash, flashDone: 0 })
-  marks.current.focusedItemId = focusedItemId
-  marks.current.flash = flash
+  // Son değerler her işlemeden sonra, aşağıdaki efektlerden (ve rAF'teki çizimden) önce yazılır.
+  useLayoutEffect(() => {
+    callbacks.current = { onResult, onReadingText, onTargetClick }
+    marks.current.focusedItemId = focusedItemId
+    marks.current.flash = flash
+  })
   const lastCrossfadeKey = useRef(crossfadeKey)
+  // Menü baskısının aynası her çizimden kısa süre sonra hazırlanır (bkz. printMirror.ts):
+  // baskı anında (beforeprint beklemez) fotoğraf gibi görseller çözülmüş olur.
+  const drawCount = useRef(0)
+  const mirror = useRef<{ host: HTMLElement | null; draw: number }>({ host: null, draw: -1 })
+  const mirrorTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  // "PDF al" baskısı sürerken: pencere kapanınca başlığı ve işareti geri alır.
+  const endPrint = useRef<(() => void) | null>(null)
+  useEffect(
+    () => () => {
+      clearTimeout(mirrorTimer.current)
+      endPrint.current?.()
+    },
+    [],
+  )
 
   // İskelet bir kez yazılır; içerik sonradan değişir (titreme olmasın diye).
   const srcDoc = useMemo(() => documentShell({ lang: cv.language, title }), []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -150,7 +181,17 @@ export const CvFrame = forwardRef<CvFrameHandle, Props>(function CvFrame(
     const pagesEl = doc.getElementById('cv-pages')!
     setContentHeight(firstPageOnly ? PAGE_HEIGHT_PX : pagesEl.scrollHeight)
     gate.complete(token)
+    const drawn = ++drawCount.current
+    if (!firstPageOnly) {
+      clearTimeout(mirrorTimer.current)
+      mirrorTimer.current = setTimeout(() => {
+        const current = iframeRef.current?.contentDocument
+        if (drawCount.current !== drawn || !current) return
+        mirror.current = { host: buildPrintMirror(current), draw: drawn }
+      }, MIRROR_DELAY_MS)
+    }
     callbacks.current.onResult?.(result)
+    callbacks.current.onReadingText?.(readingText(doc))
   }, [cv, suggestions, interactive, placeholders, emptyHint, firstPageOnly, crossfadeKey, gate])
 
   const render = useCallback(() => gate.track(draw()), [draw, gate])
@@ -187,6 +228,32 @@ export const CvFrame = forwardRef<CvFrameHandle, Props>(function CvFrame(
     return () => doc.removeEventListener('click', onClick)
   }, [ready, loadCount, interactive])
 
+  // Odak önizlemedeyken kısayollar (Ctrl+P, Ctrl+Z, Ctrl+S…) üst pencerenin dinleyicilerine
+  // iletilir: iframe ayrı bir belge, tuş olayları üste kabarmaz. Betiksiz sandbox'ta dinleyiciyi
+  // üst pencere kurar; kopya olayda engellenen varsayılan asıl olayda da engellenir.
+  useEffect(() => {
+    const doc = iframeRef.current?.contentDocument
+    if (!ready || !doc) return
+    const onKey = (event: KeyboardEvent) => {
+      if (!event.ctrlKey && !event.metaKey) return
+      const copy = new KeyboardEvent('keydown', {
+        key: event.key,
+        code: event.code,
+        ctrlKey: event.ctrlKey,
+        metaKey: event.metaKey,
+        shiftKey: event.shiftKey,
+        altKey: event.altKey,
+        repeat: event.repeat,
+        bubbles: true,
+        cancelable: true,
+      })
+      window.dispatchEvent(copy)
+      if (copy.defaultPrevented) event.preventDefault()
+    }
+    doc.addEventListener('keydown', onKey, true)
+    return () => doc.removeEventListener('keydown', onKey, true)
+  }, [ready, loadCount])
+
   useImperativeHandle(
     ref,
     () => ({
@@ -200,17 +267,40 @@ export const CvFrame = forwardRef<CvFrameHandle, Props>(function CvFrame(
         await gate.settled()
         // Geçiş kopyası baskıya girmesin (CSS'te de @media print ile gizli).
         doc.getElementById(GHOST_ID)?.remove()
+        // Önceki baskının penceresi kapanmış sayılır (geri alma bekliyorsa şimdi yapılır).
+        endPrint.current?.()
         const previousTitle = document.title
         doc.title = printTitle
         document.title = printTitle
         doc.body.classList.remove('interactive')
-        try {
-          win.focus()
-          win.print()
-        } finally {
+        document.documentElement.setAttribute(OWN_PRINT_ATTR, '')
+        // print() çoğu tarayıcıda pencere kapanana dek bekler ama her yerde değil: başlık ve
+        // işaret hemen değil, baskı bitince (afterprint, ya da yeniden odak/etkileşim) geri alınır.
+        let stopWatching = () => {}
+        const restore = () => {
+          stopWatching()
+          if (endPrint.current === restore) endPrint.current = null
+          document.documentElement.removeAttribute(OWN_PRINT_ATTR)
           document.title = previousTitle
           doc.body.classList.toggle('interactive', interactive)
         }
+        endPrint.current = restore
+        stopWatching = whenPrintEnds([win, window], restore)
+        try {
+          win.focus()
+          win.print()
+        } catch (error) {
+          restore()
+          throw error
+        }
+      },
+      printMirror() {
+        const doc = iframeRef.current?.contentDocument
+        if (!doc) return null
+        // Son çizimden hazırlanmış ayna varsa o (görselleri çözülmüş); yoksa şimdi kurulur.
+        const built = mirror.current
+        if (built.host && built.draw === drawCount.current) return built.host
+        return buildPrintMirror(doc)
       },
     }),
     [render, interactive, gate],
@@ -289,23 +379,13 @@ const FADE_MS = 220
  */
 function snapshotForCrossfade(doc: Document) {
   doc.getElementById(GHOST_ID)?.remove()
-  const pages = doc.getElementById('cv-pages')
-  if (!pages || !pages.firstElementChild) return
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-  const css = (doc.getElementById('cv-styles')?.textContent ?? '') + (doc.getElementById('cv-host')?.textContent ?? '')
   const host = doc.createElement('div')
   host.id = GHOST_ID
   host.setAttribute('aria-hidden', 'true')
   host.inert = true
   host.style.cssText = `position:absolute;inset:0 0 auto 0;z-index:10;pointer-events:none;opacity:1;transition:opacity ${FADE_MS}ms cubic-bezier(0.2,0.7,0.2,1)`
-  const root = host.attachShadow({ mode: 'open' })
-  const style = doc.createElement('style')
-  // :root değişkenleri ve body yazı ayarları gölge kökte :host üzerinden okunur; sayfa giriş animasyonu kopyada istenmez.
-  style.textContent = `${css.replace(/:root/g, ':host')}
-:host{display:block;color:var(--ink);font-family:var(--font);font-size:var(--fs);line-height:var(--lh);-webkit-font-smoothing:antialiased;font-kerning:normal;overflow-wrap:break-word}
-.page-enter{animation:none}`
-  root.append(style, pages.cloneNode(true))
-  doc.body.append(host)
+  if (shadowCopyOfPages(doc, host)) doc.body.append(host)
 }
 
 /**

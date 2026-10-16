@@ -13,15 +13,17 @@ import { Segmented } from '@/components/ui/Segmented'
 import { Switch } from '@/components/ui/Switch'
 import { cn } from '@/lib/cn'
 import { m } from '@/paraglide/messages'
+import type { ReadingText } from '@/render/atsText'
 import { CvFrame } from '@/render/CvFrame'
 import { getTemplate } from '@/render/templates'
-import { TEMPLATE_TEXT } from '@/features/templates/TemplatesPage'
+import { TEMPLATE_TEXT } from '@/features/templates/templateText'
 import { matchJobAd } from '@/review/keywords'
 import { pdfErrorFinding, reviewCv, reviewPdfText, type Finding } from '@/review/rules'
 import { cvPlainText } from '@/review/text'
 import { FindingGroups, SeverityCounts } from './FindingList'
 import { KeywordPanel } from './KeywordPanel'
 import { openInEditor } from './openInEditor'
+import { ReviewAiCard } from './ReviewAiCard'
 
 const AD_KEY = 'cveditor:reviewAd'
 
@@ -83,8 +85,9 @@ function Collapsible({
 type PdfState =
   | { status: 'idle' }
   | { status: 'reading'; name: string }
-  | { status: 'ready'; name: string; pdf: PdfText }
-  | { status: 'error'; name: string; finding: Finding }
+  // file: her seçilen dosyada artar (aynı adla yeniden yüklenen dosya da ayrı kaynaktır)
+  | { status: 'ready'; name: string; file: number; pdf: PdfText }
+  | { status: 'error'; name: string; file: number; finding: Finding }
 
 function PdfSource({ state, onFile }: { state: PdfState; onFile: (file: File) => void }) {
   const input = useRef<HTMLInputElement>(null)
@@ -168,11 +171,13 @@ function MyCvSource({
   cv,
   onSelect,
   onPageCount,
+  onReadingText,
 }: {
   cvs: Cv[]
   cv: Cv | null
   onSelect: (id: string) => void
   onPageCount: (count: number) => void
+  onReadingText: (text: ReadingText) => void
 }) {
   const pages = useRef('')
   const [pageCount, setPageCount] = useState(0)
@@ -226,6 +231,8 @@ function MyCvSource({
                 setPageCount(r.pageCount)
                 onPageCount(r.pageCount)
               }}
+              // Küçük resim yalnız ilk sayfayı gösterir ama bütün sayfalar çizilir; metin hepsinden okunur.
+              onReadingText={onReadingText}
             />
           </Link>
           <div className="min-w-0 pt-0.5">
@@ -256,8 +263,11 @@ function MyCvSource({
   )
 }
 
-/** "ATS'nin gördüğü metin": PDF'ten okunan satırlar, okunma sırasıyla, sayfa sayfa. */
-function ExtractedText({ pdf }: { pdf: PdfText }) {
+/**
+ * "ATS'nin gördüğü metin", okunma sırasıyla, sayfa sayfa: yüklenen PDF'te
+ * PDF'ten okunan satırlar, kendi CV'nde basılacak metin (src/render/atsText.ts).
+ */
+function ExtractedText({ pdf, hint }: { pdf: PdfText | ReadingText; hint: string }) {
   const pages = useMemo(() => {
     const byPage = new Map<number, string[]>()
     for (const l of pdf.lines) byPage.set(l.page, [...(byPage.get(l.page) ?? []), l.text])
@@ -265,7 +275,7 @@ function ExtractedText({ pdf }: { pdf: PdfText }) {
   }, [pdf])
   return (
     <>
-      <p className="mb-3 text-[13px] text-muted">{m.rv_text_hint()}</p>
+      <p className="mb-3 text-[13px] text-muted">{hint}</p>
       <div
         tabIndex={0}
         aria-label={m.rv_text_title()}
@@ -301,6 +311,7 @@ export function ReviewPage() {
   const [textOpen, setTextOpen] = useState(false)
   const [showPassed, setShowPassed] = useState(true)
   const [pages, setPages] = useState<{ cvId: string; count: number } | null>(null)
+  const [cvText, setCvText] = useState<{ cvId: string; text: ReadingText } | null>(null)
   const deferredAd = useDeferredValue(ad)
   const readToken = useRef(0)
   const readAbort = useRef<AbortController | null>(null)
@@ -335,17 +346,17 @@ export function ReviewPage() {
     readAbort.current = controller
     setTextOpen(false)
     if (file.size > MAX_PDF_BYTES) {
-      setPdfState({ status: 'error', name: file.name, finding: pdfErrorFinding('too_large') })
+      setPdfState({ status: 'error', name: file.name, file: token, finding: pdfErrorFinding('too_large') })
       return
     }
     setPdfState({ status: 'reading', name: file.name })
     try {
       const pdf = await extractPdfText(await file.arrayBuffer(), { signal: controller.signal })
-      if (token === readToken.current) setPdfState({ status: 'ready', name: file.name, pdf })
+      if (token === readToken.current) setPdfState({ status: 'ready', name: file.name, file: token, pdf })
     } catch (error) {
       if (token !== readToken.current || controller.signal.aborted) return
       const code = error instanceof PdfTextError ? error.code : 'unreadable'
-      setPdfState({ status: 'error', name: file.name, finding: pdfErrorFinding(code) })
+      setPdfState({ status: 'error', name: file.name, file: token, finding: pdfErrorFinding(code) })
     }
   }
 
@@ -366,7 +377,9 @@ export function ReviewPage() {
     [deferredAd, sourceText, cv?.language],
   )
 
-  const sourceKey = mode === 'mine' ? `cv-${cv?.id ?? ''}` : `pdf-${pdfState.status === 'ready' ? pdfState.name : pdfState.status}`
+  // Kaynak değişince (başka CV, başka dosya) sonuç alanı yeniden kurulur: yapay zekâ sonuçları eski kaynaktan kalmaz.
+  const sourceKey =
+    mode === 'mine' ? `cv-${cv?.id ?? ''}` : `pdf-${pdfState.status === 'ready' || pdfState.status === 'error' ? pdfState.file : pdfState.status}`
 
   return (
     <div className="animate-fade-in">
@@ -399,6 +412,7 @@ export function ReviewPage() {
                   cv={cv}
                   onSelect={(id) => void navigate({ to: '/inceleme', search: { cv: id }, replace: true })}
                   onPageCount={(count) => cv && setPages({ cvId: cv.id, count })}
+                  onReadingText={(text) => cv && setCvText({ cvId: cv.id, text })}
                 />
               )
             ) : (
@@ -446,7 +460,12 @@ export function ReviewPage() {
                 </label>
               </div>
 
-              {match && <KeywordPanel match={match} />}
+              {match && (
+                <KeywordPanel
+                  match={match}
+                  ai={{ cv: mode === 'mine' ? cv : null, pdf: mode === 'pdf' && pdfState.status === 'ready' ? pdfState.pdf : null, jobAd: deferredAd }}
+                />
+              )}
 
               <FindingGroups
                 findings={findings}
@@ -456,16 +475,22 @@ export function ReviewPage() {
 
               {mode === 'pdf' && pdfState.status === 'ready' && (
                 <Collapsible open={textOpen} onOpenChange={setTextOpen} title={m.rv_text_title()}>
-                  <ExtractedText pdf={pdfState.pdf} />
+                  <ExtractedText pdf={pdfState.pdf} hint={m.rv_text_hint()} />
+                </Collapsible>
+              )}
+              {mode === 'mine' && cv && cvText?.cvId === cv.id && (
+                <Collapsible open={textOpen} onOpenChange={setTextOpen} title={m.rv_text_title()}>
+                  <ExtractedText pdf={cvText.text} hint={m.rv_text_hint_cv()} />
                 </Collapsible>
               )}
 
-              <section aria-labelledby="rv-ai" className="rounded-xl border border-dashed border-line-strong px-4 py-3.5">
-                <h2 id="rv-ai" className="text-[15px] font-semibold tracking-tight">
-                  {m.rv_ai_title()}
-                </h2>
-                <p className="mt-1 text-[13px] text-muted">{m.rv_ai_body()}</p>
-              </section>
+              <ReviewAiCard
+                cv={mode === 'mine' ? cv : null}
+                pdf={mode === 'pdf' && pdfState.status === 'ready' ? pdfState.pdf : null}
+                // Ertelenmemiş ilan: "Ne gönderilir?" ve gönderim yazılan metnin son hâlini kullanır.
+                jobAd={ad}
+                onEdit={mode === 'mine' && cv ? (target) => openInEditor(navigate, cv.id, target) : undefined}
+              />
             </div>
           )}
         </div>

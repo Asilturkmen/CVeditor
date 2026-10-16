@@ -1,8 +1,10 @@
+import { readFileSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'
 import { createCv, patchCv, preview } from './helpers.ts'
 import {
   flowText,
   fontReport,
+  joinItems,
   orderProblem,
   pdfText,
   renderPreviewPdf,
@@ -21,15 +23,50 @@ import {
 
 interface Layout {
   label: string
-  template: 'Klasik' | 'Modern'
-  columns: 1 | 2
+  /** Şablonun kimliği (src/render/templates.ts) */
+  id: string
+  /** Arayüzdeki (Türkçe) adı; şablon seçme düğmesi bununla bulunur */
+  template: string
+  columns: number
 }
 
-const LAYOUTS: Layout[] = [
-  { label: 'Klasik tek sütun', template: 'Klasik', columns: 1 },
-  { label: 'Klasik iki sütun', template: 'Klasik', columns: 2 },
-  { label: 'Modern iki sütun', template: 'Modern', columns: 2 },
-]
+/*
+ * Matris = her şablon × şemanın izin verdiği her sütun sayısı. Liste kaynaktan okunur
+ * (templates.ts'teki TEMPLATE_LIST, schema.ts'teki columns birleşimi); yeni şablon ya da
+ * sütun seçeneği kendiliğinden kapsanır. Okumanın doğruluğu aşağıda tarayıcıdaki gerçek
+ * modüllerle karşılaştırılır ("matris kaynakla eşleşiyor").
+ */
+const source = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8')
+
+function parsedTemplateIds(): string[] {
+  const list = /TEMPLATE_LIST\b[^=]*=\s*\[([^\]]*)\]/.exec(source('src/render/templates.ts'))
+  const ids = [...(list?.[1] ?? '').matchAll(/TEMPLATES\.(\w+)/g)].map((m) => m[1])
+  if (ids.length === 0) throw new Error('templates.ts içinde TEMPLATE_LIST okunamadı; ats.spec.ts ayrıştırıcısını güncelle')
+  return ids
+}
+
+function parsedColumnOptions(): number[] {
+  const union = /columns:\s*z\.union\(\[([^\]]*)\]\)/.exec(source('src/cv/schema.ts'))
+  const options = [...(union?.[1] ?? '').matchAll(/z\.literal\((\d+)\)/g)].map((m) => Number(m[1]))
+  if (options.length === 0) throw new Error('schema.ts içinde columns seçenekleri okunamadı; ats.spec.ts ayrıştırıcısını güncelle')
+  return options
+}
+
+const TR_MESSAGES = JSON.parse(source('messages/tr.json')) as Record<string, string>
+const TEMPLATE_IDS = parsedTemplateIds()
+const COLUMN_OPTIONS = parsedColumnOptions()
+const COLUMN_LABEL: Record<number, string> = { 1: 'tek sütun', 2: 'iki sütun' }
+
+const LAYOUTS: Layout[] = TEMPLATE_IDS.flatMap((id) => {
+  const template = TR_MESSAGES[`template_${id}_name`]
+  if (!template) throw new Error(`messages/tr.json içinde template_${id}_name yok`)
+  return COLUMN_OPTIONS.map((columns) => ({
+    label: `${template} ${COLUMN_LABEL[columns] ?? `${columns} sütun`}`,
+    id,
+    template,
+    columns,
+  }))
+})
 
 const POSITIONS = [
   ['Frontend Geliştirici', 'Şub 2024 – Günümüz', 'Lacivert Yazılım · İzmir'],
@@ -96,15 +133,21 @@ async function storedColumns(page: Page, id: string) {
 }
 
 /** Görünüm sekmesinden sütun sayısını değiştirir (canlı önizleme, yeniden yüklemeden). */
-async function switchColumns(page: Page, columns: 1 | 2) {
+async function switchColumns(page: Page, columns: number) {
+  const radio = { 1: 'Tek sütun', 2: 'İki sütun' }[columns]
+  if (!radio) throw new Error(`${columns} sütun için Görünüm sekmesindeki seçenek adı ats.spec.ts'e eklenmeli`)
   await page.getByRole('radio', { name: 'Görünüm' }).click()
-  await page.getByRole('radio', { name: columns === 2 ? 'İki sütun' : 'Tek sütun', exact: true }).click()
+  await page.getByRole('radio', { name: radio, exact: true }).click()
 }
 
-async function openSample(page: Page, layout: Layout): Promise<string> {
+async function openSample(page: Page, layout: Layout, patch?: string): Promise<string> {
   const id = await createCv(page, { template: layout.template, start: 'sample' })
-  const twoNow = (await preview(page).locator('.col-side').count()) > 0
-  if ((layout.columns === 2) !== twoNow) {
+  if (patch) {
+    await patchCv(page, id, patch)
+    await page.reload()
+  }
+  await page.waitForFunction(() => '__cveditorDb' in window)
+  if ((await storedColumns(page, id)) !== layout.columns) {
     await switchColumns(page, layout.columns)
     // Düzen testleri geçiş animasyonundan bağımsız olsun: kaydedilince temiz yükle
     // (geçişin kendisi aşağıda ayrı testte).
@@ -113,7 +156,8 @@ async function openSample(page: Page, layout: Layout): Promise<string> {
     await page.reload()
   }
   await settledPageCount(page)
-  await expect(preview(page).locator('.col-side')).toHaveCount(layout.columns === 2 ? 1 : 0)
+  await expect(preview(page).locator('#cv-pages > .page').first().locator('.col-side')).toHaveCount(layout.columns > 1 ? 1 : 0)
+  await expect(preview(page).locator('#cv-pages')).toHaveClass(new RegExp(`\\btpl-${layout.id}\\b.*\\bcols-${layout.columns}\\b`))
   return id
 }
 
@@ -137,8 +181,184 @@ function headerBottom(pages: PdfPage[]) {
   return Math.max(...tops) + 1.5
 }
 
+/**
+ * Çizilmiş CV'nin (önizleme iframe'indeki #cv-pages) hesaplanmış stillerini ATS kurallarına
+ * göre tarar: harf aralığı ≤ 0.05em, `order` yok, `*-reverse` yok, metin taşıyan öğe
+ * `position:absolute/fixed` değil, ::before/::after harf/rakam üretmiyor.
+ */
+async function styleAudit(page: Page) {
+  return preview(page)
+    .locator('html')
+    .evaluate((html) => {
+      const doc = html.ownerDocument
+      const win = doc.defaultView!
+      const root = doc.getElementById('cv-pages')!
+      const describe = (el: Element) =>
+        `${el.tagName.toLowerCase()}${[...el.classList].map((c) => `.${c}`).join('')} "${(el.textContent ?? '').trim().slice(0, 40)}"`
+      const ownText = (el: Element) => [...el.childNodes].some((n) => n.nodeType === Node.TEXT_NODE && n.textContent?.trim())
+      const problems = { letterSpacing: [] as string[], order: [] as string[], reverse: [] as string[], absolute: [] as string[], pseudoText: [] as string[] }
+      let textElements = 0
+      let maxSpacingEm = -Infinity
+      for (const el of [root, ...root.querySelectorAll('*')]) {
+        const cs = win.getComputedStyle(el)
+        if (ownText(el)) {
+          textElements++
+          const fontSize = parseFloat(cs.fontSize)
+          const spacing = cs.letterSpacing === 'normal' ? 0 : parseFloat(cs.letterSpacing)
+          const em = spacing / fontSize
+          maxSpacingEm = Math.max(maxSpacingEm, em)
+          // Hesaplanmış px değeri yuvarlanabilir: 0.05em'e küçük pay.
+          if (!(em <= 0.0505)) problems.letterSpacing.push(`${describe(el)}: ${cs.letterSpacing} / ${cs.fontSize} = ${em.toFixed(4)}em`)
+        }
+        if (cs.order !== '0') problems.order.push(`${describe(el)}: order ${cs.order}`)
+        if (/reverse/.test(cs.flexDirection) || /reverse/.test(cs.flexWrap)) {
+          problems.reverse.push(`${describe(el)}: ${cs.flexDirection} ${cs.flexWrap}`)
+        }
+        if ((cs.position === 'absolute' || cs.position === 'fixed') && (el.textContent ?? '').trim()) {
+          problems.absolute.push(`${describe(el)}: position ${cs.position}`)
+        }
+        for (const pseudo of ['::before', '::after']) {
+          const content = win.getComputedStyle(el, pseudo).content
+          if (content && content !== 'none' && content !== 'normal' && /[\p{L}\p{N}]/u.test(content)) {
+            problems.pseudoText.push(`${describe(el)}${pseudo}: ${content}`)
+          }
+        }
+      }
+      return { textElements, maxSpacingEm, problems }
+    })
+}
+
+/**
+ * Her önizleme sayfasındaki işaret metinleri DOM sırasıyla (kayıt başlıkları, satır
+ * etiketleri, maddeler, bölüm başlıkları) ve sayfanın görünen metni (innerText: CSS büyük
+ * harfi uygulanmış, gizli öğeler hariç).
+ */
+async function previewPagesContent(page: Page) {
+  return preview(page)
+    .locator('html')
+    .evaluate((html) =>
+      [...html.ownerDocument.querySelectorAll<HTMLElement>('#cv-pages > .page')].map((p) => ({
+        markers: [...p.querySelectorAll<HTMLElement>('.section-title, .entry-title, .line-label, .rich li')]
+          .map((el) => el.innerText.replace(/\s+/g, ' ').trim())
+          .filter(Boolean),
+        text: p.innerText,
+        splitParts: p.querySelectorAll('.entry.is-split').length,
+        continuedParts: p.querySelectorAll('.entry.is-continued').length,
+      })),
+    )
+}
+
+/**
+ * Önizleme = PDF, sayfa sayfa: PDF'in i. sayfasında önizlemenin i. sayfasındaki işaretler
+ * aynı sırayla var; hiçbir işaret önizlemede bulunmadığı sayfada PDF'te belirmiyor (ve tersi).
+ */
+async function expectPagesMatch(page: Page) {
+  const previewCount = await settledPageCount(page)
+  const content = await previewPagesContent(page)
+  expect(content).toHaveLength(previewCount)
+  const pdfPages = await pdfText(await renderPreviewPdf(page))
+  expect(pdfPages, 'PDF sayfa sayısı önizlemeyle aynı').toHaveLength(content.length)
+  const pdfTexts = pdfPages.map((p) => squash(joinItems(p.items)))
+  const all = [...new Set(content.flatMap((c) => c.markers.map(squash)))]
+  for (const [i, c] of content.entries()) {
+    expect(c.markers.length, `önizleme sayfası ${i + 1}'de işaret yok`).toBeGreaterThan(0)
+    expect(orderProblem(pdfTexts[i], c.markers.map(squash)), `PDF sayfa ${i + 1}: önizleme sayfasının sırası`).toBeNull()
+    const previewText = squash(c.text)
+    for (const marker of all) {
+      expect(pdfTexts[i].includes(marker), `"${marker}" önizleme sayfası ${i + 1}'de ${previewText.includes(marker) ? 'var' : 'yok'}, PDF'te tersi`).toBe(
+        previewText.includes(marker),
+      )
+    }
+  }
+  return content
+}
+
+/** Örnek CV'ye 8 ek deneyim kaydı (her biri 3 madde): 2-3 sayfa. */
+const LONG_CV = `const exp = cv.sections.find((s) => s.type === 'experience');
+  const base = exp.items[0];
+  for (let i = 1; i <= 8; i++) {
+    const n = String(i).padStart(2, '0');
+    exp.items.push({
+      ...structuredClone(base),
+      id: 'ek-kayit-' + n,
+      translationGroupId: 'ek-grup-' + n,
+      position: 'Ek Görev ' + n,
+      company: 'Örnek Şirket ' + n,
+      description: '<ul>' + [1, 2, 3].map((k) => '<li>Görev ' + n + ' maddesi ' + k + ' ölçülebilir bir sonucu kısaca anlatır.</li>').join('') + '</ul>',
+    });
+  }`
+
+const OVERSIZED_BULLETS = Array.from({ length: 70 }, (_, i) => `Madde ${i + 1} sonucu ölçülebilir biçimde anlatır.`)
+/** Stajyer kaydı bir sayfadan uzun (70 madde): maddeler arasından bölünür. */
+const OVERSIZED_CV = `const exp = cv.sections.find((s) => s.type === 'experience');
+  exp.items[1].description = '<ul>' + ${JSON.stringify(OVERSIZED_BULLETS)}.map((b) => '<li>' + b + '</li>').join('') + '</ul>';`
+
+test('ATS matrisi kaynakla eşleşiyor: her şablon × her sütun seçeneği', async ({ page }) => {
+  await page.goto('/sablonlar')
+  const live = await page.evaluate(async ([templatesUrl, schemaUrl]) => {
+    const templates = await import(/* @vite-ignore */ templatesUrl)
+    const schema = await import(/* @vite-ignore */ schemaUrl)
+    const columns = schema.TemplateSettingsSchema.shape.columns
+    return {
+      ids: (templates.TEMPLATE_LIST as { id: string }[]).map((t) => t.id),
+      columns: Array.from({ length: 10 }, (_, n) => n).filter((n) => columns.safeParse(n).success),
+    }
+  }, ['/src/render/templates.ts', '/src/cv/schema.ts'])
+  expect(live.ids).toEqual(TEMPLATE_IDS)
+  expect(live.columns).toEqual(COLUMN_OPTIONS)
+  expect(LAYOUTS).toHaveLength(live.ids.length * live.columns.length)
+  // Her şablon galeride seçilebilir (matris bu adlarla CV açar).
+  for (const layout of LAYOUTS) await expect(page.getByRole('button', { name: `${layout.template} şablonunu seç` })).toBeVisible()
+})
+
 for (const layout of LAYOUTS) {
   test.describe(`ATS PDF — ${layout.label}`, () => {
+    test('harf aralığı her metin öğesinde ≤ 0.05em', async ({ page }) => {
+      // pdf.js/pdfminer ~0.1em üstü harf aralığını kelime boşluğu sayar; kural 0.05em.
+      await openSample(page, layout, LONG_CV)
+      const { textElements, maxSpacingEm, problems } = await styleAudit(page)
+      expect(textElements, 'taranan metin öğesi').toBeGreaterThan(40)
+      expect(problems.letterSpacing).toEqual([])
+      // Tarama boş değil: bölüm başlıklarının 0.05em'i görülüyor.
+      expect(maxSpacingEm).toBeGreaterThan(0)
+    })
+
+    test('okuma sırasını bozan stil yok: order, *-reverse, metinde position:absolute, ::before/::after metni', async ({ page }) => {
+      await openSample(page, layout, LONG_CV)
+      const { problems } = await styleAudit(page)
+      expect(problems.order, 'CSS order').toEqual([])
+      expect(problems.reverse, 'flex *-reverse').toEqual([])
+      expect(problems.absolute, 'metin taşıyan öğede position:absolute/fixed').toEqual([])
+      expect(problems.pseudoText, '::before/::after ile üretilen metin').toEqual([])
+    })
+
+    test('önizleme = PDF sayfa sayfa: her sayfada aynı kayıtlar aynı sırayla (2-3 sayfalık CV)', async ({ page }) => {
+      test.slow() // CV aç + yamala + (gerekirse) sütun değiştir + yeniden yükle + PDF bas
+      await openSample(page, layout, LONG_CV)
+      const content = await expectPagesMatch(page)
+      expect(content.length, 'uzun CV 2-3 sayfa olmalı').toBeGreaterThanOrEqual(2)
+      expect(content.length, 'uzun CV 2-3 sayfa olmalı').toBeLessThanOrEqual(3)
+      // Kayıtlar sığdığı için hiçbiri bölünmedi; her ek kayıt tek sayfada.
+      expect(content.reduce((n, c) => n + c.splitParts, 0)).toBe(0)
+      for (let i = 1; i <= 8; i++) {
+        const title = `Ek Görev ${String(i).padStart(2, '0')}`
+        expect(content.filter((c) => c.markers.includes(title)), `"${title}" tam bir sayfada`).toHaveLength(1)
+      }
+    })
+
+    test('önizleme = PDF sayfa sayfa: maddeler arasından bölünen uzun kayıt', async ({ page }) => {
+      test.slow()
+      await openSample(page, layout, OVERSIZED_CV)
+      await expect(page.getByRole('alert')).toContainText('1 kayıt bir sayfadan uzun')
+      const content = await expectPagesMatch(page)
+      expect(content.length).toBeGreaterThan(1)
+      // Kayıt gerçekten bölündü: devam parçası var ve maddeler sayfalara dağıldı.
+      expect(content.reduce((n, c) => n + c.continuedParts, 0)).toBeGreaterThan(0)
+      const bulletPages = content.map((c) => OVERSIZED_BULLETS.filter((b) => c.markers.includes(b)).length)
+      expect(bulletPages.filter((n) => n > 0).length, 'maddeler en az iki sayfada').toBeGreaterThan(1)
+      expect(bulletPages.reduce((a, b) => a + b, 0), 'her madde tam bir kez').toBe(OVERSIZED_BULLETS.length)
+    })
+
     test('metin seçilebilir; Türkçe karakterler, tarihler ve pozisyonlar doğru çıkar', async ({ page }) => {
       await openSample(page, layout)
       const { pages, pdf } = await printed(page)

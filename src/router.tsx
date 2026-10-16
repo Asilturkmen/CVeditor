@@ -1,9 +1,9 @@
-import { createRootRoute, createRoute, createRouter, lazyRouteComponent, Navigate, Outlet } from '@tanstack/react-router'
-import { useLiveQuery } from 'dexie-react-hooks'
+import { createRootRoute, createRoute, createRouter, lazyRouteComponent, Outlet } from '@tanstack/react-router'
 import { Toaster } from '@/components/ui/Toaster'
 import { TooltipProvider } from '@/components/ui/Tooltip'
-import { db } from '@/db/db'
+import { AiAuthDialog } from '@/features/ai/AiAuthDialog'
 import { AppShell } from '@/features/shell/AppShell'
+import { HomeRedirect } from '@/features/shell/HomeRedirect'
 import { CvListPage } from '@/features/cv-list/CvListPage'
 import { TemplatesPage } from '@/features/templates/TemplatesPage'
 import { NotFound } from '@/features/shell/NotFound'
@@ -13,17 +13,11 @@ const rootRoute = createRootRoute({
     <TooltipProvider delayDuration={350}>
       <Outlet />
       <Toaster />
+      <AiAuthDialog />
     </TooltipProvider>
   ),
   notFoundComponent: NotFound,
 })
-
-/** Ana sayfa: hiç CV yoksa Şablonlar, varsa CV'lerim. */
-function HomeRedirect() {
-  const count = useLiveQuery(() => db.cvs.count())
-  if (count === undefined) return null
-  return <Navigate to={count === 0 ? '/sablonlar' : '/cvler'} replace />
-}
 
 const indexRoute = createRoute({ getParentRoute: () => rootRoute, path: '/', component: HomeRedirect })
 

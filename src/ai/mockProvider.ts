@@ -4,8 +4,9 @@ import type { CvLanguage, SectionType } from '@/cv/schema'
 import { isRichTextEmpty } from '@/render/richtext'
 import { m } from '@/paraglide/messages'
 import { heuristicImport } from './importHeuristics'
+import { mockMatchKeywords, mockReview } from './mockReview'
 import { mockTranslate } from './mockTranslate'
-import { AiError, type AiProvider, type EditOperation, type EditPayload, type EditResult } from './types'
+import { AiError, type AiErrorCode, type AiProvider, type EditOperation, type EditPayload, type EditResult } from './types'
 
 /**
  * ÖRNEK SAĞLAYICI — gerçek yapay zekâ değildir, hiçbir yere istek atmaz.
@@ -213,10 +214,71 @@ function delay<T>(value: () => T, ms: number, signal: AbortSignal): Promise<T> {
   })
 }
 
+// ---------------------------------------------------------------- Deneme bayrakları
+
+/**
+ * Yalnız denemek için (uçtan uca testler ve elle deneme): localStorage'daki
+ * `cveditor:mockAi` JSON'u örnek sağlayıcıyı gerçek sunucu gibi davrandırır.
+ *   { "password": "deneme" }  → parola ister; doğru parola girilene dek her çağrı 'unauthorized'
+ *   { "fail": "rate_limited" } → her çağrı bu hata koduyla döner
+ *   { "malformed": true }     → her çağrı şemaya uymayan bir yanıt döndürür (doğrulama hatası)
+ * Bayrak yoksa (varsayılan) parola istenmez, hata üretilmez.
+ */
+export const MOCK_FLAGS_KEY = 'cveditor:mockAi'
+
+interface MockFlags {
+  password?: string
+  fail?: AiErrorCode
+  /** Yanıt şemaya uymayan bir nesne olur (doğrulama yolunu denemek için) */
+  malformed?: boolean
+}
+
+function mockFlags(): MockFlags {
+  try {
+    const raw = localStorage.getItem(MOCK_FLAGS_KEY)
+    return raw ? (JSON.parse(raw) as MockFlags) : {}
+  } catch {
+    return {}
+  }
+}
+
+/** Örnek oturum: doğru parola girilince açılır (gerçekte HttpOnly çerez). */
+let session = false
+
+/** Testler için: örnek oturumu kapatır. */
+export function resetMockSession() {
+  session = false
+}
+
+function guarded<T>(value: () => T): () => T {
+  return () => {
+    const flags = mockFlags()
+    if (flags.password && !session) throw new AiError('Parola gerekli', 'unauthorized')
+    if (flags.fail) throw new AiError(`Örnek hata: ${flags.fail}`, flags.fail)
+    if (flags.malformed) return { bozuk: 'yanıt' } as unknown as T
+    return value()
+  }
+}
+
 export const mockProvider: AiProvider = {
   id: 'mock',
   isDemo: true,
-  edit: (payload, signal) => delay(() => mockEdit(payload), 900, signal),
-  translate: (request, signal) => delay(() => mockTranslate(request), 700, signal),
-  parseImport: (request, signal) => delay(() => heuristicImport(request), 600, signal),
+  get requiresAuth() {
+    return !!mockFlags().password
+  },
+  authenticate: (password, signal) =>
+    delay(
+      () => {
+        const expected = mockFlags().password
+        if (expected && password !== expected) throw new AiError('Parola yanlış', 'unauthorized')
+        session = true
+      },
+      400,
+      signal,
+    ),
+  edit: (payload, signal) => delay(guarded(() => mockEdit(payload)), 900, signal),
+  translate: (request, signal) => delay(guarded(() => mockTranslate(request)), 700, signal),
+  parseImport: (request, signal) => delay(guarded(() => heuristicImport(request)), 600, signal),
+  review: (request, signal) => delay(guarded(() => mockReview(request)), 900, signal),
+  matchKeywords: (request, signal) => delay(guarded(() => mockMatchKeywords(request)), 700, signal),
 }

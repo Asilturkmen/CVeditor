@@ -1,12 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // pdfjs yerine sahte belge: sayfa sayısı ve okunan sayfalar denetlenebilsin.
-const fake = vi.hoisted(() => ({ numPages: 1, read: [] as number[], destroyed: 0, onPage: null as null | ((p: number) => void) }))
+const fake = vi.hoisted(() => ({
+  numPages: 1,
+  read: [] as number[],
+  destroyed: 0,
+  onPage: null as null | ((p: number) => void),
+  /** Belge açılırken pdfjs'in fırlattığı hata (ör. parolalı PDF'te PasswordException) */
+  openError: null as null | Error,
+}))
 
 vi.mock('pdfjs-dist', () => ({
   GlobalWorkerOptions: {},
   getDocument: () => ({
-    promise: Promise.resolve({
+    promise: fake.openError ? Promise.reject(fake.openError) : Promise.resolve({
       numPages: fake.numPages,
       getPage: async (p: number) => {
         fake.read.push(p)
@@ -35,6 +42,7 @@ beforeEach(() => {
   fake.read = []
   fake.destroyed = 0
   fake.onPage = null
+  fake.openError = null
 })
 
 describe('PDF metni okuma sınırları', () => {
@@ -67,6 +75,18 @@ describe('PDF metni okuma sınırları', () => {
     expect(error).not.toBeInstanceOf(PdfTextError)
     expect((error as DOMException).name).toBe('AbortError')
     expect(fake.read).toEqual([1, 2])
+  })
+
+  it("parolalı PDF açık 'encrypted' hatası verir; başka açılış hatası 'unreadable'", async () => {
+    // pdfjs parola gerektiğinde adı PasswordException olan hata fırlatır (gerçek PDF'le: e2e/import.spec.ts).
+    fake.openError = Object.assign(new Error('No password given'), { name: 'PasswordException', code: 1 })
+    const error = await extractPdfText(pdfBytes()).catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(PdfTextError)
+    expect(error).toMatchObject({ code: 'encrypted', message: expect.stringMatching(/parolalı/i) })
+    expect(fake.read).toEqual([])
+
+    fake.openError = Object.assign(new Error('Invalid PDF structure'), { name: 'InvalidPDFException' })
+    await expect(extractPdfText(pdfBytes())).rejects.toMatchObject({ code: 'unreadable' })
   })
 
   it('PDF olmayan dosya reddedilir', async () => {

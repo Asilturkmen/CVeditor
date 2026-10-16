@@ -11,15 +11,21 @@ import {
   suggestTranslatedName,
   type TranslatedEntry,
 } from '@/ai/translate'
+import { maskSourceOf } from '@/ai/mask'
+import { parseTranslateResult } from '@/ai/validate'
 import type { Cv } from '@/cv/schema'
 import { saveCv } from '@/db/repo'
 import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
 import { Field, Input } from '@/components/ui/Field'
-import { toast } from '@/components/ui/Toaster'
+import { toast } from '@/components/ui/toast'
 import { useEditor } from '@/editor/store'
 import { m } from '@/paraglide/messages'
-import { changedCount, DemoTranslateNote, initialReview, reviewValues, TranslationReview, type ReviewState } from './TranslationReview'
+import { withAiAuth } from '@/features/ai/aiAuth'
+import { aiErrorMessage } from '@/features/ai/aiErrorMessage'
+import { useChanged } from '@/lib/useChanged'
+import { changedCount, initialReview, reviewValues, type ReviewState } from './reviewState'
+import { DemoTranslateNote, TranslationReview } from './TranslationReview'
 
 type Step = 'setup' | 'running' | 'review' | 'error'
 
@@ -36,18 +42,19 @@ export function TranslateCvDialog({ cv, open, onClose }: { cv: Cv; open: boolean
   const [entries, setEntries] = useState<TranslatedEntry[]>([])
   const [review, setReview] = useState<ReviewState>({})
   const [saving, setSaving] = useState(false)
+  const [errorText, setErrorText] = useState('')
   const controller = useRef<AbortController | null>(null)
   /** Çeviri başladığı andaki CV: onaylanınca bu kopya üzerine uygulanır */
-  const snapshot = useRef<Cv | null>(null)
+  const [snapshot, setSnapshot] = useState<Cv | null>(null)
 
-  useEffect(() => {
-    if (!open) return
+  // Her açılışta baştan başlanır (ad, açıldığı andaki CV adından önerilir).
+  if (useChanged(open, false) && open) {
     setStep('setup')
     setName(suggestTranslatedName(cv.name, to))
     setEntries([])
     setReview({})
     setSaving(false)
-  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+  }
 
   // Kapanınca (ya da sayfa değişince) süren istek iptal edilir
   useEffect(() => {
@@ -60,7 +67,7 @@ export function TranslateCvDialog({ cv, open, onClose }: { cv: Cv; open: boolean
   const start = async () => {
     await useEditor.getState().flush()
     const source = structuredClone(useEditor.getState().cv ?? cv)
-    snapshot.current = source
+    setSnapshot(source)
     const collected = collectCvTexts(source)
     if (collected.length === 0) {
       setEntries([])
@@ -72,8 +79,10 @@ export function TranslateCvDialog({ cv, open, onClose }: { cv: Cv; open: boolean
     controller.current = abort
     setStep('running')
     try {
-      const prepared = buildTranslateRequest(source.language, to, collected, source.personal)
-      const result = await provider.translate(prepared.request, abort.signal)
+      const prepared = buildTranslateRequest(source.language, to, collected, maskSourceOf(source))
+      const result = parseTranslateResult(
+        await withAiAuth(() => provider.translate(prepared.request, abort.signal), abort.signal),
+      )
       if (abort.signal.aborted) return
       const merged = mergeTranslations(collected, result, prepared)
       setEntries(merged)
@@ -82,6 +91,7 @@ export function TranslateCvDialog({ cv, open, onClose }: { cv: Cv; open: boolean
     } catch (error) {
       if (abort.signal.aborted) return
       console.error(error)
+      setErrorText(aiErrorMessage(error, m.tr8_translate_error()))
       setStep('error')
     } finally {
       if (controller.current === abort) controller.current = null
@@ -94,7 +104,7 @@ export function TranslateCvDialog({ cv, open, onClose }: { cv: Cv; open: boolean
   }
 
   const save = async () => {
-    const source = snapshot.current
+    const source = snapshot
     if (!source || saving) return
     setSaving(true)
     try {
@@ -109,6 +119,7 @@ export function TranslateCvDialog({ cv, open, onClose }: { cv: Cv; open: boolean
     } catch (error) {
       console.error(error)
       setSaving(false)
+      setErrorText(m.tr8_translate_error())
       setStep('error')
     }
   }
@@ -167,9 +178,9 @@ export function TranslateCvDialog({ cv, open, onClose }: { cv: Cv; open: boolean
               entries={entries}
               state={review}
               onChange={setReview}
-              from={snapshot.current?.language ?? cv.language}
+              from={snapshot?.language ?? cv.language}
               to={to}
-              source={snapshot.current}
+              source={snapshot}
             />
           )
         ) : (
@@ -196,7 +207,7 @@ export function TranslateCvDialog({ cv, open, onClose }: { cv: Cv; open: boolean
             )}
             {step === 'error' && (
               <p role="alert" className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">
-                {m.tr8_translate_error()}
+                {errorText || m.tr8_translate_error()}
               </p>
             )}
           </>

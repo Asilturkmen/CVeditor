@@ -21,8 +21,10 @@ export interface FindingTarget {
   itemId?: string
   sectionId?: string
   personal?: boolean
-  /** Düzeltme Görünüm sekmesinde (sütun, fotoğraf) */
+  /** Düzeltme Görünüm sekmesinde (sütun, fotoğraf, sayfa sayısı) */
   tab?: 'appearance'
+  /** Bölüm yok ya da kaydı yok: editör bu türde bölüm (gerekirse ilk kaydıyla) ekleyip ona gider */
+  addSection?: SectionType
 }
 
 export interface Finding {
@@ -85,6 +87,16 @@ function add(ctx: Ctx, f: Finding) {
   ctx.out.push(f)
 }
 
+/**
+ * Görünmeyen (yok, gizli ya da kaydı boş) bölüm için hedef: kaydı olan bölüm
+ * varsa ilk kaydı (gizliyse editörde "gizli" rozetiyle görünür), yoksa bölüm
+ * eklenir.
+ */
+function sectionTarget(cv: Cv, type: SectionType): FindingTarget {
+  const existing = cv.sections.find((s) => s.type === type && s.items.length > 0)
+  return existing ? { sectionId: existing.id, itemId: (existing.items as AnyItem[])[0].id } : { addSection: type }
+}
+
 export interface ReviewCvOptions {
   /** Önizlemedeki sayfa sayısı (bilinmiyorsa sayfa kontrolü atlanır) */
   pageCount?: number
@@ -110,7 +122,7 @@ export function reviewCv(cv: Cv, options: ReviewCvOptions = {}): Finding[] {
   checkDates(ctx, shown)
   checkContent(ctx, shown, now)
   checkFormatting(ctx, shown)
-  if (options.pageCount) checkPageCount(ctx.out, options.pageCount)
+  if (options.pageCount) checkPageCount(ctx.out, options.pageCount, { tab: 'appearance' })
   checkPhoto(ctx)
   return ctx.out
 }
@@ -269,11 +281,11 @@ function checkEssentials(ctx: Ctx, shown: Section[]) {
   const names: string[] = []
   const lang = ctx.cv.language
   if (has('experience')) names.push(SECTION_TITLES[lang].experience)
-  else add(ctx, { id: 'need-experience', category: 'yapi', severity: 'warn', title: m.rv_need_experience(), detail: m.rv_need_experience_d() })
+  else add(ctx, { id: 'need-experience', category: 'yapi', severity: 'warn', title: m.rv_need_experience(), detail: m.rv_need_experience_d(), target: sectionTarget(ctx.cv, 'experience') })
   if (has('education')) names.push(SECTION_TITLES[lang].education)
-  else add(ctx, { id: 'need-education', category: 'yapi', severity: 'warn', title: m.rv_need_education(), detail: m.rv_need_education_d() })
+  else add(ctx, { id: 'need-education', category: 'yapi', severity: 'warn', title: m.rv_need_education(), detail: m.rv_need_education_d(), target: sectionTarget(ctx.cv, 'education') })
   if (has('skills')) names.push(SECTION_TITLES[lang].skills)
-  else add(ctx, { id: 'need-skills', category: 'yapi', severity: 'info', title: m.rv_need_skills(), detail: m.rv_need_skills_d() })
+  else add(ctx, { id: 'need-skills', category: 'yapi', severity: 'info', title: m.rv_need_skills(), detail: m.rv_need_skills_d(), target: sectionTarget(ctx.cv, 'skills') })
   if (names.length) {
     add(ctx, { id: 'essentials', category: 'yapi', severity: 'ok', title: m.rv_essentials_ok({ list: names.join(', ') }), detail: m.rv_essentials_ok_d() })
   }
@@ -328,6 +340,7 @@ function checkDates(ctx: Ctx, shown: Section[]) {
   let withMonth = 0
   let withoutMonth = 0
   let checked = 0
+  let firstWithoutMonth: FindingTarget | undefined
 
   for (const s of shown) {
     if (!CHRONO.includes(s.type)) continue
@@ -338,8 +351,10 @@ function checkDates(ctx: Ctx, shown: Section[]) {
       const target = { sectionId: s.id, itemId: item.id }
       for (const d of [range.start, range.end]) {
         if (!d) continue
-        if (d.month == null) withoutMonth++
-        else withMonth++
+        if (d.month == null) {
+          withoutMonth++
+          firstWithoutMonth ??= target
+        } else withMonth++
       }
       if (!DATED_REQUIRED.includes(s.type)) {
         if (isRangeInverted(range)) {
@@ -385,7 +400,8 @@ function checkDates(ctx: Ctx, shown: Section[]) {
   if (checked && !completeIssues) add(ctx, { id: 'dates-complete', category: 'tarihler', severity: 'ok', title: m.rv_dates_complete(), detail: m.rv_dates_complete_d() })
   if (checked && !orderIssues) add(ctx, { id: 'dates-order', category: 'tarihler', severity: 'ok', title: m.rv_dates_ordered(), detail: m.rv_dates_ordered_d() })
   if (withMonth && withoutMonth) {
-    add(ctx, { id: 'dates-format', category: 'tarihler', severity: 'info', title: m.rv_dates_month_mixed(), detail: m.rv_dates_month_mixed_d({ withMonth, withoutMonth }) })
+    // Öneri "hepsine ay ekle": ayı olmayan ilk tarihe gidilir.
+    add(ctx, { id: 'dates-format', category: 'tarihler', severity: 'info', title: m.rv_dates_month_mixed(), detail: m.rv_dates_month_mixed_d({ withMonth, withoutMonth }), target: firstWithoutMonth })
   } else if (withMonth + withoutMonth > 0) {
     add(ctx, { id: 'dates-format', category: 'tarihler', severity: 'ok', title: m.rv_dates_format_ok(), detail: m.rv_dates_format_ok_d() })
   }
@@ -402,7 +418,7 @@ function checkContent(ctx: Ctx, shown: Section[], now: Date) {
   const { cv } = ctx
   const summary = shown.find((s) => s.type === 'summary')
   if (!summary) {
-    add(ctx, { id: 'summary', category: 'icerik', severity: 'info', title: m.rv_summary_missing(), detail: m.rv_summary_missing_d() })
+    add(ctx, { id: 'summary', category: 'icerik', severity: 'info', title: m.rv_summary_missing(), detail: m.rv_summary_missing_d(), target: sectionTarget(cv, 'summary') })
   } else {
     const words = wordCount(visibleItems(summary).map((i) => htmlToText((i as { content: string }).content)).join(' '))
     const target = { sectionId: summary.id, itemId: visibleItems(summary)[0]?.id }
@@ -420,6 +436,7 @@ function checkContent(ctx: Ctx, shown: Section[], now: Date) {
   let bulletTotal = 0
   let bulletNumbers = 0
   let describedRoles = 0
+  let firstWithoutNumber: FindingTarget | undefined
 
   for (const s of shown) {
     if (!['experience', 'projects', 'volunteer'].includes(s.type)) continue
@@ -460,8 +477,10 @@ function checkContent(ctx: Ctx, shown: Section[], now: Date) {
       }
 
       if (s.type !== 'volunteer') {
+        const numbered = bullets.filter((b) => /\d|%/.test(b)).length
         bulletTotal += bullets.length
-        bulletNumbers += bullets.filter((b) => /\d|%/.test(b)).length
+        bulletNumbers += numbered
+        if (numbered < bullets.length) firstWithoutNumber ??= target
       }
     })
   }
@@ -478,6 +497,7 @@ function checkContent(ctx: Ctx, shown: Section[], now: Date) {
       severity: enough ? 'ok' : 'info',
       title: m.rv_numbers({ count: bulletNumbers, total: bulletTotal }),
       detail: enough ? m.rv_numbers_ok_d() : m.rv_numbers_low_d(),
+      target: enough ? undefined : firstWithoutNumber,
     })
   }
 }
@@ -495,6 +515,8 @@ function checkFormatting(ctx: Ctx, shown: Section[]) {
   let noDot = 0
   let doubleIssues = 0
   let capsIssues = 0
+  let firstDot: FindingTarget | undefined
+  let firstNoDot: FindingTarget | undefined
 
   const p = cv.personal
   const personalTexts = [p.fullName, p.headline, p.location]
@@ -521,8 +543,13 @@ function checkFormatting(ctx: Ctx, shown: Section[]) {
           plain.push(...bullets, ...paragraphs)
           lines.push(...bullets, ...paragraphs)
           for (const b of bullets) {
-            if (/[.!?…]$/.test(b)) dot++
-            else noDot++
+            if (/[.!?…]$/.test(b)) {
+              dot++
+              firstDot ??= target
+            } else {
+              noDot++
+              firstNoDot ??= target
+            }
           }
         } else {
           plain.push(value.trim())
@@ -542,7 +569,9 @@ function checkFormatting(ctx: Ctx, shown: Section[]) {
   }
 
   if (dot && noDot) {
-    add(ctx, { id: 'bullet-end', category: 'bicim', severity: 'info', title: m.rv_bullet_end_mixed(), detail: m.rv_bullet_end_mixed_d({ dot, noDot }) })
+    // Azınlıkta kalan biçimin ilk kaydına gidilir (eşitse noktasız olana).
+    const target = dot < noDot ? firstDot : firstNoDot
+    add(ctx, { id: 'bullet-end', category: 'bicim', severity: 'info', title: m.rv_bullet_end_mixed(), detail: m.rv_bullet_end_mixed_d({ dot, noDot }), target })
   } else if (dot + noDot > 1) {
     add(ctx, { id: 'bullet-end', category: 'bicim', severity: 'ok', title: m.rv_bullet_end_ok(), detail: m.rv_bullet_end_ok_d() })
   }
@@ -550,9 +579,10 @@ function checkFormatting(ctx: Ctx, shown: Section[]) {
   if (!capsIssues) add(ctx, { id: 'caps', category: 'bicim', severity: 'ok', title: m.rv_caps_ok(), detail: m.rv_caps_ok_d() })
 }
 
-function checkPageCount(out: Finding[], pages: number) {
-  if (pages > 2) out.push({ id: 'pages', category: 'bicim', severity: 'warn', title: m.rv_pages_many({ count: pages }), detail: m.rv_pages_many_d() })
-  else if (pages === 2) out.push({ id: 'pages', category: 'bicim', severity: 'info', title: m.rv_pages_two(), detail: m.rv_pages_two_d() })
+/** Kendi CV'de hedef Görünüm sekmesi (yazı boyutu, aralık); yüklenen PDF'te hedef yok. */
+function checkPageCount(out: Finding[], pages: number, target?: FindingTarget) {
+  if (pages > 2) out.push({ id: 'pages', category: 'bicim', severity: 'warn', title: m.rv_pages_many({ count: pages }), detail: m.rv_pages_many_d(), target })
+  else if (pages === 2) out.push({ id: 'pages', category: 'bicim', severity: 'info', title: m.rv_pages_two(), detail: m.rv_pages_two_d(), target })
   else out.push({ id: 'pages', category: 'bicim', severity: 'ok', title: m.rv_pages_one(), detail: m.rv_pages_one_d() })
 }
 

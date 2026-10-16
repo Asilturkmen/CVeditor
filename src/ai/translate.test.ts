@@ -3,6 +3,7 @@ import { createCv, createSection } from '@/cv/factory'
 import { samplePersonal, sampleSections } from '@/cv/sample'
 import { CvSchema, type AnyItem, type Cv } from '@/cv/schema'
 import { templateSettingsFor } from '@/render/templates'
+import { maskSourceOf } from './mask'
 import { mockTranslate, translateText } from './mockTranslate'
 import {
   applyToItem,
@@ -249,6 +250,45 @@ describe('çeviri gizliliği', () => {
     expect(copied).toMatchObject({ hidden: true, position: 'Yazılım Stajyeri', translationGroupId: hiddenItem.translationGroupId })
     expect(byType(en, 'custom')).toMatchObject({ hidden: true, title: 'Yayınlar' })
     expect((byType(en, 'experience').items[0] as unknown as Record<string, string>).position).toBe('Frontend Developer')
+  })
+
+  it('kişinin konumu metinlerde ve kayıtların konum alanında maskelenir, çeviriden sonra geri konur', () => {
+    const cv = sampleCv() // konum: "İzmir, Türkiye"
+    summaryOf(cv).content = "<p>İzmir, Türkiye'de yaşıyorum; IZMIR ve Izmir ofislerinde, İstanbul'da da çalıştım. Türkiye'nin önde gelen ekiplerindeyim.</p>"
+    const entries = collectCvTexts(cv)
+    const prepared = buildTranslateRequest('tr', 'en', entries, cv.personal)
+    const texts = prepared.request.items.map((i) => i.text).join('\n')
+    expect(texts).not.toMatch(/[iİı]zm[iİı]r/i)
+    expect(texts).toContain("İstanbul'da")
+    expect(texts).toContain("Türkiye'nin")
+    const merged = mergeTranslations(entries, mockTranslate(prepared.request), prepared)
+    expect(merged.every((e) => !e.unrestored)).toBe(true)
+    const key = itemKey(byType(cv, 'summary').items[0].id, 'content')
+    expect(merged.find((e) => e.key === key)!.translated).toContain("İzmir, Türkiye'de")
+    const expLocation = merged.find((e) => e.key === itemKey(byType(cv, 'experience').items[0].id, 'location'))!
+    expect(expLocation).toMatchObject({ translated: 'İzmir', unrestored: false })
+  })
+
+  it('ad ve referans kişiler büyük harf ve noktalı/noktasız i farkıyla maskelenir (maskSourceOf)', () => {
+    const cv = sampleCv()
+    cv.personal.fullName = 'Ayşe Yılmaz'
+    const refs = createSection('references', 1)
+    Object.assign(refs.items[0], { name: 'İpek Işık', position: 'Takım lideri', email: 'ipek@example.com' })
+    cv.sections.push(refs)
+    summaryOf(cv).content =
+      '<p>AYŞE YILMAZ (ayşe yilmaz, AYSE YILMAZ) olarak İPEK IŞIK ve ipek ışık ile çalıştım; IPEK ISIK önerir: ipek@example.com</p>'
+    const entries = collectCvTexts(cv)
+    const prepared = buildTranslateRequest('tr', 'en', entries, maskSourceOf(cv))
+    const sent = prepared.request.items.map((i) => i.text).join('\n')
+    expect(sent).not.toMatch(/ay[sş]e|y[iı]lmaz|[iİı]pek|[iİı][sş][iİı]k/i)
+    expect(sent).toContain('⟦REFNAME⟧')
+    expect(sent).toContain('⟦REFEMAIL⟧')
+    const key = itemKey(byType(cv, 'summary').items[0].id, 'content')
+    const summary = mergeTranslations(entries, mockTranslate(prepared.request), prepared).find((e) => e.key === key)!
+    expect(summary.unrestored).toBe(false)
+    for (const original of ['AYŞE YILMAZ', 'ayşe yilmaz', 'AYSE YILMAZ', 'İPEK IŞIK', 'ipek ışık', 'IPEK ISIK', 'ipek@example.com']) {
+      expect(summary.translated).toContain(original)
+    }
   })
 
   it('referansın e-posta ve telefonu çeviriye hiç girmez', () => {

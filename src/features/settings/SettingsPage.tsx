@@ -9,12 +9,13 @@ import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
 import { Segmented } from '@/components/ui/Segmented'
 import { Switch } from '@/components/ui/Switch'
-import { toast } from '@/components/ui/Toaster'
+import { toast } from '@/components/ui/toast'
 import { exportAllJson } from '@/features/cv-actions'
 import { cn } from '@/lib/cn'
-import { isChromium, isPersisted, requestPersistence } from '@/lib/persistence'
+import { isChromium, isPersisted, isSafari, requestPersistence } from '@/lib/persistence'
 import { ACCENTS, usePrefs, type AccentId } from '@/lib/prefs'
 import { formatDateTime } from '@/lib/time'
+import { useChanged } from '@/lib/useChanged'
 import { m } from '@/paraglide/messages'
 import { getLocale, setLocale, type Locale } from '@/paraglide/runtime'
 
@@ -134,9 +135,7 @@ function RestoreDialog({ parsed, onClose }: { parsed: ParsedBackup | null; onClo
 
 function ClearAllDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [agreed, setAgreed] = useState(false)
-  useEffect(() => {
-    if (open) setAgreed(false)
-  }, [open])
+  if (useChanged(open, false) && open) setAgreed(false)
   return (
     <Dialog
       open={open}
@@ -186,6 +185,7 @@ export function SettingsPage() {
   const [clearing, setClearing] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const chromium = isChromium()
+  const safari = isSafari()
 
   useEffect(() => {
     void isPersisted().then(setPersisted)
@@ -311,6 +311,12 @@ export function SettingsPage() {
           {chromium ? <Check className="mt-0.5 size-4 shrink-0 text-ok" /> : <Info className="mt-0.5 size-4 shrink-0 text-warn" />}
           <p>{chromium ? m.settings_browser_ok() : m.settings_browser_warn()}</p>
         </div>
+        {safari && (
+          <div className="flex gap-3 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3 text-sm">
+            <Info className="mt-0.5 size-4 shrink-0 text-warn" />
+            <p>{m.settings_browser_safari()}</p>
+          </div>
+        )}
       </Card>
 
       <Card title={m.settings_shortcuts()}>
