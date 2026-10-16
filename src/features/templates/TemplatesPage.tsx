@@ -6,25 +6,28 @@ import { samplePersonal, sampleSections } from '@/cv/sample'
 import { db } from '@/db/db'
 import { cn } from '@/lib/cn'
 import { m } from '@/paraglide/messages'
+import { getLocale } from '@/paraglide/runtime'
 import { CvFrame } from '@/render/CvFrame'
 import { TEMPLATE_LIST, templateSettingsFor, type TemplateDef, type TemplateId } from '@/render/templates'
 import { NewCvDialog } from './NewCvDialog'
 
-export const TEMPLATE_TEXT: Record<TemplateId, { description: () => string; layout: () => string }> = {
-  klasik: { description: () => m.template_klasik_desc(), layout: () => m.layout_one_column() },
-  modern: { description: () => m.template_modern_desc(), layout: () => m.layout_two_columns() },
+export const TEMPLATE_TEXT: Record<TemplateId, { name: () => string; description: () => string; layout: () => string }> = {
+  klasik: { name: () => m.template_klasik_name(), description: () => m.template_klasik_desc(), layout: () => m.ux_layout_default_one() },
+  modern: { name: () => m.template_modern_name(), description: () => m.template_modern_desc(), layout: () => m.ux_layout_default_two() },
 }
 
 /** Galeride gösterilen uydurma örnek CV (gerçek kişi değil). */
 export function useSampleCv(templateId: TemplateId) {
   return useMemo(() => {
-    const sections = sampleSections('tr')
+    // Galeri örneği arayüz diliyle yazılır (dil değişince sayfa yeniden yüklenir).
+    const language = getLocale() === 'en' ? 'en' : 'tr'
+    const sections = sampleSections(language)
     return createCv({
-      name: 'Örnek',
-      language: 'tr',
+      name: m.badge_sample(),
+      language,
       templateId,
       template: templateSettingsFor(templateId, sections),
-      personal: samplePersonal('tr'),
+      personal: samplePersonal(language),
       sections,
     })
   }, [templateId])
@@ -38,24 +41,24 @@ function TemplateCard({ template, onChoose }: { template: TemplateDef; onChoose:
       type="button"
       onClick={onChoose}
       className="group flex flex-col gap-4 text-left focus-visible:outline-none"
-      aria-label={m.templates_choose({ name: template.name })}
+      aria-label={m.templates_choose({ name: text.name() })}
     >
       <div
         className={cn(
-          'relative aspect-[210/297] w-full overflow-hidden rounded-2xl border border-line bg-canvas p-5',
+          'relative w-full rounded-2xl border border-line bg-canvas p-5',
           'transition-[transform,box-shadow,border-color] duration-250 ease-[var(--ease-out-soft)]',
           'group-hover:-translate-y-1 group-hover:border-line-strong group-hover:shadow-lg',
           'group-focus-visible:ring-2 group-focus-visible:ring-accent group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-bg',
         )}
       >
-        <div className="h-full overflow-hidden rounded-[3px] shadow-md">
-          <CvFrame cv={sample} scale="fit" fitPadding={0} firstPageOnly title={template.name} />
+        <div className="aspect-[210/297] w-full overflow-hidden rounded-[3px] shadow-md">
+          <CvFrame cv={sample} scale="fit" fitPadding={0} firstPageOnly title={text.name()} />
         </div>
       </div>
       <div className="flex items-start justify-between gap-4 px-1">
         <div>
           <h2 className="flex items-center gap-2 text-[17px] font-semibold tracking-tight">
-            {template.name}
+            {text.name()}
             <span className="rounded-full border border-line px-2 py-px text-[11px] font-medium text-muted">
               {text.layout()}
             </span>
@@ -90,7 +93,7 @@ export function TemplatesPage() {
           <TemplateCard key={template.id} template={template} onChoose={() => setChosen(template.id)} />
         ))}
       </div>
-      <p className="mt-12 max-w-2xl text-sm text-faint">{m.templates_more_soon()}</p>
+      <p className="mt-12 max-w-2xl text-sm text-muted">{m.templates_more_soon()}</p>
       <NewCvDialog templateId={chosen} onClose={() => setChosen(null)} />
     </div>
   )

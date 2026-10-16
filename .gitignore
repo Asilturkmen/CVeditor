@@ -34,3 +34,21 @@ blob-report
 # Yerel, kişisel notlar (beyin köprüsü vb.)
 CLAUDE.local.md
 .claude/settings.local.json
+
+# Ortam ve gizli dosyalar (V3: anahtarlar yalnız sunucuda, git dışında)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+.npmrc
+secrets/
+
+# Gerçek CV dışa aktarımları ve yedekleri (repoya girmez)
+*.cveditor.json
+*.resume.json
+cveditor-yedek-*.json

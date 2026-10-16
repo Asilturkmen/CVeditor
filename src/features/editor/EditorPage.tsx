@@ -6,8 +6,8 @@ import {
   Download,
   FileDown,
   Languages,
+  ListChecks,
   Loader2,
-  MonitorSmartphone,
   MoreHorizontal,
   Redo2,
   Trash2,
@@ -26,9 +26,10 @@ import { toast } from '@/components/ui/Toaster'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { useEditor } from '@/editor/store'
 import { useEditorUi } from '@/editor/ui'
-import { duplicate, exportCvJson, printTitle } from '@/features/cv-actions'
+import { duplicate, exportCvJson, exportJsonResume, printTitle } from '@/features/cv-actions'
 import { DeleteDialog } from '@/features/cv-list/CvListPage'
 import { ThemeToggle } from '@/features/shell/AppShell'
+import { TranslateCvDialog } from '@/features/translate/TranslateCvDialog'
 import { Wordmark } from '@/features/shell/Wordmark'
 import { cn } from '@/lib/cn'
 import { useMediaQuery } from '@/lib/useMediaQuery'
@@ -42,15 +43,31 @@ import { oversizedLabels, PreviewPane } from './PreviewPane'
 
 const PANEL_KEY = 'cveditor:panelWidth'
 const PANEL_MIN = 380
-const PANEL_DEFAULT = 500
+const PANEL_MAX_DEFAULT = 560
 
-function readPanelWidth() {
+/** Varsayılan panel genişliği pencereyle orantılı: clamp(380px, 38vw, 560px). */
+const panelDefault = (viewport: number) => Math.round(Math.min(PANEL_MAX_DEFAULT, Math.max(PANEL_MIN, viewport * 0.38)))
+/** Panel pencerenin yarısını geçmez; CV her zaman en az yarıyı alır. */
+const panelMax = (viewport: number) => Math.max(PANEL_MIN, Math.round(viewport * 0.5))
+
+/** Kullanıcının sürükleyerek seçtiği genişlik; hiç sürüklemediyse null (varsayılan orantılı). */
+function readSavedPanelWidth() {
   try {
     const value = Number(localStorage.getItem(PANEL_KEY))
-    return value >= PANEL_MIN ? value : PANEL_DEFAULT
+    return value >= PANEL_MIN ? value : null
   } catch {
-    return PANEL_DEFAULT
+    return null
   }
+}
+
+function useViewportWidth() {
+  const [width, setWidth] = useState(() => window.innerWidth)
+  useEffect(() => {
+    const onResize = () => setWidth(window.innerWidth)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  return width
 }
 
 function SaveIndicator() {
@@ -145,6 +162,8 @@ function useEditorShortcuts(onPrint: () => void) {
       const mod = e.ctrlKey || e.metaKey
       if (!mod) return
       const key = e.key.toLowerCase()
+      // Açık bir pencerede (ör. çeviri incelemesi) Ctrl+Z o pencerenin alanına aittir, arkadaki CV'ye değil.
+      if ((key === 'z' || key === 'y') && document.querySelector('[role="dialog"]')) return
       if (key === 'z' && !e.shiftKey) {
         e.preventDefault()
         useEditor.getState().undo()
@@ -187,7 +206,7 @@ function PdfConfirmDialog({
       open={open}
       onOpenChange={(next) => !next && onClose()}
       title={m.pdf_confirm_title()}
-      description={m.pdf_confirm_desc({ count: labels.length })}
+      description={labels.length === 1 ? m.ux_pdf_confirm_desc_one() : m.pdf_confirm_desc({ count: labels.length })}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -214,7 +233,7 @@ function PdfConfirmDialog({
           onChange={(e) => setAgreed(e.target.checked)}
           className="mt-0.5 size-4 accent-[var(--accent)]"
         />
-        <span>{m.pdf_confirm_check()}</span>
+        <span>{labels.length === 1 ? m.ux_pdf_confirm_check_one() : m.pdf_confirm_check()}</span>
       </label>
     </Dialog>
   )
@@ -230,15 +249,11 @@ function MobileEditor({ cv, onPrint, frameRef }: { cv: Cv; onPrint: () => void; 
         <span className="min-w-0 flex-1 truncate font-semibold">{cv.name}</span>
         <Button variant="primary" size="sm" onClick={onPrint}>
           <FileDown />
-          PDF
+          {m.pdf_button()}
         </Button>
       </header>
-      <div className="flex items-start gap-2.5 border-b border-line bg-surface px-4 py-3 text-[13px] text-muted">
-        <MonitorSmartphone className="mt-0.5 size-4 shrink-0" />
-        <p>{m.mobile_note()}</p>
-      </div>
       <div className="min-h-0 flex-1">
-        <PreviewPane ref={frameRef} cv={cv} readOnly />
+        <PreviewPane ref={frameRef} cv={cv} readOnly notice={m.mobile_note()} />
       </div>
     </div>
   )
@@ -257,9 +272,13 @@ export function EditorPage() {
   const pageCount = useEditorUi((s) => s.pageCount)
   const resetUi = useEditorUi((s) => s.reset)
   const [status, setStatus] = useState<'loading' | 'ready' | 'missing' | 'broken'>('loading')
-  const [panelWidth, setPanelWidth] = useState(readPanelWidth)
+  const [savedPanelWidth, setSavedPanelWidth] = useState(readSavedPanelWidth)
+  const viewport = useViewportWidth()
+  const maxPanel = panelMax(viewport)
+  const panelWidth = Math.min(maxPanel, savedPanelWidth ?? panelDefault(viewport))
   const [confirmPdf, setConfirmPdf] = useState(false)
   const [deleting, setDeleting] = useState<Cv | null>(null)
+  const [translating, setTranslating] = useState(false)
   const frameRef = useRef<CvFrameHandle>(null)
   const narrow = useMediaQuery('(max-width: 899px)')
 
@@ -296,11 +315,12 @@ export function EditorPage() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(PANEL_KEY, String(Math.round(panelWidth)))
+      if (savedPanelWidth === null) localStorage.removeItem(PANEL_KEY)
+      else localStorage.setItem(PANEL_KEY, String(Math.round(savedPanelWidth)))
     } catch {
       // yalnız bu oturumda kalır
     }
-  }, [panelWidth])
+  }, [savedPanelWidth])
 
   const doPrint = useCallback(() => {
     const current = useEditor.getState().cv
@@ -358,8 +378,6 @@ export function EditorPage() {
       </>
     )
   }
-
-  const maxPanel = Math.max(PANEL_MIN, window.innerWidth * 0.62)
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden animate-fade-in">
@@ -435,8 +453,22 @@ export function EditorPage() {
               <MenuItem icon={<Download />} onSelect={() => exportCvJson(cv)}>
                 {m.list_export_json()}
               </MenuItem>
-              <MenuItem icon={<Languages />} disabled hint="V3">
+              <MenuItem icon={<Download />} onSelect={() => exportJsonResume(cv)}>
+                {m.imp_json_export()}
+              </MenuItem>
+              <MenuItem icon={<Languages />} onSelect={() => setTranslating(true)}>
                 {m.editor_translate_cv()}
+              </MenuItem>
+              <MenuItem
+                icon={<ListChecks />}
+                onSelect={() =>
+                  void useEditor
+                    .getState()
+                    .flush()
+                    .then(() => navigate({ to: '/inceleme', search: { cv: cv.id } }))
+                }
+              >
+                {m.rv_editor_menu()}
               </MenuItem>
               <MenuSeparator />
               <MenuItem icon={<Trash2 />} danger onSelect={() => setDeleting(cv)}>
@@ -458,8 +490,8 @@ export function EditorPage() {
           <PreviewPane ref={frameRef} cv={cv} />
         </div>
         <Splitter
-          onDrag={(dx) => setPanelWidth((w) => Math.min(maxPanel, Math.max(PANEL_MIN, w - dx)))}
-          onReset={() => setPanelWidth(PANEL_DEFAULT)}
+          onDrag={(dx) => setSavedPanelWidth((w) => Math.min(maxPanel, Math.max(PANEL_MIN, Math.min(maxPanel, w ?? panelWidth) - dx)))}
+          onReset={() => setSavedPanelWidth(null)}
         />
         <aside className="flex min-h-0 shrink-0 flex-col bg-surface" style={{ width: panelWidth }}>
           <div className="flex shrink-0 items-center border-b border-line px-4 py-2.5">
@@ -478,8 +510,14 @@ export function EditorPage() {
               {tab === 'content' ? (
                 <div className="flex flex-col gap-6">
                   <section id="personal-card" aria-label={m.editor_personal_title()} className="rounded-2xl">
-                    <h2 className="mb-3 text-[15px] font-semibold tracking-tight">{m.editor_personal_title()}</h2>
-                    <PersonalForm personal={cv.personal} showPhoto={cv.template.showPhoto} />
+                    {/* Bölüm başlıklarıyla aynı satır yapısı: tutamak yuvası boş, başlık ve alanlar aynı x'te. */}
+                    <header className="flex items-center gap-1.5 py-2">
+                      <span aria-hidden className="h-7 w-5 shrink-0" />
+                      <h2 className="px-1 py-0.5 text-[15px] font-semibold tracking-tight">{m.editor_personal_title()}</h2>
+                    </header>
+                    <div className="pb-2 pl-7.5">
+                      <PersonalForm personal={cv.personal} showPhoto={cv.template.showPhoto} />
+                    </div>
                   </section>
                   <SectionList sections={cv.sections} language={cv.language} cvId={cv.id} />
                 </div>
@@ -501,6 +539,7 @@ export function EditorPage() {
           doPrint()
         }}
       />
+      <TranslateCvDialog cv={cv} open={translating} onClose={() => setTranslating(false)} />
       <DeleteDialog
         cv={deleting}
         onClose={() => setDeleting(null)}

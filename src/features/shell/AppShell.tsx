@@ -12,6 +12,7 @@ import { Wordmark } from './Wordmark'
 const TABS = [
   { to: '/cvler', label: () => m.nav_my_cvs() },
   { to: '/sablonlar', label: () => m.nav_templates() },
+  { to: '/inceleme', label: () => m.rv_nav() },
 ] as const
 
 function NavTabs() {
@@ -35,7 +36,7 @@ function NavTabs() {
             if (el) refs.current.set(tab.to, el)
           }}
           className={cn(
-            'flex items-center px-3 text-sm font-medium transition-colors duration-150',
+            'flex items-center px-2 text-sm sm:px-3 font-medium transition-colors duration-150',
             active === tab.to ? 'text-text' : 'text-muted hover:text-text',
           )}
         >
@@ -115,7 +116,7 @@ export function AppShell() {
     <div className="min-h-dvh">
       <BrowserNote />
       <header className="sticky top-0 z-30 border-b border-line bg-bg">
-        <div className="mx-auto flex h-14 max-w-[1240px] items-stretch gap-6 px-6">
+        <div className="mx-auto flex h-14 max-w-[1240px] items-stretch gap-3 px-4 sm:gap-6 sm:px-6">
           <Link to="/" className="flex items-center" aria-label={m.app_name()}>
             <Wordmark />
           </Link>
@@ -137,7 +138,7 @@ export function AppShell() {
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-[1240px] px-6 pt-8 pb-24">
+      <main className="mx-auto max-w-[1240px] px-4 pt-8 sm:px-6 pb-24">
         <Outlet />
       </main>
     </div>

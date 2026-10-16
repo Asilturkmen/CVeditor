@@ -7,6 +7,10 @@ import { createRoot } from 'react-dom/client'
 import { router } from './router'
 import { requestPersistence } from './lib/persistence'
 import { fontFaceCss } from './render/fonts'
+import { getLocale } from './paraglide/runtime'
+
+// Arayüz dili (Paraglide: localStorage, yoksa Türkçe). CV iframe'inin lang'ı ayrı, CV dilinden gelir.
+document.documentElement.lang = getLocale()
 
 // CV yazı tipleri arayüzde de görünsün (Görünüm sekmesindeki yazı tipi listesi).
 const fontStyle = document.createElement('style')

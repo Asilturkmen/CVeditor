@@ -1,4 +1,4 @@
-/* Modern: üstte ad bandı, solda renkli yan sütun, sans yazı. */
+/* Modern: üstte ad bandı (ad, unvan, soluk iletişim satırı), solda renkli yan sütun, sans yazı. */
 .tpl-modern .cv-header {
   padding-top: calc(var(--pad-y) * 1.1);
   padding-bottom: calc(var(--section-gap) * 1.1);
@@ -7,7 +7,7 @@
 }
 
 .tpl-modern .cv-name {
-  font-weight: 750;
+  font-weight: 700;
   font-size: 2.5em;
   letter-spacing: -0.025em;
 }
@@ -27,10 +27,11 @@
 }
 
 .tpl-modern .section-title {
-  font-size: 0.86em;
+  font-size: 0.88em;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.11em;
+  /* 0.07em'den geniş harf aralığını PDF ayrıştırıcıları kelime boşluğu sayar ("D E N E Y İ M") */
+  letter-spacing: 0.05em;
   color: var(--ink);
   display: flex;
   align-items: center;
@@ -46,7 +47,7 @@
 }
 
 .tpl-modern .entry-title strong {
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .tpl-modern .entry-sub {
@@ -55,7 +56,7 @@
 }
 
 .tpl-modern .line-label {
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .tpl-modern .rich li::marker {

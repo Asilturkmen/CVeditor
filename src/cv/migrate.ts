@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { m } from '@/paraglide/messages'
 import { CURRENT_SCHEMA_VERSION, CvSchema, type Cv } from './schema'
 
 /**
@@ -8,15 +9,15 @@ import { CURRENT_SCHEMA_VERSION, CvSchema, type Cv } from './schema'
 const MIGRATIONS: Record<number, (cv: Record<string, unknown>) => Record<string, unknown>> = {}
 
 export function migrateCv(raw: unknown): Cv {
-  if (!raw || typeof raw !== 'object') throw new Error('CV verisi okunamadı')
+  if (!raw || typeof raw !== 'object') throw new Error(m.cv_err_unreadable())
   let data = raw as Record<string, unknown>
   let version = typeof data.schemaVersion === 'number' ? data.schemaVersion : 0
   if (version > CURRENT_SCHEMA_VERSION) {
-    throw new Error('Bu CV daha yeni bir CVeditör sürümüyle kaydedilmiş')
+    throw new Error(m.cv_err_newer())
   }
   while (version < CURRENT_SCHEMA_VERSION) {
     const step = MIGRATIONS[version]
-    if (!step) throw new Error(`Şema sürümü ${version} desteklenmiyor`)
+    if (!step) throw new Error(m.cv_err_schema({ version }))
     data = step(data)
     version += 1
   }
@@ -62,12 +63,12 @@ export function parseBackup(text: string): ParsedBackup {
   try {
     json = JSON.parse(text)
   } catch {
-    throw new Error('Dosya geçerli bir JSON değil')
+    throw new Error(m.backup_err_json())
   }
   const parsed = BackupSchema.safeParse(json)
-  if (!parsed.success) throw new Error('Bu dosya bir CVeditör yedeği değil')
+  if (!parsed.success) throw new Error(m.backup_err_format())
   if (parsed.data.formatVersion > BACKUP_FORMAT_VERSION) {
-    throw new Error('Yedek daha yeni bir CVeditör sürümüyle alınmış')
+    throw new Error(m.backup_err_newer())
   }
   const result: ParsedBackup = { cvs: [], failures: [] }
   parsed.data.cvs.forEach((raw, index) => {

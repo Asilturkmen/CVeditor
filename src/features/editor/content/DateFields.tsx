@@ -1,7 +1,7 @@
 import { useId } from 'react'
 import { isRangeInverted } from '@/cv/dates'
 import type { DateRange, YearMonth } from '@/cv/schema'
-import { Select } from '@/components/ui/Field'
+import { controlClass, Select } from '@/components/ui/Field'
 import { cn } from '@/lib/cn'
 import { m } from '@/paraglide/messages'
 import { getLocale } from '@/paraglide/runtime'
@@ -88,13 +88,19 @@ export function DateRangeField({ value, onChange }: { value: DateRange; onChange
               {m.date_current()}
             </label>
           </div>
-          <YearMonthField
-            label={m.date_end()}
-            value={value.current ? null : value.end}
-            disabled={value.current}
-            invalid={inverted}
-            onChange={(end) => onChange({ ...value, end })}
-          />
+          {value.current ? (
+            // Devam eden işte bitiş seçilmez; boş ve gri seçiciler yerine ne yazılacağını göster.
+            <div className={cn(controlClass, 'flex h-9 items-center bg-surface-2 px-3 text-sm text-muted hover:border-line')}>
+              {m.ux_date_present()}
+            </div>
+          ) : (
+            <YearMonthField
+              label={m.date_end()}
+              value={value.end}
+              invalid={inverted}
+              onChange={(end) => onChange({ ...value, end })}
+            />
+          )}
         </div>
       </div>
       {inverted && <p className="text-xs text-danger">{m.date_inverted()}</p>}

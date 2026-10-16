@@ -1,14 +1,5 @@
-import {
-  closestCenter,
-  DndContext,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-  type Modifier,
-} from '@dnd-kit/core'
-import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { DndContext, type DragEndEvent, type Modifier, type UniqueIdentifier } from '@dnd-kit/core'
+import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Copy, Eye, EyeOff, GripVertical, MoreHorizontal, PenLine, Plus, RotateCcw, Send, Trash2 } from 'lucide-react'
 import { memo, useCallback, useEffect, useRef, useState, type HTMLAttributes, type ReactNode } from 'react'
@@ -43,20 +34,15 @@ import { m } from '@/paraglide/messages'
 import { itemLabel } from '../labels'
 import { CopyToCvDialog } from './CopyToCvDialog'
 import { DateRangeField, YearMonthField } from './DateFields'
+import { dndScreenReaderInstructions, dndText, useDndAnnouncements } from './dndA11y'
 import { ADD_ITEM_LABELS, ITEM_FIELDS, SECTION_LABELS, type FieldDef } from './fieldDefs'
+import { useSortDnd } from './keyboardSort'
 import { RichTextField } from './RichTextField'
 
 const verticalOnly: Modifier = ({ transform }) => ({ ...transform, x: 0 })
 
-function useDndSensors() {
-  return useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  )
-}
-
 function useSortableStyle(id: string) {
-  const sortable = useSortable({ id })
+  const sortable = useSortable({ id, attributes: { roleDescription: dndText.roleDescription } })
   const style = {
     transform: CSS.Translate.toString(sortable.transform),
     transition: sortable.transition,
@@ -165,6 +151,7 @@ const ItemCard = memo(function ItemCard({
 }) {
   const { attributes, listeners, setNodeRef, style, isDragging } = useSortableStyle(item.id)
   const focusItem = useEditorUi((s) => s.focusItem)
+  const blurItem = useEditorUi((s) => s.blurItem)
   const focused = useEditorUi((s) => s.focusedItemId === item.id)
   const label = itemLabel(section.type, item) || m.editor_untitled()
   const type = section.type as Exclude<SectionType, 'summary'>
@@ -176,6 +163,7 @@ const ItemCard = memo(function ItemCard({
       style={style}
       id={`item-${item.id}`}
       onFocusCapture={() => focusItem(item.id)}
+      onBlurCapture={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && blurItem(item.id)}
       className={cn(
         'rounded-xl border bg-surface transition-[box-shadow,border-color,opacity] duration-200',
         focused ? 'border-accent-line' : 'border-line',
@@ -185,7 +173,10 @@ const ItemCard = memo(function ItemCard({
     >
       <div className={cn('flex items-center gap-1.5 pr-1.5 pl-1.5', compact ? 'py-1.5' : 'border-b border-line py-1.5')}>
         <DragHandle label={m.drag_item()} {...attributes} {...listeners} />
-        <span className={cn('min-w-0 flex-1 truncate text-[13px] font-medium', !itemLabel(section.type, item) && 'text-faint')}>
+        <span
+          title={label}
+          className={cn('line-clamp-2 min-w-0 flex-1 text-[13px] leading-snug font-medium break-words', !itemLabel(section.type, item) && 'text-faint')}
+        >
           {label}
         </span>
         {item.hidden && (
@@ -228,6 +219,7 @@ const ItemCard = memo(function ItemCard({
 function SummaryEditor({ section, language }: { section: Section; language: CvLanguage }) {
   const item = section.items[0] as AnyItem | undefined
   const focusItem = useEditorUi((s) => s.focusItem)
+  const blurItem = useEditorUi((s) => s.blurItem)
   if (!item) {
     return (
       <Button size="sm" variant="ghost" onClick={() => addItem(section.id)}>
@@ -238,7 +230,12 @@ function SummaryEditor({ section, language }: { section: Section; language: CvLa
   }
   const content = (item as unknown as { content: string }).content
   return (
-    <div id={`item-${item.id}`} onFocusCapture={() => focusItem(item.id)} className="rounded-xl">
+    <div
+      id={`item-${item.id}`}
+      onFocusCapture={() => focusItem(item.id)}
+      onBlurCapture={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && blurItem(item.id)}
+      className="rounded-xl"
+    >
       <RichTextField
         label={sectionTitle(language, 'summary', section.title)}
         value={content}
@@ -283,11 +280,11 @@ function SectionTitle({ section, language }: { section: Section; language: CvLan
         setValue(title)
         setEditing(true)
       }}
-      className="group/title flex min-w-0 items-center gap-1.5 rounded-md px-1 py-0.5 text-left hover:bg-surface-2"
+      className="group/title flex min-w-0 items-center gap-1.5 rounded-md px-1 py-0.5 text-left transition-colors hover:bg-surface-2"
       aria-label={m.section_rename_named({ name: title })}
     >
-      <span className="truncate text-[15px] font-semibold tracking-tight">{title}</span>
-      <PenLine className="size-3.5 shrink-0 text-faint opacity-0 transition-opacity group-hover/title:opacity-100" />
+      <span className="min-w-0 text-[15px] font-semibold tracking-tight break-words">{title}</span>
+      <PenLine className="size-3.5 shrink-0 text-faint transition-colors group-hover/title:text-text group-focus-visible/title:text-text" />
     </button>
   )
 }
@@ -304,12 +301,18 @@ const SectionCard = memo(function SectionCard({
   onRequestDelete: (section: Section) => void
 }) {
   const { attributes, listeners, setNodeRef, style, isDragging } = useSortableStyle(section.id)
-  const sensors = useDndSensors()
+  const dnd = useSortDnd()
   const title = sectionTitle(language, section.type, section.title)
   const items = section.items as AnyItem[]
   const focusItem = useEditorUi((s) => s.focusItem)
+  const itemName = (id: UniqueIdentifier) => {
+    const item = items.find((i) => i.id === id)
+    return (item && itemLabel(section.type, item)) || m.editor_untitled()
+  }
+  const itemAnnouncements = useDndAnnouncements(itemName)
 
   const onDragEnd = ({ active, over }: DragEndEvent) => {
+    dnd.reset()
     if (!over || active.id === over.id) return
     const from = items.findIndex((i) => i.id === active.id)
     const to = items.findIndex((i) => i.id === over.id)
@@ -330,7 +333,10 @@ const SectionCard = memo(function SectionCard({
         <DragHandle label={m.drag_section()} {...attributes} {...listeners} />
         <SectionTitle section={section} language={language} />
         {section.type !== 'summary' && items.length > 0 && (
-          <span className="text-xs text-faint tabular-nums">{items.length}</span>
+          <span className="text-xs text-faint tabular-nums">
+            <span aria-hidden>{items.length}</span>
+            <span className="sr-only">{m.ux_section_item_count({ count: items.length })}</span>
+          </span>
         )}
         {section.hidden && (
           <span className="rounded-full bg-surface-2 px-1.5 py-px text-[11px] font-medium text-muted">{m.common_hidden()}</span>
@@ -356,19 +362,27 @@ const SectionCard = memo(function SectionCard({
           </Menu>
         </div>
       </header>
-      <div className={cn('flex flex-col gap-2.5 pb-2 pl-6 transition-opacity', section.hidden && 'opacity-60')}>
+      <div className={cn('flex flex-col gap-2.5 pb-2 pl-7.5 transition-opacity', section.hidden && 'opacity-60')}>
         {section.type === 'summary' ? (
           <SummaryEditor section={section} language={language} />
         ) : (
           <>
-            <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[verticalOnly]} onDragEnd={onDragEnd}>
+            <DndContext
+              sensors={dnd.sensors}
+              collisionDetection={dnd.collisionDetection}
+              modifiers={[verticalOnly]}
+              accessibility={{ announcements: itemAnnouncements, screenReaderInstructions: dndScreenReaderInstructions }}
+              onDragStart={dnd.reset}
+              onDragCancel={dnd.reset}
+              onDragEnd={onDragEnd}
+            >
               <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
                 {items.map((item) => (
                   <ItemCard key={item.id} section={section} item={item} onCopyToCv={(it) => onCopyToCv(section, it)} />
                 ))}
               </SortableContext>
             </DndContext>
-            {items.length === 0 && <p className="text-[13px] text-faint">{m.section_empty()}</p>}
+            {items.length === 0 && <p className="text-[13px] text-muted">{m.section_empty()}</p>}
             <div>
               <Button
                 size="sm"
@@ -428,7 +442,7 @@ function AddSectionMenu({ existing }: { existing: Set<SectionType> }) {
 }
 
 export function SectionList({ sections, language, cvId }: { sections: Section[]; language: CvLanguage; cvId: string }) {
-  const sensors = useDndSensors()
+  const dnd = useSortDnd()
   const [copying, setCopying] = useState<{ type: SectionType; item: AnyItem } | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<Section | null>(null)
   const scrollTarget = useEditorUi((s) => s.scrollTarget)
@@ -448,7 +462,14 @@ export function SectionList({ sections, language, cvId }: { sections: Section[];
     el.querySelector<HTMLElement>('input, [contenteditable="true"]')?.focus({ preventScroll: true })
   }, [scrollTarget])
 
+  const sectionName = (id: UniqueIdentifier) => {
+    const s = sections.find((x) => x.id === id)
+    return s ? sectionTitle(language, s.type, s.title) : ''
+  }
+  const sectionAnnouncements = useDndAnnouncements(sectionName)
+
   const onDragEnd = ({ active, over }: DragEndEvent) => {
+    dnd.reset()
     if (!over || active.id === over.id) return
     const from = sections.findIndex((s) => s.id === active.id)
     const to = sections.findIndex((s) => s.id === over.id)
@@ -480,7 +501,15 @@ export function SectionList({ sections, language, cvId }: { sections: Section[];
 
   return (
     <div className="flex flex-col gap-3">
-      <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[verticalOnly]} onDragEnd={onDragEnd}>
+      <DndContext
+        sensors={dnd.sensors}
+        collisionDetection={dnd.collisionDetection}
+        modifiers={[verticalOnly]}
+        accessibility={{ announcements: sectionAnnouncements, screenReaderInstructions: dndScreenReaderInstructions }}
+        onDragStart={dnd.reset}
+        onDragCancel={dnd.reset}
+        onDragEnd={onDragEnd}
+      >
         <SortableContext items={sections.map((s) => s.id)} strategy={verticalListSortingStrategy}>
           <div data-section-list className="flex flex-col gap-3">
             {sections.map((section) => (

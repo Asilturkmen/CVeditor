@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Alex Morgan CV</title>
+<!-- Fictional person for import tests. Two-column layout: sidebar left, dates on their own line. -->
+<style>
+  @page { size: A4; margin: 0 }
+  body { margin: 0; font-family: Georgia, serif; font-size: 10pt; color: #1c1c1c; line-height: 1.35 }
+  .grid { display: grid; grid-template-columns: 62mm 1fr; min-height: 297mm }
+  aside { background: #eef1f0; padding: 14mm 7mm }
+  main { padding: 14mm 10mm }
+  h1 { font-size: 24pt; margin: 0 0 2px }
+  .headline { font-size: 12pt; margin-bottom: 10px; color: #444 }
+  h2 { font-size: 10.5pt; text-transform: uppercase; letter-spacing: .08em; margin: 14px 0 6px }
+  .title { font-weight: bold }
+  .meta { color: #555 }
+  ul { margin: 3px 0 9px 15px; padding: 0 }
+  p { margin: 2px 0 }
+</style>
+</head>
+<body>
+<div class="grid">
+  <aside>
+    <h2>Contact</h2>
+    <p>alex.morgan@example.com</p>
+    <p>+44 20 7946 0958</p>
+    <p>London, United Kingdom</p>
+    <p>linkedin.com/in/alex-morgan-sample</p>
+    <h2>Skills</h2>
+    <p>Languages: Go, TypeScript, SQL</p>
+    <p>Cloud: AWS, Terraform, Kubernetes</p>
+    <h2>Languages</h2>
+    <p>English (Native)</p>
+    <p>German (B2)</p>
+  </aside>
+  <main>
+    <h1>Alex Morgan</h1>
+    <div class="headline">Backend Engineer</div>
+    <h2>Profile</h2>
+    <p>Backend engineer with 7 years of experience building reliable payment and data services. I care about clear APIs and the people who maintain them.</p>
+    <h2>Work Experience</h2>
+    <p class="title">Senior Backend Engineer</p>
+    <p class="meta">Sample Payments Ltd | London</p>
+    <p class="meta">Jan 2021 – Present</p>
+    <ul>
+      <li>Designed an idempotent payment API that handles 3 million requests per day.</li>
+      <li>Reduced p99 latency by 35% by moving reporting queries to a read replica and
+        rewriting the slowest endpoints.</li>
+    </ul>
+    <p class="title">Software Engineer</p>
+    <p class="meta">Example Analytics GmbH | Berlin</p>
+    <p class="meta">03/2017 – 12/2020</p>
+    <ul>
+      <li>Built the ingestion pipeline for event data.</li>
+      <li>Mentored two junior engineers.</li>
+    </ul>
+    <h2>Education</h2>
+    <p class="title">University of Northfield</p>
+    <p class="meta">BSc Computer Science</p>
+    <p class="meta">2013 – 2016</p>
+    <h2>Projects</h2>
+    <p class="title">ledger-lite</p>
+    <ul>
+      <li>Open source double-entry bookkeeping library for Go.</li>
+    </ul>
+  </main>
+</div>
+</body>
+</html>

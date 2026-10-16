@@ -16,6 +16,7 @@ import { isChromium, isPersisted, requestPersistence } from '@/lib/persistence'
 import { ACCENTS, usePrefs, type AccentId } from '@/lib/prefs'
 import { formatDateTime } from '@/lib/time'
 import { m } from '@/paraglide/messages'
+import { getLocale, setLocale, type Locale } from '@/paraglide/runtime'
 
 const ACCENT_NAMES: Record<AccentId, () => string> = {
   petrol: () => m.accent_petrol(),
@@ -24,6 +25,12 @@ const ACCENT_NAMES: Record<AccentId, () => string> = {
   orman: () => m.accent_orman(),
   grafit: () => m.accent_grafit(),
 }
+
+/** Dil adları her zaman kendi dilinde yazılır (çevrilmez); kullanıcı tanımadığı arayüzde de kendi dilini bulsun. */
+const LOCALE_OPTIONS: { value: Locale; label: ReactNode }[] = [
+  { value: 'tr', label: <span lang="tr">Türkçe</span> },
+  { value: 'en', label: <span lang="en">English</span> },
+]
 
 function Card({ title, description, children, tone }: { title: string; description?: ReactNode; children: ReactNode; tone?: 'danger' }) {
   return (
@@ -194,10 +201,14 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="max-w-[920px] animate-fade-in">
+    <div className="animate-fade-in">
       <h1 className="mb-8 text-2xl font-semibold tracking-tight">{m.settings_title()}</h1>
 
       <Card title={m.settings_appearance()} description={m.settings_appearance_desc()}>
+        <Row label={m.settings_language()} hint={m.settings_language_hint()}>
+          {/* setLocale tercihi localStorage'a yazar ve sayfayı yeniden yükler. */}
+          <Segmented value={getLocale()} onChange={(locale) => void setLocale(locale)} aria-label={m.settings_language()} options={LOCALE_OPTIONS} />
+        </Row>
         <Row label={m.settings_dark()} hint={m.settings_dark_hint()}>
           <Switch checked={theme === 'dark'} onCheckedChange={(on) => setTheme(on ? 'dark' : 'light')} aria-label={m.settings_dark()} />
         </Row>
@@ -217,7 +228,10 @@ export function SettingsPage() {
                   accent === a.id ? 'border-text' : 'border-line hover:border-line-strong',
                 )}
               >
-                <span className="flex size-6 items-center justify-center rounded-full" style={{ background: a.color }}>
+                <span
+                  className="flex size-6 items-center justify-center rounded-full ring-1 ring-black/10 ring-inset dark:ring-white/25"
+                  style={{ background: a.color }}
+                >
                   {accent === a.id && <Check className="size-3.5 text-white" strokeWidth={3} />}
                 </span>
                 {ACCENT_NAMES[a.id]()}
@@ -234,7 +248,7 @@ export function SettingsPage() {
         >
           <Button onClick={() => void exportAllJson(cvs)} disabled={cvs.length === 0}>
             <Download />
-            {m.settings_backup_button({ count: cvs.length })}
+            {cvs.length > 0 ? m.settings_backup_button({ count: cvs.length }) : m.ux_settings_backup_empty()}
           </Button>
         </Row>
         <Row label={m.settings_restore()} hint={m.settings_restore_hint()}>

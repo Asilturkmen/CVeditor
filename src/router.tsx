@@ -36,6 +36,14 @@ const settingsRoute = createRoute({
   path: '/ayarlar',
   component: lazyRouteComponent(() => import('@/features/settings/SettingsPage'), 'SettingsPage'),
 })
+/** CV İnceleme; ?cv=<id> o CV'yi seçili açar. pdfjs ve kurallar ayrı parçada. */
+export const reviewRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: '/inceleme',
+  validateSearch: (search: Record<string, unknown>): { cv?: string } =>
+    typeof search.cv === 'string' && search.cv ? { cv: search.cv } : {},
+  component: lazyRouteComponent(() => import('@/features/review/ReviewPage'), 'ReviewPage'),
+})
 
 export const editorRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -46,7 +54,7 @@ export const editorRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
-  shellRoute.addChildren([listRoute, templatesRoute, settingsRoute]),
+  shellRoute.addChildren([listRoute, templatesRoute, settingsRoute, reviewRoute]),
   editorRoute,
 ])
 

@@ -207,7 +207,7 @@ function LinkButton({ editor, active }: { editor: ReturnType<typeof useEditor>; 
               autoFocus
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="ornek.com"
+              placeholder={m.ph_website()}
               aria-label={m.rich_link_url()}
               className="h-8"
             />

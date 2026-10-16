@@ -1,4 +1,4 @@
-import { AlertTriangle, Minus, Plus } from 'lucide-react'
+import { AlertTriangle, Minus, MonitorSmartphone, Plus } from 'lucide-react'
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { AnyItem, Cv } from '@/cv/schema'
 import { Button } from '@/components/ui/Button'
@@ -6,8 +6,8 @@ import { Tooltip } from '@/components/ui/Tooltip'
 import { useEditorUi } from '@/editor/ui'
 import { cn } from '@/lib/cn'
 import { m } from '@/paraglide/messages'
-import { CvFrame, type CvFrameHandle, type CvFrameTarget } from '@/render/CvFrame'
-import type { SuggestionMap } from '@/render/CvMarkup'
+import { CvFrame, PAGE_WIDTH_PX, type CvFrameHandle, type CvFrameTarget } from '@/render/CvFrame'
+import type { AddedItemSuggestion, SuggestionMap } from '@/render/CvMarkup'
 import type { PaginateResult } from '@/render/paginate'
 import { itemLabel } from './labels'
 
@@ -21,7 +21,8 @@ export function oversizedLabels(cv: Cv, oversized: { itemId: string | null; sect
   })
 }
 
-function ZoomControl({ fitScale }: { fitScale: number }) {
+/** Önizlemenin altında ince çubuk: sayfanın üstüne binmez. Yüzdeye tıklamak %100'e döndürür. */
+function ZoomBar({ fitScale }: { fitScale: number }) {
   const zoom = useEditorUi((s) => s.zoom)
   const setZoom = useEditorUi((s) => s.setZoom)
   const current = zoom === 'fit' ? fitScale : zoom
@@ -31,73 +32,91 @@ function ZoomControl({ fitScale }: { fitScale: number }) {
     if (next) setZoom(next)
   }
   return (
-    <div className="flex items-center gap-0.5 rounded-lg border border-line bg-surface p-0.5 shadow-sm">
-      <Tooltip content={m.zoom_out()}>
-        <Button size="icon-sm" variant="ghost" aria-label={m.zoom_out()} onClick={() => step(-1)}>
-          <Minus />
-        </Button>
-      </Tooltip>
-      <span className="w-11 text-center text-xs font-medium text-muted tabular-nums">{Math.round(current * 100)}%</span>
-      <Tooltip content={m.zoom_in()}>
-        <Button size="icon-sm" variant="ghost" aria-label={m.zoom_in()} onClick={() => step(1)}>
-          <Plus />
-        </Button>
-      </Tooltip>
-      <span className="mx-0.5 h-4 w-px bg-line" />
-      <button
-        type="button"
-        onClick={() => setZoom('fit')}
-        className={cn(
-          'h-7 rounded-md px-2 text-xs font-medium transition-colors',
-          zoom === 'fit' ? 'bg-surface-2 text-text' : 'text-muted hover:bg-surface-2 hover:text-text',
-        )}
-      >
-        {m.zoom_fit()}
-      </button>
-      <button
-        type="button"
-        onClick={() => setZoom(1)}
-        className={cn(
-          'h-7 rounded-md px-2 text-xs font-medium transition-colors',
-          zoom === 1 ? 'bg-surface-2 text-text' : 'text-muted hover:bg-surface-2 hover:text-text',
-        )}
-      >
-        100%
-      </button>
+    <div className="flex h-10 shrink-0 items-center justify-end border-t border-line bg-canvas px-3">
+      <div role="group" aria-label={m.ai2_zoom_label()} className="flex items-center gap-0.5">
+        <Tooltip content={m.zoom_out()}>
+          <Button size="icon-sm" variant="ghost" aria-label={m.zoom_out()} disabled={current <= ZOOM_STEPS[0] + 0.001} onClick={() => step(-1)}>
+            <Minus />
+          </Button>
+        </Tooltip>
+        <Tooltip content={m.ai2_zoom_reset()}>
+          <button
+            type="button"
+            onClick={() => setZoom(1)}
+            className="h-7 w-12 rounded-md text-center text-xs font-medium text-muted tabular-nums transition-colors hover:bg-surface-2 hover:text-text"
+          >
+            {Math.round(current * 100)}%
+          </button>
+        </Tooltip>
+        <Tooltip content={m.zoom_in()}>
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            aria-label={m.zoom_in()}
+            disabled={current >= ZOOM_STEPS.at(-1)! - 0.001}
+            onClick={() => step(1)}
+          >
+            <Plus />
+          </Button>
+        </Tooltip>
+        <span className="mx-1 h-4 w-px bg-line" />
+        <button
+          type="button"
+          onClick={() => setZoom('fit')}
+          aria-pressed={zoom === 'fit'}
+          className={cn(
+            'h-7 rounded-md px-2 text-xs font-medium transition-colors',
+            zoom === 'fit' ? 'bg-surface-2 text-text' : 'text-muted hover:bg-surface-2 hover:text-text',
+          )}
+        >
+          {m.zoom_fit()}
+        </button>
+      </div>
     </div>
   )
 }
 
-export const PreviewPane = forwardRef<CvFrameHandle, { cv: Cv; readOnly?: boolean }>(function PreviewPane(
-  { cv, readOnly = false },
-  ref,
-) {
+/** Bekleyen önerilerden önizleme işaretleri. */
+function useSuggestionMap(): SuggestionMap | undefined {
+  const suggestions = useEditorUi((s) => s.suggestions)
+  return useMemo(() => {
+    if (suggestions.length === 0) return undefined
+    const map: SuggestionMap = { fields: new Map(), added: new Map(), removed: new Map() }
+    for (const s of suggestions) {
+      if (s.kind === 'field') map.fields.set(`${s.target}:${s.field}`, s)
+      else if (s.kind === 'removeItem') map.removed!.set(s.itemId, s.id)
+      else {
+        const list: AddedItemSuggestion[] = map.added!.get(s.sectionId) ?? []
+        list.push({ id: s.id, afterItemId: s.afterItemId, item: s.item })
+        map.added!.set(s.sectionId, list)
+      }
+    }
+    return map
+  }, [suggestions])
+}
+
+export const PreviewPane = forwardRef<
+  CvFrameHandle,
+  {
+    cv: Cv
+    readOnly?: boolean
+    /** Salt okunur (telefon) görünümde uyarıyla aynı kutuda gösterilen not */
+    notice?: string
+  }
+>(function PreviewPane({ cv, readOnly = false, notice }, ref) {
   const zoom = useEditorUi((s) => s.zoom)
+  const tab = useEditorUi((s) => s.tab)
   const focusedItemId = useEditorUi((s) => s.focusedItemId)
   const focusItem = useEditorUi((s) => s.focusItem)
   const setTab = useEditorUi((s) => s.setTab)
-  const suggestions = useEditorUi((s) => s.suggestions)
   const setPagination = useEditorUi((s) => s.setPagination)
   const oversized = useEditorUi((s) => s.oversized)
   const clipped = useEditorUi((s) => s.clipped)
+  const reveal = useEditorUi((s) => s.reveal)
+  const flash = useEditorUi((s) => s.flash)
   const [fitScale, setFitScale] = useState(1)
-  const [fading, setFading] = useState(false)
-  const previousTemplate = useRef(cv.templateId + cv.template.columns)
-
-  // Şablon/sütun değişince kısa geçiş: CV yeni düzene "akar".
-  useEffect(() => {
-    const key = cv.templateId + cv.template.columns
-    if (key === previousTemplate.current) return
-    previousTemplate.current = key
-    setFading(true)
-    const timer = setTimeout(() => setFading(false), 160)
-    return () => clearTimeout(timer)
-  }, [cv.templateId, cv.template.columns])
-
-  const suggestionMap = useMemo<SuggestionMap | undefined>(() => {
-    if (suggestions.length === 0) return undefined
-    return new Map(suggestions.map((s) => [`${s.target}:${s.field}`, s]))
-  }, [suggestions])
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const suggestionMap = useSuggestionMap()
 
   const onResult = useCallback(
     (r: PaginateResult) => setPagination({ pageCount: r.pageCount, oversized: r.oversized, clipped: r.clipped }),
@@ -113,38 +132,80 @@ export const PreviewPane = forwardRef<CvFrameHandle, { cv: Cv; readOnly?: boolea
     [focusItem, setTab],
   )
 
+  // Öneri listesinden seçilen öneriyi önizlemede görünür yap.
+  useEffect(() => {
+    if (!reveal) return
+    const scroller = scrollRef.current
+    const iframe = scroller?.querySelector('iframe')
+    const el = iframe?.contentDocument?.querySelector<HTMLElement>(`[data-sg-id="${CSS.escape(reveal.id)}"]`)
+    if (!scroller || !iframe || !el) return
+    const scale = iframe.getBoundingClientRect().width / PAGE_WIDTH_PX
+    const top = iframe.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop
+    const elTop = top + el.getBoundingClientRect().top * scale
+    const elHeight = el.getBoundingClientRect().height * scale
+    const target = elTop - Math.max(24, (scroller.clientHeight - elHeight) / 2)
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    scroller.scrollTo({ top: Math.max(0, target), behavior: reduce ? 'auto' : 'smooth' })
+  }, [reveal])
+
   const warnings = oversizedLabels(cv, oversized)
+  const hasWarning = warnings.length > 0 || clipped
 
   return (
     <div className="relative flex h-full min-h-0 flex-col bg-canvas">
-      {(warnings.length > 0 || clipped) && (
-        <div
-          role="alert"
-          className="flex items-start gap-3 border-b border-warn/25 bg-warn-soft px-5 py-2.5 text-[13px] animate-rise-in"
-        >
-          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warn" />
-          <div className="flex-1">
-            <p className="font-semibold text-text">{m.oversized_title({ count: warnings.length })}</p>
-            <p className="text-muted">
-              {m.oversized_body()}{' '}
-              {warnings.map((w, i) => (
-                <span key={`${w.id}-${i}`}>
-                  {i > 0 && ', '}
-                  <button
-                    type="button"
-                    className="font-medium text-text underline underline-offset-2 hover:text-accent"
-                    onClick={() => w.id && onTargetClick({ itemId: w.id, sectionId: null, personal: false })}
-                  >
-                    {w.label}
-                  </button>
-                </span>
-              ))}
-              {clipped && <span className="block text-danger">{m.clipped_body()}</span>}
-            </p>
-          </div>
-        </div>
-      )}
-      <div className="min-h-0 flex-1 overflow-auto">
+      {readOnly
+        ? (notice || hasWarning) && (
+            // Telefonda tek, sıkı kutu: düzenleme notu + (varsa) uzun kayıt uyarısı. Tıklanacak bir şey yok.
+            <div
+              role={hasWarning ? 'alert' : undefined}
+              className={cn(
+                'flex flex-col gap-1.5 border-b px-4 py-2.5 text-[13px]',
+                hasWarning ? 'border-warn/25 bg-warn-soft' : 'border-line bg-surface',
+              )}
+            >
+              {notice && (
+                <p className="flex items-start gap-2.5 text-muted">
+                  <MonitorSmartphone className="mt-0.5 size-4 shrink-0" />
+                  {notice}
+                </p>
+              )}
+              {warnings.length > 0 && (
+                <p className="flex items-start gap-2.5 text-text">
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warn" />
+                  {m.ai2_oversized_mobile({ count: warnings.length, names: warnings.map((w) => w.label).join(', ') })}
+                </p>
+              )}
+              {clipped && <p className="pl-6.5 text-danger">{m.clipped_body()}</p>}
+            </div>
+          )
+        : hasWarning && (
+            <div
+              role="alert"
+              className="flex items-start gap-3 border-b border-warn/25 bg-warn-soft px-5 py-2.5 text-[13px] animate-rise-in"
+            >
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warn" />
+              <div className="flex-1">
+                <p className="font-semibold text-text">{m.oversized_title({ count: warnings.length })}</p>
+                <p className="text-muted">
+                  {m.oversized_body()}{' '}
+                  {warnings.map((w, i) => (
+                    <span key={`${w.id}-${i}`}>
+                      {i > 0 && ', '}
+                      <button
+                        type="button"
+                        className="font-medium text-text underline underline-offset-2 hover:text-accent"
+                        onClick={() => w.id && onTargetClick({ itemId: w.id, sectionId: null, personal: false })}
+                      >
+                        {w.label}
+                      </button>
+                    </span>
+                  ))}
+                  {clipped && <span className="block text-danger">{m.clipped_body()}</span>}
+                </p>
+              </div>
+            </div>
+          )}
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
         <CvFrame
           ref={ref}
           cv={cv}
@@ -154,19 +215,18 @@ export const PreviewPane = forwardRef<CvFrameHandle, { cv: Cv; readOnly?: boolea
           placeholders
           emptyHint={m.preview_empty_hint()}
           suggestions={suggestionMap}
-          focusedItemId={focusedItemId}
+          // Vurgu yalnız İçerik sekmesinde ve odak paneldeyken (önizleme = PDF).
+          focusedItemId={!readOnly && tab === 'content' ? focusedItemId : null}
+          flash={readOnly ? null : flash}
+          crossfadeKey={`${cv.templateId}:${cv.template.columns}`}
           onResult={onResult}
           onTargetClick={readOnly ? undefined : onTargetClick}
           onScaleChange={zoom === 'fit' ? setFitScale : undefined}
-          className={cn('py-6 transition-opacity duration-150 ease-out', fading ? 'opacity-0' : 'opacity-100')}
+          className="py-6"
           title={m.preview_title()}
         />
       </div>
-      {!readOnly && (
-        <div className="pointer-events-none absolute right-4 bottom-4 [&>*]:pointer-events-auto">
-          <ZoomControl fitScale={fitScale} />
-        </div>
-      )}
+      {!readOnly && <ZoomBar fitScale={fitScale} />}
     </div>
   )
 })

@@ -71,7 +71,7 @@ export function Segmented<T extends string>({
       {indicator && (
         <span
           aria-hidden
-          className="absolute top-0.5 bottom-0.5 rounded-md bg-surface shadow-sm ring-1 ring-line transition-[left,width] duration-200 ease-[var(--ease-out-soft)] dark:bg-surface-3"
+          className="absolute top-0.5 bottom-0.5 rounded-md bg-surface shadow-sm ring-1 ring-line transition-[left,width] duration-200 ease-[var(--ease-out-soft)] dark:bg-line-strong dark:ring-faint/35"
           style={{ left: indicator.left, width: indicator.width }}
         />
       )}

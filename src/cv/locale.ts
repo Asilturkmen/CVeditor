@@ -41,8 +41,6 @@ export const MONTHS_SHORT: Record<CvLanguage, readonly string[]> = {
 
 export const PRESENT: Record<CvLanguage, string> = { tr: 'Günümüz', en: 'Present' }
 
-export const CONTACT_TITLE: Record<CvLanguage, string> = { tr: 'İletişim', en: 'Contact' }
-
 export const LANGUAGE_NAMES: Record<CvLanguage, string> = { tr: 'Türkçe', en: 'İngilizce' }
 
 /** Önizlemede boş ad yerine görünen soluk yer tutucu (PDF'e basılmaz) */

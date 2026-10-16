@@ -14,7 +14,10 @@ import {
   setPersonal,
   switchTemplate,
 } from './actions'
-import { generateMockSuggestions, tidyHtml } from './mockSuggestions'
+import { mockEdit, tidyHtml } from '@/ai/mockProvider'
+import { operationsToSuggestions } from '@/ai/ops'
+import { buildEditPayload } from '@/ai/payload'
+import type { AiScope } from '@/ai/types'
 import { useEditor } from './store'
 
 function sampleCv(): Cv {
@@ -139,12 +142,18 @@ describe('düzenleme', () => {
   })
 })
 
-describe('örnek öneriler (V1)', () => {
+/** Örnek sağlayıcının önerileri (gerçek akışla aynı yol: payload → işlem → öneri). */
+function mockSuggestions(scope: AiScope, prompt = 'Maddeleri düzelt') {
+  const { payload, unmask } = buildEditPayload(cv(), scope, prompt)
+  return operationsToSuggestions(cv(), mockEdit(payload), unmask, payload).suggestions
+}
+
+describe('örnek öneriler', () => {
   it('öneriden sonra alan değiştiyse öneri uygulanmaz', () => {
     const experience = cv().sections.find((s) => s.type === 'experience')!
     const target = experience.items[0]
     setItemField(experience.id, target.id, 'description', '<ul><li>birinci</li><li>ikinci</li></ul>')
-    const list = generateMockSuggestions(cv(), { kind: 'item', sectionId: experience.id, itemId: target.id })
+    const list = mockSuggestions({ kind: 'item', sectionId: experience.id, itemId: target.id })
     setItemField(experience.id, target.id, 'description', '<ul><li>kullanıcının yeni metni</li></ul>')
     expect(applySuggestions(list)).toBe(0)
     const item = cv().sections.find((s) => s.type === 'experience')!.items[0] as { description: string }
@@ -166,13 +175,41 @@ describe('örnek öneriler (V1)', () => {
     setItemField(experience.id, target.id, 'description', '<ul><li>birinci</li><li>ikinci</li></ul>')
     const pastBefore = useEditor.getState().past.length
 
-    const scoped = generateMockSuggestions(cv(), { kind: 'item', sectionId: experience.id, itemId: target.id })
+    const scoped = mockSuggestions({ kind: 'item', sectionId: experience.id, itemId: target.id })
     expect(scoped.length).toBeGreaterThan(0)
-    expect(scoped.every((s) => s.target === target.id)).toBe(true)
+    expect(scoped.every((s) => s.kind === 'field' && s.target === target.id)).toBe(true)
 
     expect(applySuggestions(scoped)).toBe(scoped.length)
     expect(useEditor.getState().past.length).toBe(pastBefore + 1)
     const updated = cv().sections.find((s) => s.type === 'experience')!.items[0] as { description: string }
     expect(updated.description).toBe('<ul><li>Birinci</li><li>İkinci</li></ul>')
+  })
+
+  it('ekleme + kaldırma + alan önerisi tek adımda uygulanır ve tek adımda geri alınır', () => {
+    const before = JSON.stringify(cv().sections)
+    const list = mockSuggestions({ kind: 'all' }, 'Becerilere bir grup ekle ve son kaydı sil')
+    expect(list.some((s) => s.kind === 'addItem')).toBe(true)
+    expect(list.some((s) => s.kind === 'removeItem')).toBe(true)
+    const pastBefore = useEditor.getState().past.length
+    expect(applySuggestions(list)).toBe(list.length)
+    expect(useEditor.getState().past.length).toBe(pastBefore + 1)
+    const add = list.find((s) => s.kind === 'addItem')!
+    expect(cv().sections.some((s) => s.items.some((i) => i.id === (add.kind === 'addItem' && add.item.id)))).toBe(true)
+    useEditor.getState().undo()
+    expect(JSON.stringify(cv().sections)).toBe(before)
+  })
+
+  it('kaldırma önerisi kayıt sonradan değiştiyse uygulanmaz; ekleme aynı id ile iki kez girmez', () => {
+    const list = mockSuggestions({ kind: 'all' }, 'son kaydı sil ve bir beceri ekle')
+    const remove = list.find((s) => s.kind === 'removeItem')!
+    const add = list.find((s) => s.kind === 'addItem')!
+    if (remove.kind !== 'removeItem' || add.kind !== 'addItem') throw new Error('tür')
+    setItemField(remove.sectionId, remove.itemId, 'name', 'Elle değişti')
+    expect(applySuggestions([remove])).toBe(0)
+    expect(cv().sections.find((s) => s.id === remove.sectionId)!.items.some((i) => i.id === remove.itemId)).toBe(true)
+    expect(applySuggestions([add])).toBe(1)
+    expect(applySuggestions([add])).toBe(0)
+    const count = cv().sections.flatMap((s) => s.items as { id: string }[]).filter((i) => i.id === add.item.id).length
+    expect(count).toBe(1)
   })
 })

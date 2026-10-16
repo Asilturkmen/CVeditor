@@ -20,7 +20,7 @@
   --line-strong: #cfcec8;
   --text: #1b1b19;
   --muted: #66655f;
-  --faint: #96958e;
+  --faint: #6e6d66; /* bg 4.8:1, surface 5.2:1, surface-2 4.5:1 */
   --accent: var(--accent-base);
   --accent-hover: color-mix(in oklab, var(--accent-base) 86%, black);
   --accent-fg: #ffffff;
@@ -48,7 +48,7 @@
   --line-strong: #3b3b38;
   --text: #ecebe7;
   --muted: #a3a29b;
-  --faint: #73726c;
+  --faint: #929189; /* bg 5.9:1, surface 5.5:1, surface-2 5.0:1 */
   --accent: color-mix(in oklab, var(--accent-base) 62%, white);
   --accent-hover: color-mix(in oklab, var(--accent-base) 50%, white);
   --accent-fg: #0f0f0e;

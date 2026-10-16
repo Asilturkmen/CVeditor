@@ -29,6 +29,8 @@ interface EditorState {
   future: HistoryEntry[]
   saveState: SaveState
   lastSavedAt: number | null
+  /** Her load() çağrısında artar: aynı CV yeniden yüklense de yükleme fark edilir. */
+  loads: number
   load: (cv: Cv) => void
   unload: (id?: string) => void
   update: (recipe: (draft: Draft<Cv>) => void, options?: { coalesceKey?: string }) => void
@@ -75,11 +77,12 @@ export const useEditor = create<EditorState>((set, get) => {
     future: [],
     saveState: 'saved',
     lastSavedAt: null,
+    loads: 0,
 
     load(cv) {
       if (saveTimer) clearTimeout(saveTimer)
       saveTimer = null
-      set({ cv, past: [], future: [], saveState: 'saved', lastSavedAt: null })
+      set({ cv, past: [], future: [], saveState: 'saved', lastSavedAt: null, loads: get().loads + 1 })
     },
 
     unload(id) {

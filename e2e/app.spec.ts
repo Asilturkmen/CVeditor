@@ -153,7 +153,7 @@ test('yedek al ve başka tarayıcıya geri yükle', async ({ page, browser }) =>
   await createCv(page, { name: 'Yedeklenen', start: 'sample' })
   await page.goto('/ayarlar')
   const downloadPromise = page.waitForEvent('download')
-  await page.getByRole('button', { name: /Yedekle \(1\)/ }).click()
+  await page.getByRole('button', { name: /1 CV'yi yedekle/ }).click()
   const download = await downloadPromise
   const file = await download.path()
   const backup = JSON.parse(readFileSync(file, 'utf8'))
@@ -179,6 +179,7 @@ test('kaydı başka CV\'ye ekler (aynı çeviri grubuyla)', async ({ page }) => 
   const card = page.locator('[id^="item-"]', { hasText: 'Rota' }).first()
   await card.getByRole('button', { name: /için işlemler/ }).click()
   await page.getByRole('menuitem', { name: "Başka CV'ye ekle…" }).click()
+  await page.getByRole('dialog').getByRole('radio', { name: 'Olduğu gibi ekle' }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Ekle' }).click()
   await expect(page.getByText('"Hedef EN" CV\'sine eklendi')).toBeVisible()
 })

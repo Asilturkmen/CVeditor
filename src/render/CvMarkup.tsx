@@ -1,7 +1,7 @@
-import type { ReactNode } from 'react'
+import { cloneElement, Fragment, type ReactElement, type ReactNode } from 'react'
 import { formatDateRange, formatYearMonth } from '@/cv/dates'
 import { isItemEmpty } from '@/cv/factory'
-import { CONTACT_TITLE, NAME_PLACEHOLDER, sectionTitle } from '@/cv/locale'
+import { NAME_PLACEHOLDER, sectionTitle } from '@/cv/locale'
 import type { AnyItem, Cv, CvLanguage, Section } from '@/cv/schema'
 import { diffHtml, diffText } from './diff'
 import { displayUrl, isRichTextEmpty, sanitizeDiffHtml, sanitizeRichText, toHref } from './richtext'
@@ -18,8 +18,21 @@ export interface FieldSuggestion {
   after: string
   rich: boolean
 }
-/** Anahtar: `${itemId|'personal'}:${alan}` */
-export type SuggestionMap = Map<string, FieldSuggestion>
+export interface AddedItemSuggestion {
+  id: string
+  afterItemId: string | null
+  item: AnyItem
+}
+
+/** Önizlemede işaretlenecek bekleyen öneriler. */
+export interface SuggestionMap {
+  /** Anahtar: `${itemId|'personal'}:${alan}` */
+  fields: Map<string, FieldSuggestion>
+  /** Bölüm id'si → eklenecek kayıtlar (geçici, yeşil) */
+  added?: Map<string, AddedItemSuggestion[]>
+  /** Kayıt id'si → kaldırma önerisinin id'si (üstü çizili, kırmızı) */
+  removed?: Map<string, string>
+}
 
 interface Ctx {
   lang: CvLanguage
@@ -27,7 +40,7 @@ interface Ctx {
 }
 
 function Text({ ctx, target, field, value }: { ctx: Ctx; target: string; field: string; value: string }) {
-  const sg = ctx.suggestions?.get(`${target}:${field}`)
+  const sg = ctx.suggestions?.fields.get(`${target}:${field}`)
   if (sg) {
     return (
       <span className="sg" data-sg-id={sg.id} dangerouslySetInnerHTML={{ __html: diffText(sg.before, sg.after) }} />
@@ -37,7 +50,7 @@ function Text({ ctx, target, field, value }: { ctx: Ctx; target: string; field: 
 }
 
 function Rich({ ctx, target, field, value }: { ctx: Ctx; target: string; field: string; value: string }) {
-  const sg = ctx.suggestions?.get(`${target}:${field}`)
+  const sg = ctx.suggestions?.fields.get(`${target}:${field}`)
   if (sg) {
     const html = sanitizeDiffHtml(diffHtml(sanitizeRichText(sg.before), sanitizeRichText(sg.after)))
     return <div className="entry-body rich sg sg-block" data-sg-id={sg.id} dangerouslySetInnerHTML={{ __html: html }} />
@@ -47,7 +60,7 @@ function Rich({ ctx, target, field, value }: { ctx: Ctx; target: string; field: 
 }
 
 function hasSuggestion(ctx: Ctx, target: string, field: string) {
-  return ctx.suggestions?.has(`${target}:${field}`) ?? false
+  return ctx.suggestions?.fields.has(`${target}:${field}`) ?? false
 }
 
 /** Boş olmayan parçaları " · " ile birleştirir; ayırıcı metin olarak kalır (ATS okur). */
@@ -68,6 +81,11 @@ function Joined({ parts }: { parts: ReactNode[] }) {
 function Link({ value }: { value: string }) {
   if (!value.trim()) return null
   return <a href={toHref(value)}>{displayUrl(value)}</a>
+}
+
+/** Bağlantı alanı; bekleyen öneri varsa bağlantı yerine fark gösterilir. */
+function UrlField({ ctx, target, field, value }: { ctx: Ctx; target: string; field: string; value: string }) {
+  return hasSuggestion(ctx, target, field) ? <Text ctx={ctx} target={target} field={field} value={value} /> : <Link value={value} />
 }
 
 function EntryHead({ title, date }: { title: ReactNode; date: string }) {
@@ -119,13 +137,22 @@ function ItemBlock({ section, item, ctx }: { section: Section; item: AnyItem; ct
     }
     case 'education': {
       const it = item as Extract<Section, { type: 'education' }>['items'][number]
-      const degree = [it.degree, it.field].filter(Boolean).join(', ')
+      const degreeSg = hasSuggestion(ctx, item.id, 'degree') || hasSuggestion(ctx, item.id, 'field')
+      const degree = degreeSg ? (
+        <>
+          {v('degree', it.degree)}
+          {(it.degree || hasSuggestion(ctx, item.id, 'degree')) && (it.field || hasSuggestion(ctx, item.id, 'field')) && ', '}
+          {v('field', it.field)}
+        </>
+      ) : (
+        [it.degree, it.field].filter(Boolean).join(', ')
+      )
       return (
         <div {...entryAttrs(section, item, 'education')}>
           <EntryHead title={<strong>{t('school', it.school)}</strong>} date={formatDateRange(it.dates, lang)} />
           {(degree || it.location || it.grade) && (
             <Sub>
-              <Joined parts={[degree, v('location', it.location), it.grade]} />
+              <Joined parts={[degree, v('location', it.location), v('grade', it.grade)]} />
             </Sub>
           )}
           {rich(it.description)}
@@ -142,9 +169,9 @@ function ItemBlock({ section, item, ctx }: { section: Section; item: AnyItem; ct
             }
             date={formatDateRange(it.dates, lang)}
           />
-          {it.url && (
+          {(it.url || hasSuggestion(ctx, item.id, 'url')) && (
             <Sub>
-              <Link value={it.url} />
+              <UrlField ctx={ctx} target={item.id} field="url" value={it.url} />
             </Sub>
           )}
           {rich(it.description)}
@@ -185,7 +212,9 @@ function ItemBlock({ section, item, ctx }: { section: Section; item: AnyItem; ct
           <EntryHead title={<strong>{t('name', it.name)}</strong>} date={formatYearMonth(it.date, lang)} />
           {(it.issuer || it.url) && (
             <Sub>
-              <Joined parts={[v('issuer', it.issuer), it.url ? <Link key="url" value={it.url} /> : null]} />
+              <Joined
+                parts={[v('issuer', it.issuer), it.url || hasSuggestion(ctx, item.id, 'url') ? <UrlField key="url" ctx={ctx} target={item.id} field="url" value={it.url} /> : null]}
+              />
             </Sub>
           )}
         </div>
@@ -233,8 +262,8 @@ function ItemBlock({ section, item, ctx }: { section: Section; item: AnyItem; ct
             <Sub>
               <Joined
                 parts={[
-                  it.email ? <a key="email" href={toHref(it.email)}>{it.email}</a> : null,
-                  it.phone ? <a key="phone" href={`tel:${it.phone.replace(/\s/g, '')}`}>{it.phone}</a> : null,
+                  hasSuggestion(ctx, item.id, 'email') ? t('email', it.email) : it.email ? <a key="email" href={toHref(it.email)}>{it.email}</a> : null,
+                  hasSuggestion(ctx, item.id, 'phone') ? t('phone', it.phone) : it.phone ? <a key="phone" href={`tel:${it.phone.replace(/\s/g, '')}`}>{it.phone}</a> : null,
                 ]}
               />
             </Sub>
@@ -250,7 +279,11 @@ function ItemBlock({ section, item, ctx }: { section: Section; item: AnyItem; ct
           {(it.subtitle || it.location || it.url) && (
             <Sub>
               <Joined
-                parts={[v('subtitle', it.subtitle), v('location', it.location), it.url ? <Link key="url" value={it.url} /> : null]}
+                parts={[
+                  v('subtitle', it.subtitle),
+                  v('location', it.location),
+                  it.url || hasSuggestion(ctx, item.id, 'url') ? <UrlField key="url" ctx={ctx} target={item.id} field="url" value={it.url} /> : null,
+                ]}
               />
             </Sub>
           )}
@@ -263,35 +296,61 @@ function ItemBlock({ section, item, ctx }: { section: Section; item: AnyItem; ct
 
 function SectionBlocks({ section, ctx }: { section: Section; ctx: Ctx }) {
   const items = (section.items as AnyItem[]).filter((i) => !i.hidden && !isItemEmpty(i))
+  const added = ctx.suggestions?.added?.get(section.id) ?? []
+  const removed = ctx.suggestions?.removed
+  // Önerilen yeni kayıtlar yerlerine (afterItemId'nin ardına, yoksa sona) geçici olarak girer.
+  const rows: { item: AnyItem; mark?: { className: string; id: string } }[] = items.map((item) => {
+    const sgId = removed?.get(item.id)
+    return { item, mark: sgId ? { className: 'sg-removed', id: sgId } : undefined }
+  })
+  for (const a of added) {
+    const row = { item: a.item, mark: { className: 'sg-added', id: a.id } }
+    let index = a.afterItemId ? rows.findIndex((r) => r.item.id === a.afterItemId) : -1
+    if (index < 0) index = rows.length - 1
+    while (index + 1 < rows.length && rows[index + 1].mark?.className === 'sg-added') index++
+    rows.splice(index + 1, 0, row)
+  }
   return (
     <>
       <h2 className="section-title" data-block="" data-keep-with-next="" data-section-id={section.id}>
         <span>{sectionTitle(ctx.lang, section.type, section.title)}</span>
       </h2>
-      {items.map((item) => (
-        <ItemBlock key={item.id} section={section} item={item} ctx={ctx} />
-      ))}
+      {rows.map(({ item, mark }) => {
+        if (!mark) return <ItemBlock key={item.id} section={section} item={item} ctx={ctx} />
+        // Kaydın kendi bloğu işaretlenir (sayfalama aynı bloğu taşır).
+        const el = ItemBlock({ section, item, ctx }) as ReactElement<{ className: string }>
+        return cloneElement(el, { key: item.id, className: `${el.props.className} sg ${mark.className}`, 'data-sg-id': mark.id } as never)
+      })}
     </>
   )
 }
 
-function ContactList({ cv }: { cv: Cv }) {
+function ContactList({ cv, ctx }: { cv: Cv; ctx: Ctx }) {
   const p = cv.personal
   const items: ReactNode[] = []
-  if (p.email) items.push(<a href={toHref(p.email)}>{p.email}</a>)
-  if (p.phone) items.push(<a href={`tel:${p.phone.replace(/\s/g, '')}`}>{p.phone}</a>)
-  if (p.location) items.push(<span>{p.location}</span>)
-  if (p.website) items.push(<Link value={p.website} />)
-  if (p.linkedin) items.push(<Link value={p.linkedin} />)
-  if (p.github) items.push(<Link value={p.github} />)
+  const push = (field: keyof typeof p, node: ReactNode) => {
+    if (hasSuggestion(ctx, 'personal', field)) items.push(<Text ctx={ctx} target="personal" field={field} value={String(p[field] ?? '')} />)
+    else if (p[field]) items.push(node)
+  }
+  push('email', <a href={toHref(p.email)}>{p.email}</a>)
+  push('phone', <a href={`tel:${p.phone.replace(/\s/g, '')}`}>{p.phone}</a>)
+  push('location', <span>{p.location}</span>)
+  push('website', <Link value={p.website} />)
+  push('linkedin', <Link value={p.linkedin} />)
+  push('github', <Link value={p.github} />)
   if (items.length === 0) return null
   return (
     <ul className="cv-contact">
       {items.map((node, i) => (
-        <li key={i}>
-          {node}
-          {i < items.length - 1 && <span className="sep">{' ·'} </span>}
-        </li>
+        // Her öğe bölünmez bir birim (adres ortasından satıra kırılmaz); liste yalnız öğeler
+        // arasındaki boşlukta kırılır. Ayırıcı önceki öğeye yapışık, satır başında "·" kalmaz.
+        <Fragment key={i}>
+          {i > 0 && ' '}
+          <li>
+            {node}
+            {i < items.length - 1 && <span className="sep">{' ·'}</span>}
+          </li>
+        </Fragment>
       ))}
     </ul>
   )
@@ -313,7 +372,8 @@ function Header({ cv, ctx, placeholders }: { cv: Cv; ctx: Ctx; placeholders: boo
             <Text ctx={ctx} target="personal" field="headline" value={p.headline} />
           </p>
         )}
-        {cv.template.columns === 1 && <ContactList cv={cv} />}
+        {/* İletişim her düzende başlıkta (tam genişlik): dar yan sütunda adresler satıra bölünürdü. */}
+        <ContactList cv={cv} ctx={ctx} />
       </div>
     </header>
   )
@@ -339,12 +399,12 @@ export function CvSource({
 }) {
   const ctx: Ctx = { lang: cv.language, suggestions }
   const two = cv.template.columns === 2
-  const sections = visibleSections(cv)
+  // Boş bölüme önerilen kayıt da görünsün.
+  const visible = new Set(visibleSections(cv))
+  const sections = cv.sections.filter((s) => visible.has(s) || (!s.hidden && !!suggestions?.added?.get(s.id)?.length))
   const sideIds = new Set(two ? cv.template.sideSections : [])
   const side = sections.filter((s) => sideIds.has(s.id))
   const main = sections.filter((s) => !sideIds.has(s.id))
-  const p = cv.personal
-  const hasContact = !!(p.email || p.phone || p.location || p.website || p.linkedin || p.github)
 
   return (
     <div className={`cv tpl-${cv.templateId} cols-${two ? 2 : 1} align-${cv.template.headerAlign}`}>
@@ -353,16 +413,6 @@ export function CvSource({
       </div>
       {two && (
         <div data-flow="side">
-          {hasContact && (
-            <>
-              <h2 className="section-title" data-block="" data-keep-with-next="" data-target="personal">
-                <span>{CONTACT_TITLE[cv.language]}</span>
-              </h2>
-              <div className="entry entry-contact" data-block="" data-target="personal">
-                <ContactList cv={cv} />
-              </div>
-            </>
-          )}
           {side.map((s) => (
             <SectionBlocks key={s.id} section={s} ctx={ctx} />
           ))}

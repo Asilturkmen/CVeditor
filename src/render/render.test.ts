@@ -58,10 +58,23 @@ describe('CV kaynağı (çizim)', () => {
     const doc = parse(renderCvSource(cv))
     const flows = Array.from(doc.querySelectorAll('[data-flow]')).map((el) => el.getAttribute('data-flow'))
     expect(flows).toEqual(['header', 'side', 'main'])
-    const side = doc.querySelector('[data-flow="side"]')!.textContent!
-    expect(side).toContain('İletişim')
-    expect(side).toContain('Beceriler')
+    const side = doc.querySelector('[data-flow="side"]')!
+    // Yan sütun becerilerle başlar; iletişim her düzende başlıkta (tam genişlik).
+    expect(side.querySelector('.section-title')!.textContent).toBe('Beceriler')
+    expect(side.textContent).not.toContain('İletişim')
+    expect(side.querySelector('.cv-contact')).toBeNull()
+    expect(doc.querySelector('[data-flow="header"] .cv-contact')!.textContent).toContain('linkedin.com/in/deniz-aksoy-ornek')
     expect(doc.querySelector('[data-flow="main"]')!.textContent).toContain('Deneyim')
+  })
+
+  it('iletişim öğeleri ayrı birimler; ayırıcı önceki öğeye yapışık, öğeler arasında boşluk', () => {
+    const doc = parse(renderCvSource(cvWith('modern')))
+    const list = doc.querySelector('.cv-contact')!
+    const items = Array.from(list.querySelectorAll('li'))
+    expect(items.map((li) => li.textContent)).toContain('linkedin.com/in/deniz-aksoy-ornek\u00a0·')
+    expect(items.at(-1)!.querySelector('.sep')).toBeNull()
+    // Satır yalnız öğeler arasındaki (li dışındaki) düz boşlukta kırılabilir.
+    for (const li of items.slice(1)) expect(li.previousSibling?.textContent).toBe(' ')
   })
 
   it('tek sütunda iletişim başlıkta, yan sütun yok', () => {

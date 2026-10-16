@@ -13,7 +13,17 @@ import { defaultSideSections, getTemplate, TEMPLATE_LIST, TEMPLATES, type Templa
 import { visibleSections } from '@/render/CvMarkup'
 import { TEMPLATE_TEXT } from '@/features/templates/TemplatesPage'
 
-const ACCENT_PRESETS = ['#1f5f8b', '#2f6f62', '#24543d', '#7a3e2b', '#8a5a14', '#5b3f7a', '#3a3a3a', '#1c2b4a']
+/** CV vurgu renkleri; ekran okuyucu için Türkçe adlarıyla. */
+const ACCENT_PRESETS: { color: string; name: () => string }[] = [
+  { color: '#1f5f8b', name: () => m.ux_color_blue() },
+  { color: '#2f6f62', name: () => m.accent_petrol() },
+  { color: '#24543d', name: () => m.accent_orman() },
+  { color: '#7a3e2b', name: () => m.accent_kiremit() },
+  { color: '#8a5a14', name: () => m.ux_color_mustard() },
+  { color: '#5b3f7a', name: () => m.ux_color_purple() },
+  { color: '#3a3a3a', name: () => m.accent_grafit() },
+  { color: '#1c2b4a', name: () => m.ux_color_navy() },
+]
 
 function Group({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   return (
@@ -61,7 +71,7 @@ function TemplateChoice({ cv, id }: { cv: Cv; id: TemplateId }) {
           active ? 'border-accent shadow-[0_0_0_2px_var(--accent)]' : 'border-line group-hover:-translate-y-0.5 group-hover:border-line-strong',
         )}
       >
-        <CvFrame cv={preview} scale="fit" fitPadding={0} firstPageOnly title={template.name} />
+        <CvFrame cv={preview} scale="fit" fitPadding={0} firstPageOnly title={TEMPLATE_TEXT[template.id].name()} />
         {active && (
           <span className="absolute top-2 right-2 flex size-5 items-center justify-center rounded-full bg-accent text-accent-fg shadow-sm animate-[pop-in_200ms_var(--ease-spring)]">
             <Check className="size-3" strokeWidth={3} />
@@ -69,7 +79,7 @@ function TemplateChoice({ cv, id }: { cv: Cv; id: TemplateId }) {
         )}
       </div>
       <div>
-        <p className="text-[13px] font-semibold">{template.name}</p>
+        <p className="text-[13px] font-semibold">{TEMPLATE_TEXT[template.id].name()}</p>
         <p className="text-xs text-muted">{TEMPLATE_TEXT[id].layout()}</p>
       </div>
     </button>
@@ -93,7 +103,7 @@ export function AppearanceTab({ cv }: { cv: Cv }) {
 
       <Group title={m.ap_accent()}>
         <div className="flex flex-wrap items-center gap-2" role="radiogroup" aria-label={m.ap_accent()}>
-          {ACCENT_PRESETS.map((color) => {
+          {ACCENT_PRESETS.map(({ color, name }) => {
             const active = t.accentColor.toLowerCase() === color
             return (
               <button
@@ -101,11 +111,12 @@ export function AppearanceTab({ cv }: { cv: Cv }) {
                 type="button"
                 role="radio"
                 aria-checked={active}
-                aria-label={color}
+                aria-label={name()}
+                title={name()}
                 onClick={() => set('accentColor')(color)}
                 className={cn(
                   'flex size-8 items-center justify-center rounded-full ring-offset-2 ring-offset-surface transition-[transform,box-shadow] duration-150 hover:scale-105',
-                  active && 'ring-2 ring-text',
+                  active ? 'ring-2 ring-text' : 'ring-1 ring-black/10 ring-inset dark:ring-white/25',
                 )}
                 style={{ background: color }}
               >
@@ -148,7 +159,7 @@ export function AppearanceTab({ cv }: { cv: Cv }) {
                   {font.label}
                   <span className="ml-2 text-muted">Ağ Şı İç Ğü</span>
                 </span>
-                <span className="text-xs text-faint">{font.kind === 'serif' ? m.ap_serif() : m.ap_sans()}</span>
+                <span className="text-xs text-muted">{font.kind === 'serif' ? m.ap_serif() : m.ap_sans()}</span>
               </button>
             )
           })}
@@ -156,7 +167,7 @@ export function AppearanceTab({ cv }: { cv: Cv }) {
       </Group>
 
       <Group title={m.ap_size_spacing()}>
-        <div className="grid grid-cols-[88px_1fr] items-center gap-x-3 gap-y-2.5">
+        <div className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2.5">
           <span className="text-[13px] text-muted">{m.ap_font_size()}</span>
           <Segmented
             stretch

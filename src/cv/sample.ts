@@ -101,7 +101,7 @@ export function sampleSections(language: CvLanguage): Section[] {
   const certificates = createSection('certificates', 1)
   Object.assign(certificates.items[0], {
     name: tr ? 'Web Erişilebilirliği Temelleri' : 'Web Accessibility Fundamentals',
-    issuer: 'Örnek Akademi',
+    issuer: tr ? 'Örnek Akademi' : 'Example Academy',
     date: ym(2023, 11),
     url: '',
   })

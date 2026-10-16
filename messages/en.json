@@ -1,0 +1,1169 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "app_name": "CVeditör",
+  "imp_drop_hint": "or drop the file here",
+  "imp_drop_here": "Drop it, we'll read it",
+  "imp_privacy": "Your file is read in this browser and never sent anywhere. PDF only for now; Word (DOCX) is coming in a later version.",
+  "imp_reading_pdf": "Reading PDF…",
+  "imp_parsing": "Splitting into entries…",
+  "imp_cancel": "Cancel",
+  "imp_err_not_pdf_title": "This file isn't a PDF",
+  "imp_err_not_pdf_body": "If it's a Word document, save it as PDF first (File → Save as → PDF). DOCX support is coming in a later version.",
+  "imp_err_encrypted_title": "The PDF is password-protected",
+  "imp_err_encrypted_body": "Save a copy without a password and try again.",
+  "imp_err_no_text_title": "This PDF has no readable text",
+  "imp_err_no_text_body": "The text was most likely saved as an image (e.g. a flattened PDF from Canva or a scanned page). Export it again as a PDF with selectable text, or enter your details by hand. Reading text from images (OCR) is coming in a later version.",
+  "imp_err_unreadable_title": "Couldn't read the PDF",
+  "imp_err_unreadable_body": "The file may be damaged or in an unsupported format. Export the PDF again and retry.",
+  "imp_err_too_large_title": "The file is too large",
+  "imp_err_too_large_body": "You can pick a PDF of up to 20 MB.",
+  "imp_err_parse_title": "Couldn't split into entries",
+  "imp_err_parse_body": "Something unexpected went wrong. Try again; if it keeps happening, enter your details by hand.",
+  "imp_try_another": "Choose another PDF",
+  "imp_banner_rules": "Entries were split with rules; parsing will be more accurate once AI is connected. Your file wasn't sent anywhere.",
+  "imp_banner_ai": "AI split the entries; your contact details were masked before sending. Check them before you create the CV.",
+  "imp_file_meta": [
+    {
+      "declarations": [
+        "input file",
+        "input pages",
+        "local pagesPlural = pages: plural"
+      ],
+      "selectors": [
+        "pagesPlural"
+      ],
+      "match": {
+        "pagesPlural=one": "{file} · {pages} page",
+        "pagesPlural=other": "{file} · {pages} pages"
+      }
+    }
+  ],
+  "imp_detected": "PDF language: {language}",
+  "imp_detected_unsure": "Couldn't tell the PDF's language",
+  "imp_mismatch": "The PDF looks like it's in {detected}, but you're creating the CV in {selected}. Content isn't translated; the CV language sets the section titles and date format.",
+  "imp_switch_en": "Make the CV English",
+  "imp_switch_tr": "Make the CV Turkish",
+  "imp_review_hint": "Untick the entries you don't want. Open an entry to fix its fields.",
+  "imp_contacts_none": "No contact details found; you can add them in the editor.",
+  "imp_count": "{selected} of {total} entries selected",
+  "imp_none_found_title": "Couldn't recognise the sections",
+  "imp_none_found_body": "The text was read but couldn't be split into entries. Copy the text below and paste it into the right fields in the editor.",
+  "imp_raw_text": "Text read from the PDF",
+  "imp_raw_hint": "If parsing missed something, copy it from here.",
+  "imp_copy": "Copy",
+  "imp_copied": "Copied",
+  "imp_fields_show": "Show fields",
+  "imp_fields_hide": "Hide fields",
+  "imp_bullets": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} bullet",
+        "countPlural=other": "{count} bullets"
+      }
+    }
+  ],
+  "imp_json_title": "JSON Resume file",
+  "imp_json_desc": "Bring in sections from a file in jsonresume.org format.",
+  "imp_json_pick": "Choose JSON file",
+  "imp_json_loaded": "{file} · sections: {sections} · entries: {items}",
+  "imp_json_warnings": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} field couldn't be imported",
+        "countPlural=other": "{count} fields couldn't be imported"
+      }
+    }
+  ],
+  "imp_json_invalid": "The file couldn't be read as JSON.",
+  "imp_json_language_note": "The CV in this file is in {language}; content is imported without translation.",
+  "imp_json_export": "Export as JSON Resume",
+  "imp_json_err_not_object": "Couldn't read the JSON Resume: the file doesn't contain a JSON object",
+  "imp_json_err_not_resume": "This file isn't a JSON Resume: it has no basics, work, education, projects or skills field",
+  "imp_json_warn_object": "expected an object, skipped",
+  "imp_json_warn_text": "expected text, skipped",
+  "imp_json_warn_list": "expected a list, skipped",
+  "imp_json_warn_date": "couldn't read the date (\"{value}\")",
+  "imp_json_warn_image": "only embedded (data URL) photos are imported; the address was skipped",
+  "rv_nav": "Review",
+  "rv_title": "CV Review",
+  "rv_intro": "Checks your CV with rules, the way an ATS (applicant tracking system) reads it. No scores: it tells you what passes, what to fix, and why.",
+  "rv_source_title": "CV to review",
+  "rv_source_mine": "Pick from My CVs",
+  "rv_source_pdf": "Upload PDF",
+  "rv_select_label": "CV",
+  "rv_select_placeholder": "Choose a CV",
+  "rv_no_cvs": "You don't have a CV yet. Start from a template or upload a PDF.",
+  "rv_no_cvs_link": "Go to Templates",
+  "rv_open_editor": "Open in editor",
+  "rv_drop_title": "Drop the PDF here",
+  "rv_drop_button": "Choose PDF",
+  "rv_drop_hint": "The file is read in your browser and never sent anywhere.",
+  "rv_pdf_reading": "Reading PDF…",
+  "rv_pdf_pages": [
+    {
+      "declarations": [
+        "input pages",
+        "local pagesPlural = pages: plural"
+      ],
+      "selectors": [
+        "pagesPlural"
+      ],
+      "match": {
+        "pagesPlural=one": "{pages} page",
+        "pagesPlural=other": "{pages} pages"
+      }
+    }
+  ],
+  "rv_pdf_replace": "Choose another PDF",
+  "rv_ad_title": "Job ad",
+  "rv_ad_optional": "optional",
+  "rv_ad_hint": "Paste the ad text to check whether its keywords appear in your CV.",
+  "rv_ad_label": "Ad text",
+  "rv_ad_placeholder": "Paste the full job ad here…",
+  "rv_empty_title": "Choose a CV or upload a PDF",
+  "rv_empty_body": "The review starts as soon as you choose, and updates on its own as you edit your CV.",
+  "rv_results_label": "Review results",
+  "rv_sev_problem": "Problem",
+  "rv_sev_warn": "Warning",
+  "rv_sev_info": "Tip",
+  "rv_sev_ok": "Passed",
+  "rv_sev_problem_n": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "problem",
+        "countPlural=other": "problems"
+      }
+    }
+  ],
+  "rv_sev_warn_n": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "warning",
+        "countPlural=other": "warnings"
+      }
+    }
+  ],
+  "rv_sev_info_n": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "tip",
+        "countPlural=other": "tips"
+      }
+    }
+  ],
+  "rv_sev_ok_n": "passed",
+  "rv_show_passed": "Show passed",
+  "rv_cat_okunabilirlik": "Readability",
+  "rv_cat_iletisim": "Contact and links",
+  "rv_cat_yapi": "Structure and sections",
+  "rv_cat_tarihler": "Dates",
+  "rv_cat_icerik": "Content",
+  "rv_cat_bicim": "Format and length",
+  "rv_edit": "Edit",
+  "rv_edit_label": "Edit: {title}",
+  "rv_kw_title": "Compared with the ad",
+  "rv_kw_note": "Rough match: looks for the ad's frequent and technical words in your CV, ignoring suffixes and plurals. It doesn't know synonyms; meaning-based comparison will come once AI is connected.",
+  "rv_kw_missing": "Missing",
+  "rv_kw_present": "Found",
+  "rv_kw_missing_hint": "In the ad, not in your CV. If you really know these, add them where they fit.",
+  "rv_kw_none": "No keywords found in the ad. Make sure you pasted the full text.",
+  "rv_kw_all_present": "Every keyword from the ad appears in your CV.",
+  "rv_kw_count": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "Appears once in the ad",
+        "countPlural=other": "Appears {count} times in the ad"
+      }
+    }
+  ],
+  "rv_text_title": "Text the ATS sees",
+  "rv_text_hint": "The PDF's text in reading order. Most ATSs use this order; anything that looks jumbled here looks jumbled to the ATS too.",
+  "rv_text_page": "Page {page}",
+  "rv_ai_title": "AI feedback",
+  "rv_ai_body": "Content feedback such as bullet impact, verb choice and fit with the ad will appear here once AI is connected. The checks above are rule-based.",
+  "rv_editor_menu": "Review this CV",
+  "rv_group_passed": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} check passed",
+        "countPlural=other": "{count} checks passed"
+      }
+    }
+  ],
+  "rv_cv_text_ok": "Text is selectable and in the right reading order",
+  "rv_cv_text_ok_d": "CVeditör prints the PDF as real text; it doesn't use images, tables or text boxes. The ATS reads the text in page order.",
+  "rv_layout_single": "Single-column layout",
+  "rv_layout_single_d": "Every ATS reads a single column top to bottom.",
+  "rv_layout_two": "Two-column layout",
+  "rv_layout_two_d": "This template has the side column read first, then the main column; most ATSs read that correctly. Still, a single column is the safest layout.",
+  "rv_layout_side_main": "“{section}” is in the side column",
+  "rv_layout_side_main_d": "Some ATSs mix two columns line by line; main sections such as experience and education belong in the main column. Move this section to the main column in the Appearance tab.",
+  "rv_layout_side_long": "Side column is long",
+  "rv_layout_side_long_d": "The side column holds {chars} characters of text. Short lists like skills and languages work well there; long text becomes unreadable in an ATS that mixes columns.",
+  "rv_name_ok": "Full name present",
+  "rv_name_ok_d": "The ATS files the candidate under this name.",
+  "rv_name_missing": "No full name",
+  "rv_name_missing_d": "The ATS files the application by name; without one, the CV shows up unnamed. Add your name at the top of your personal details.",
+  "rv_headline_ok": "Headline present: {value}",
+  "rv_headline_ok_d": "Recruiters and ATSs match this line against the role first; keep it close to the title in the ad.",
+  "rv_headline_missing": "No headline",
+  "rv_headline_missing_d": "The headline under your name (e.g. “Frontend Developer”) is the first line matched against the role. Use a title close to the one in the ad.",
+  "rv_email_ok": "Email address is valid",
+  "rv_email_ok_d": "The ATS fills the contact field with this address.",
+  "rv_email_missing": "No email",
+  "rv_email_missing_d": "Recruiters usually reply by email, and ATSs tell candidates apart by email.",
+  "rv_email_bad": "Email address looks wrong: {value}",
+  "rv_email_bad_d": "If the ATS can't parse this field, your contact details stay empty. Format: name@domain.com.",
+  "rv_phone_ok": "Phone includes the country code",
+  "rv_phone_ok_d": "It dials correctly for applications abroad too.",
+  "rv_phone_missing": "No phone",
+  "rv_phone_missing_d": "Interview invitations often come by phone. Include the country code, e.g. +90 5xx xxx xx xx.",
+  "rv_phone_bad": "Phone number looks wrong: {value}",
+  "rv_phone_bad_d": "7-15 digits expected; use only +, spaces, hyphens and parentheses. Letters or extra notes stop the ATS from parsing the number.",
+  "rv_phone_no_cc": "Phone has no country code",
+  "rv_phone_no_cc_d": "If you're applying to a company abroad, start the number with your country code (e.g. +90).",
+  "rv_location_ok": "Location present",
+  "rv_location_ok_d": "ATSs can filter candidates by city; your location shows up in that filter.",
+  "rv_location_missing": "No location",
+  "rv_location_missing_d": "Many ATSs filter candidates by city. City and country are enough; no full address needed.",
+  "rv_link_bad": "Link looks wrong: {value}",
+  "rv_link_bad_d": "A broken link can't be clicked and isn't carried into the ATS profile field. No spaces; format: domain.com/path.",
+  "rv_link_not_linkedin": "LinkedIn field has no LinkedIn address: {value}",
+  "rv_link_not_github": "GitHub field has no GitHub address: {value}",
+  "rv_link_wrong_site_d": "The ATS saves this field as that profile. Write the full address: linkedin.com/in/your-name or github.com/your-username.",
+  "rv_linkedin_missing": "No LinkedIn address",
+  "rv_linkedin_missing_d": "Most recruiters check the LinkedIn profile; some ATSs keep this link in a separate field.",
+  "rv_links_ok": "Links look good ({count})",
+  "rv_links_ok_d": "All are valid addresses and clickable in the PDF.",
+  "rv_title_unknown": "The ATS may not recognise the “{title}” heading",
+  "rv_title_unknown_d": "ATSs split sections by known headings; entries under an unknown heading may land in the wrong field or be skipped. Standard equivalent: “{suggestion}”.",
+  "rv_title_custom": "“{title}” is a custom section",
+  "rv_title_custom_d": "Not every ATS recognises custom headings. If the content fits a standard section (Projects, Certificates, Volunteering…), move it there; if not, it can stay.",
+  "rv_titles_ok": "Section headings are standard",
+  "rv_titles_ok_d": "ATSs recognise these headings and sort entries into the right fields.",
+  "rv_need_experience": "Experience section missing or empty",
+  "rv_need_experience_d": "ATSs read experience as a separate field and compare it with the ad more than anything else. If you're a new graduate, include internships and part-time jobs.",
+  "rv_need_education": "Education section missing or empty",
+  "rv_need_education_d": "Many ads require education; if the ATS sees this field empty, you may be filtered out automatically.",
+  "rv_need_skills": "No Skills section",
+  "rv_need_skills_d": "A separate skills list is the easiest way to match the ad's keywords.",
+  "rv_essentials_ok": "Core sections present: {list}",
+  "rv_essentials_ok_d": "The sections ATSs look for as separate fields.",
+  "rv_hidden_section": "The “{title}” section is hidden",
+  "rv_hidden_items": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} entry hidden",
+        "countPlural=other": "{count} entries hidden"
+      }
+    }
+  ],
+  "rv_hidden_d": "Hidden sections and entries don't go into the PDF. If you hid them on purpose, that's fine.",
+  "rv_hidden_none": "No hidden sections or entries",
+  "rv_hidden_none_d": "Everything you see in the editor is in the PDF too.",
+  "rv_date_no_start": "No start date: {label}",
+  "rv_date_no_start_d": "The ATS works out experience from dates; an undated entry may not count toward your total experience.",
+  "rv_date_no_end": "No end date: {label}",
+  "rv_date_no_end_d": "If it's ongoing, tick “Ongoing”; if it ended, add the end date. Otherwise the duration can't be worked out.",
+  "rv_date_inverted": "Dates are reversed: {label}",
+  "rv_date_inverted_d": "The end comes before the start ({range}). The ATS miscalculates the duration or ignores the entry, and recruiters read it as carelessness.",
+  "rv_date_order": "{section} isn't newest first",
+  "rv_date_order_d": "Recruiters and ATSs expect the most recent entry at the top. Drag the entries to reorder them.",
+  "rv_dates_complete": "Dates are complete",
+  "rv_dates_complete_d": "Every entry has a start and an end (or is marked ongoing); the ATS can work out durations.",
+  "rv_dates_ordered": "Entries are newest first",
+  "rv_dates_ordered_d": "Your most recent experience is on top, visible at a glance.",
+  "rv_dates_month_mixed": "Some dates have a month, some don't",
+  "rv_dates_month_mixed_d": "With month: {withMonth}; year only: {withoutMonth}. A consistent format looks tidier and makes durations easier to work out; add the month to all of them if you can.",
+  "rv_dates_format_ok": "Date format is consistent",
+  "rv_dates_format_ok_d": "All dates are written the same way.",
+  "rv_summary_missing": "No summary",
+  "rv_summary_missing_d": "A 2-4 sentence summary is the first thing a recruiter reads, and it gives you room to use the ad's keywords naturally.",
+  "rv_summary_short": "Summary is short ({words} words)",
+  "rv_summary_short_d": "Aim for 2-4 sentences: what you do, where you're strongest, the role you're after.",
+  "rv_summary_long": "Summary is long ({words} words)",
+  "rv_summary_long_d": "Recruiters give the summary a few seconds; 40-80 words is usually enough. Leave the detail to your experience bullets.",
+  "rv_summary_ok": "Summary is a good length ({words} words)",
+  "rv_summary_ok_d": "Short and readable; it says who you are at a glance.",
+  "rv_empty_desc": "No description: {label}",
+  "rv_empty_desc_d": "Your recent roles are where the ATS looks for keywords and where recruiters read the most. Write 2-4 bullets on what you did and the result.",
+  "rv_empty_ok": "Your recent roles have descriptions",
+  "rv_empty_ok_d": "Your experience from the last five years is described.",
+  "rv_paragraph": "Description is one paragraph: {label}",
+  "rv_paragraph_d": "A long paragraph gets skipped when skimming. Split it into bullets so it's easier to read and the ATS sees each task on its own line.",
+  "rv_paragraph_ok": "Experience descriptions are bulleted or short",
+  "rv_paragraph_ok_d": "Easy to skim.",
+  "rv_long_bullets": [
+    {
+      "declarations": [
+        "input count",
+        "input label",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} bullet is too long: {label}",
+        "countPlural=other": "{count} bullets are too long: {label}"
+      }
+    }
+  ],
+  "rv_long_bullets_d": "Bullets over {max} characters don't get read when skimming. One task and its result per bullet; split the rest into another bullet.",
+  "rv_long_ok": "Bullets are short",
+  "rv_long_ok_d": "No bullet is over {max} characters.",
+  "rv_pronoun": "Bullet starts with a pronoun: {label}",
+  "rv_pronoun_d": "A CV doesn't need “I/my” (“ben/benim” in Turkish); start the bullet straight with a verb: “Led…”, “Built…”.",
+  "rv_pronoun_ok": "Bullets don't use pronouns",
+  "rv_pronoun_ok_d": "Bullets start straight with the work.",
+  "rv_numbers": "{count} of {total} bullets include a number",
+  "rv_numbers_ok_d": "Measurable results (percentages, time, people, amounts) make a bullet concrete.",
+  "rv_numbers_low_d": "Few measurable results. Add numbers where they fit: how much faster, how many people reached, how much saved. Don't make up numbers you don't know.",
+  "rv_personal_label": "Personal details",
+  "rv_double_space": "Double spaces: {label}",
+  "rv_double_space_d": "Double spaces stand out and can break keyword search in some ATSs.",
+  "rv_double_ok": "No double spaces",
+  "rv_double_ok_d": "Spacing is clean.",
+  "rv_all_caps": "All caps: {label}",
+  "rv_all_caps_d": "All-caps lines are hard to read, and some ATSs may take them for headings. Use normal case; bold is enough for emphasis.",
+  "rv_caps_ok": "Capitalisation is normal",
+  "rv_caps_ok_d": "No line is written entirely in capitals.",
+  "rv_bullet_end_mixed": "Bullet endings are inconsistent",
+  "rv_bullet_end_mixed_d": "Ending with a period: {dot}; without: {noDot}. Pick one style and use it everywhere.",
+  "rv_bullet_end_ok": "Bullet endings are consistent",
+  "rv_bullet_end_ok_d": "All bullets end the same way.",
+  "rv_pages_many": "CV is {count} pages",
+  "rv_pages_many_d": "CVs longer than two pages often aren't read to the end. Shorten old entries and ones unrelated to the ad.",
+  "rv_pages_two": "CV is 2 pages",
+  "rv_pages_two_d": "Two pages is normal if you're experienced; if you're a new graduate, aim for one.",
+  "rv_pages_one": "CV is one page",
+  "rv_pages_one_d": "A length a recruiter can take in at a glance.",
+  "rv_photo_en": "English CV has a photo",
+  "rv_photo_en_d": "In the US and UK a photo usually isn't expected; some companies screen out CVs with photos to avoid bias. Check what's usual in the country you're applying to.",
+  "rv_photo_ok": "Photo use suits this language",
+  "rv_photo_ok_tr_d": "Photos are common in Türkiye. ATSs don't read photos; they don't affect the text.",
+  "rv_photo_none_d": "No photo; it makes no difference to the ATS.",
+  "rv_pdf_text_ok": [
+    {
+      "declarations": [
+        "input pages",
+        "input words",
+        "local pagesPlural = pages: plural"
+      ],
+      "selectors": [
+        "pagesPlural"
+      ],
+      "match": {
+        "pagesPlural=one": "Text is selectable ({pages} page, {words} words)",
+        "pagesPlural=other": "Text is selectable ({pages} pages, {words} words)"
+      }
+    }
+  ],
+  "rv_pdf_text_ok_d": "An ATS can read the text in this PDF. See what it sees under “Text the ATS sees”.",
+  "rv_pdf_little": "Very little text found ({words} words)",
+  "rv_pdf_little_d": "Part of the text may be embedded as an image (e.g. exported as a picture from a design tool). ATSs don't read text inside images.",
+  "rv_pdf_empty_page": "Page {page} has almost no text",
+  "rv_pdf_empty_page_d": "This page may have been saved as an image; the ATS sees it as blank.",
+  "rv_pdf_garbled": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} character can't be read",
+        "countPlural=other": "{count} characters can't be read"
+      }
+    }
+  ],
+  "rv_pdf_garbled_d": "The text has unrecognised characters (�). The font wasn't embedded properly, so the ATS can't search these words. Export the PDF again from another program.",
+  "rv_pdf_mojibake": "Turkish characters look broken",
+  "rv_pdf_mojibake_d": "The text has broken letters such as {sample} (e.g. “ý” instead of “ı”). The ATS can't find these words; export the PDF again with a font that supports Turkish characters.",
+  "rv_pdf_no_dotless": "No “ı” anywhere in the text",
+  "rv_pdf_no_dotless_d": "The text looks Turkish but has no “ı” at all; the font may lack the letter or it may have been turned into “i”. The ATS sees “yazilim” instead of “yazılım”.",
+  "rv_pdf_spaced": "Letters are spaced apart",
+  "rv_pdf_spaced_d": "Words look split letter by letter (e.g. “E X P E R I E N C E”). This usually comes from wide letter spacing or a poor export; the ATS can't recognise the words.",
+  "rv_pdf_chars_ok": "Characters are clean",
+  "rv_pdf_chars_ok_d": "No broken or unrecognised characters; Turkish letters read correctly.",
+  "rv_pdf_interleaved": "Columns get mixed up",
+  "rv_pdf_interleaved_d": "The text jumps between two columns line by line ({switches} switches). The ATS reads it in that order and sentences run into each other. Try a single-column layout.",
+  "rv_pdf_columns_d": "Columns are read one after the other; most ATSs read that correctly. A single column is still the safest.",
+  "rv_pdf_repeated": "Line repeated on every page: “{text}”",
+  "rv_pdf_repeated_d": "It looks like a header or footer. Some ATSs don't read headers and footers; if your contact details are there, move them into the body.",
+  "rv_pdf_repeated_ok": "No header or footer",
+  "rv_pdf_repeated_ok_d": "No line repeats across pages; everything is in the body.",
+  "rv_pdf_email_ok": "Email found: {value}",
+  "rv_pdf_email_ok_d": "The ATS can fill the contact field with this address.",
+  "rv_pdf_email_missing": "No email found",
+  "rv_pdf_email_missing_d": "The ATS pulls contact details from the text. If there's no email, or it's inside an image, no one can reach you.",
+  "rv_pdf_contact_late": "Email isn't on the first page",
+  "rv_pdf_contact_late_d": "Contact details are expected at the top of the first page; that's where ATSs and recruiters look.",
+  "rv_pdf_phone_ok": "Phone found: {value}",
+  "rv_pdf_phone_ok_d": "The number can be read as text.",
+  "rv_pdf_phone_missing": "No phone found",
+  "rv_pdf_phone_missing_d": "Nothing in the text looks like a phone number. If there is one, it may be inside an image; write it as text with the country code.",
+  "rv_pdf_linkedin_ok": "LinkedIn address found",
+  "rv_pdf_linkedin_ok_d": "The address can be read as text: {value}",
+  "rv_pdf_headings_ok": "Standard section headings found",
+  "rv_pdf_headings_ok_d": "Found: {list}. The ATS sorts entries by these headings.",
+  "rv_pdf_heading_missing": "Heading not found: {name}",
+  "rv_pdf_heading_missing_d": "ATSs split sections by their headings. If you have this section, use a standard heading on a line of its own.",
+  "rv_pdf_dates_none": "No dates found",
+  "rv_pdf_dates_none_d": "Without dates in experience and education, the ATS can't work out durations.",
+  "rv_pdf_dates_mixed": "Date formats are mixed",
+  "rv_pdf_dates_mixed_d": "Formats found: {examples}. The ATS works out durations more reliably with one format; write them all the same way (e.g. “03/2021 – 12/2023” or “Mar 2021 – Dec 2023”).",
+  "rv_pdf_dates_year_d": "Some dates look like “{example}”, others are year only. Add the month to all of them if you can.",
+  "rv_pdf_dates_ok_d": "Dates are written the same way (e.g. “{example}”).",
+  "rv_pdf_err_not_pdf": "This file isn't a PDF",
+  "rv_pdf_err_not_pdf_d": "Only PDFs can be reviewed. Save the Word document as PDF and try again.",
+  "rv_pdf_err_encrypted": "The PDF is password-protected",
+  "rv_pdf_err_encrypted_d": "ATSs can't read password-protected PDFs either. Upload a copy without a password.",
+  "rv_pdf_err_no_text": "No selectable text",
+  "rv_pdf_err_no_text_d": "This PDF was saved as an image (e.g. a scan or an image export). An ATS can't read anything; export your CV as text or rebuild it in CVeditör.",
+  "rv_pdf_err_unreadable": "Couldn't read the PDF",
+  "rv_pdf_err_unreadable_d": "The file may be damaged. Export it again and retry; an ATS can't read a damaged file either.",
+  "nav_label": "Main navigation",
+  "nav_my_cvs": "My CVs",
+  "nav_templates": "Templates",
+  "nav_settings": "Settings",
+  "nav_back_to_list": "Back to My CVs",
+  "theme_to_dark": "Switch to dark theme",
+  "theme_to_light": "Switch to light theme",
+  "browser_note": "This browser isn't Chromium-based. The site works, but for a PDF that matches the preview exactly, use Chrome, Edge or Brave.",
+  "not_found_title": "This page doesn't exist",
+  "not_found_body": "The address may be mistyped, or the page may have been removed.",
+  "not_found_home": "Back to home",
+  "common_back": "Back",
+  "common_cancel": "Cancel",
+  "common_close": "Close",
+  "common_continue": "Continue",
+  "common_delete": "Delete",
+  "common_hidden": "Hidden",
+  "common_hide": "Hide",
+  "common_show": "Show",
+  "common_ok": "OK",
+  "common_open": "Open",
+  "common_redo": "Redo",
+  "common_rename": "Rename",
+  "common_save": "Save",
+  "common_undo": "Undo",
+  "lang_tr": "Turkish",
+  "lang_en": "English",
+  "layout_one_column": "One column",
+  "layout_two_columns": "Two columns",
+  "ux_layout_default_one": "Default: one column",
+  "ux_layout_default_two": "Default: two columns",
+  "badge_sample": "Sample",
+  "untitled_cv": "Untitled CV",
+  "list_title": "My CVs",
+  "list_subtitle": "Most recently edited first. CVs are stored only in this browser.",
+  "list_search": "Search CVs",
+  "list_new_cv": "New CV",
+  "list_open_cv": "Open {name}",
+  "list_cv_actions": "Actions for {name}",
+  "list_duplicate": "Duplicate",
+  "list_export_json": "Export as JSON",
+  "list_no_match": "No CV matches \"{query}\".",
+  "list_empty_title": "No CVs yet",
+  "list_empty_body": "Pick a template, fill in your details, and your PDF is ready.",
+  "list_empty_cta": "Browse templates",
+  "cv_copy_name": "{name} (copy)",
+  "rename_title": "Rename CV",
+  "delete_title": "Delete \"{name}\"?",
+  "delete_body": "The CV will be removed from this browser.",
+  "delete_undo_hint": "For a few seconds after deleting, you can bring it back with \"Undo\". If you want a permanent copy, export it as JSON first.",
+  "backup_reminder_title": "Your data lives only in this browser",
+  "backup_reminder_never": "You haven't made a backup yet. If browser data is cleared, your CVs go with it.",
+  "backup_reminder_days": [
+    {
+      "declarations": [
+        "input days",
+        "local daysPlural = days: plural"
+      ],
+      "selectors": [
+        "daysPlural"
+      ],
+      "match": {
+        "daysPlural=one": "Last backup was {days} day ago.",
+        "daysPlural=other": "Last backup was {days} days ago."
+      }
+    }
+  ],
+  "backup_now": "Back up now",
+  "toast_deleted": "\"{name}\" deleted",
+  "toast_duplicated": "\"{name}\" created",
+  "toast_backup_done": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "Backed up {count} CV",
+        "countPlural=other": "Backed up {count} CVs"
+      }
+    }
+  ],
+  "toast_item_deleted": "\"{name}\" deleted",
+  "toast_section_deleted": "\"{name}\" section deleted",
+  "toast_copied_to_cv": "Added to \"{name}\"",
+  "templates_title": "Templates",
+  "templates_subtitle": "Pick a template and fill it with your details. You can switch templates later without losing content.",
+  "templates_welcome_title": "Welcome to CVeditör",
+  "templates_welcome_body": "Pick a template to get started. You can switch templates any time; nothing you write is lost.",
+  "templates_use": "Start with this template",
+  "templates_choose": "Choose the {name} template",
+  "templates_more_soon": "The CV in the gallery is a made-up example. More templates are on the way, all with layouts an ATS can read.",
+  "template_klasik_desc": "Calm typography, thin accent rules. Puts experience first and suits any field.",
+  "template_modern_desc": "Name band with contact details on top, a tinted side column on the left. Skills on the side, experience in the wide column.",
+  "template_klasik_name": "Classic",
+  "template_modern_name": "Modern",
+  "new_cv_title": "New CV · {template}",
+  "new_cv_details_desc": "Name your CV and choose its language.",
+  "new_cv_name": "CV name",
+  "new_cv_default_name": "General {lang}",
+  "new_cv_name_hint": "Only you see this; e.g. \"General TR\" or \"Frontend internship EN\".",
+  "new_cv_language": "CV language",
+  "new_cv_language_hint": "Section titles and dates are written in this language.",
+  "new_cv_start_title": "How do you want to start?",
+  "new_cv_create": "Create CV",
+  "start_blank": "Blank CV",
+  "start_blank_desc": "Start from scratch with example hints in the fields.",
+  "start_import": "Import an old CV",
+  "start_import_desc": "Details from your PDF are split into entries; you check and confirm them.",
+  "start_copy": "Copy an existing CV",
+  "start_copy_desc": "The content is copied and the new template applied.",
+  "start_copy_none": "No CVs to copy yet.",
+  "start_copy_language_note": "The CV you chose is in another language. Content is copied as is; automatic AI translation is coming in a later version.",
+  "import_title": "Import an old CV",
+  "import_pick_title": "Choose your old CV's PDF",
+  "import_pick_body": "Only the content is imported; the look comes from the template you chose.",
+  "import_pick_button": "Choose PDF",
+  "import_sample_button": "Show with sample",
+  "import_found_sample": "Entries found (sample data). Untick the entries you don't want.",
+  "preview_title": "CV preview",
+  "preview_empty_hint": "Your CV takes shape here as you fill in the fields on the right. What you see is exactly what the PDF will look like.",
+  "tab_content": "Content",
+  "tab_appearance": "Appearance",
+  "editor_panel_tabs": "Editing panel",
+  "editor_personal_title": "Personal details",
+  "editor_untitled": "Untitled entry",
+  "editor_language_hint": "CV language: section titles and dates are in this language",
+  "editor_more": "More actions",
+  "editor_translate_cv": "Translate to the other language",
+  "editor_missing_title": "CV not found",
+  "editor_missing_body": "This CV may have been deleted or created in another browser. CVs stay only in the browser they were created in.",
+  "editor_broken_title": "Couldn't open the CV",
+  "editor_broken_body": "The saved data couldn't be read. You can try restoring a backup from Settings.",
+  "splitter_label": "Panel width",
+  "mobile_note": "Open the CV on a computer to edit it. On your phone you can preview it and export a PDF.",
+  "save_saved": "Saved",
+  "save_saving": "Saving",
+  "save_error": "Couldn't save",
+  "save_saved_toast": "Saved",
+  "page_count": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} page",
+        "countPlural=other": "{count} pages"
+      }
+    }
+  ],
+  "pages_hint": "Your CV is longer than one page. That's fine, though most employers prefer a single page.",
+  "pdf_button": "Export PDF",
+  "pdf_hint": "Choose \"Save as PDF\" in the print dialog",
+  "pdf_pending_suggestions": "Accept or reject the pending suggestions first.",
+  "pdf_confirm_title": "An entry is longer than one page",
+  "pdf_confirm_desc": "{count} entries don't fit on a single page. If you export the PDF, they'll be split between bullets; no text is cut off.",
+  "pdf_confirm_check": "I'm fine with these entries being split between bullets.",
+  "ux_pdf_confirm_desc_one": "One entry doesn't fit on a single page. If you export the PDF, it'll be split between bullets; no text is cut off.",
+  "ux_pdf_confirm_check_one": "I'm fine with this entry being split between bullets.",
+  "pdf_confirm_cancel": "Go back and shorten",
+  "pdf_confirm_go": "Export PDF",
+  "oversized_title": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} entry is longer than a page",
+        "countPlural=other": "{count} entries are longer than a page"
+      }
+    }
+  ],
+  "oversized_body": "Entries normally aren't split; one that doesn't fit on a page is split between bullets. Click to shorten:",
+  "clipped_body": "Even a single paragraph doesn't fit on the page; that paragraph may be cut off. Split it into bullets.",
+  "zoom_in": "Zoom in",
+  "zoom_out": "Zoom out",
+  "zoom_fit": "Fit",
+  "f_full_name": "Full name",
+  "f_headline": "Headline",
+  "f_email": "Email",
+  "f_phone": "Phone",
+  "f_location": "Location",
+  "f_website": "Website",
+  "f_linkedin": "LinkedIn",
+  "f_github": "GitHub",
+  "f_position": "Position",
+  "f_company": "Company",
+  "f_dates": "Dates",
+  "f_date": "Date",
+  "f_description": "Description",
+  "f_school": "School",
+  "f_degree": "Degree",
+  "f_field": "Field of study",
+  "f_grade": "GPA",
+  "f_project_name": "Project name",
+  "f_role": "Role",
+  "f_url": "Link",
+  "f_skill_group": "Group",
+  "f_skill_keywords": "Skills",
+  "f_language": "Language",
+  "f_level": "Level",
+  "f_certificate": "Certificate",
+  "f_issuer": "Issued by",
+  "f_award": "Award",
+  "f_organization": "Organisation",
+  "f_title": "Title",
+  "f_subtitle": "Subtitle",
+  "ph_full_name": "e.g. Deniz Aksoy",
+  "ph_headline": "e.g. Frontend Developer",
+  "ph_email": "name@example.com",
+  "ph_phone": "+90 5xx xxx xx xx",
+  "ph_city": "e.g. Izmir, Türkiye",
+  "ph_website": "example.com",
+  "ph_linkedin": "linkedin.com/in/username",
+  "ph_github": "github.com/username",
+  "ph_position": "e.g. Software Intern",
+  "ph_company": "e.g. Lacivert Software",
+  "ph_location": "e.g. Istanbul or Remote",
+  "ph_experience_desc": "What did you do, and what came of it? Start each bullet with a strong verb and add numbers where you can.",
+  "ph_school": "e.g. Ege University",
+  "ph_degree": "e.g. Bachelor's",
+  "ph_field": "e.g. Computer Engineering",
+  "ph_grade": "e.g. 3.42 / 4.00",
+  "ph_education_desc": "Optional: key courses, a capstone project or scholarships",
+  "ph_project_name": "e.g. Rota",
+  "ph_project_role": "e.g. Founding developer",
+  "ph_url": "github.com/user/project",
+  "ph_project_desc": "What does the project do, what did you build, and with which technologies?",
+  "ph_skill_group": "e.g. Programming languages",
+  "ph_skill_keywords": "e.g. TypeScript, React, SQL",
+  "ph_language": "e.g. English",
+  "ph_level": "e.g. Advanced (C1)",
+  "ph_certificate": "e.g. AWS Cloud Practitioner",
+  "ph_issuer": "e.g. Amazon Web Services",
+  "ph_award": "e.g. Hackathon winner",
+  "ph_volunteer_role": "e.g. Instructor",
+  "ph_organization": "e.g. Code Club Association",
+  "ph_reference_name": "e.g. Ayşe Demir",
+  "ph_reference_position": "e.g. Engineering Manager",
+  "ph_custom_title": "e.g. Publication title",
+  "ph_custom_subtitle": "e.g. Journal or event",
+  "ph_summary": "Say who you are and what you're looking for in two or three sentences. Be specific: your field, your strength, your goal.",
+  "date_start": "Start",
+  "date_end": "End",
+  "date_current": "Ongoing",
+  "date_month": "Month",
+  "date_year": "Year",
+  "date_no_month": "No month",
+  "ux_date_present": "Present",
+  "date_year_placeholder": "Year",
+  "date_inverted": "End date is before the start date.",
+  "photo_title": "Photo",
+  "photo_hint": "Optional. Common in Türkiye; usually not expected in the US and UK.",
+  "photo_visible": "Shown on the CV. You can turn it off in the Appearance tab.",
+  "photo_hidden": "Uploaded but hidden on the CV. You can turn it on in the Appearance tab.",
+  "photo_upload": "Upload",
+  "photo_change": "Change",
+  "photo_remove": "Remove photo",
+  "photo_alt": "Uploaded photo",
+  "photo_not_image": "This file isn't an image.",
+  "photo_failed": "Couldn't read the photo.",
+  "photo_shown_toast": "Photo now shown on the CV",
+  "rich_bold": "Bold",
+  "rich_italic": "Italic",
+  "rich_bullets": "Bulleted list",
+  "rich_link": "Link",
+  "rich_link_url": "Link address",
+  "rich_unlink": "Remove link",
+  "s_summary": "Summary",
+  "s_experience": "Experience",
+  "s_education": "Education",
+  "s_projects": "Projects",
+  "s_skills": "Skills",
+  "s_languages": "Languages",
+  "s_certificates": "Certificates",
+  "s_awards": "Awards",
+  "s_volunteer": "Volunteering",
+  "s_references": "References",
+  "s_custom": "Custom section",
+  "add_summary": "Add summary",
+  "add_experience": "Add experience",
+  "add_education": "Add education",
+  "add_project": "Add project",
+  "add_skill": "Add skill group",
+  "add_language": "Add language",
+  "add_certificate": "Add certificate",
+  "add_award": "Add award",
+  "add_volunteer": "Add volunteering",
+  "add_reference": "Add reference",
+  "add_custom_item": "Add entry",
+  "drag_item": "Drag to reorder",
+  "drag_section": "Drag to reorder section",
+  "dnd_role_description": "sortable",
+  "dnd_instructions": "Press Space or Enter to pick it up. While moving, use the up and down arrows to change its position; press Space or Enter again to drop it, or Escape to cancel.",
+  "dnd_picked": "Picked up {name}. Position {pos} of {total}.",
+  "dnd_over": "{name}: position {pos} of {total}.",
+  "dnd_outside": "{name}: this isn't a valid spot.",
+  "dnd_dropped": "Dropped {name}. New position {pos} of {total}.",
+  "dnd_dropped_no_change": "Dropped {name}. Position unchanged.",
+  "dnd_cancelled": "Cancelled: {name} stayed where it was.",
+  "item_actions": "Actions for {name}",
+  "item_duplicate": "Duplicate",
+  "item_copy_to_cv": "Add to another CV…",
+  "section_actions": "Actions for the {name} section",
+  "section_add": "Add section",
+  "section_add_label": "Section to add",
+  "section_already_added": "Added",
+  "section_delete": "Delete section",
+  "section_delete_title": "Delete the \"{name}\" section?",
+  "section_delete_body": "The section is removed along with all its entries.",
+  "section_delete_hint": "For a few seconds after deleting, you can bring it back with \"Undo\"; Ctrl+Z works too. If you just don't want it on the CV, hiding the section is enough.",
+  "section_empty": "No entries in this section yet.",
+  "ux_section_item_count": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} entry",
+        "countPlural=other": "{count} entries"
+      }
+    }
+  ],
+  "section_rename": "Section title",
+  "section_rename_named": "Rename \"{name}\"",
+  "section_reset_title": "Reset to default title ({name})",
+  "copy_to_cv_title": "Add to another CV",
+  "copy_to_cv_desc": "\"{name}\" is added to the same section of the CV you choose.",
+  "copy_to_cv_none": "No other CVs. Create a new CV first.",
+  "copy_to_cv_submit": "Add",
+  "tr8_translate_title_en": "Translate to English",
+  "tr8_translate_title_tr": "Translate to Turkish",
+  "tr8_translate_intro_en": "Creates an English copy of this Turkish CV; this CV stays as it is. Template and appearance stay the same; dates and section titles switch to English on their own.",
+  "tr8_translate_intro_tr": "Creates a Turkish copy of this English CV; this CV stays as it is. Template and appearance stay the same; dates and section titles switch to Turkish on their own.",
+  "tr8_translate_rules": "Names of people, companies, products and technologies, links and email aren't translated. You can check and fix every field before saving.",
+  "tr8_translate_name": "Name of the new CV",
+  "tr8_translate_count": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} field will be translated",
+        "countPlural=other": "{count} fields will be translated"
+      }
+    }
+  ],
+  "tr8_translate_start": "Translate",
+  "tr8_translate_running": "Translating…",
+  "tr8_translate_stop": "Stop",
+  "tr8_translate_demo_title": "Sample translation",
+  "tr8_translate_demo": "For now only a few dictionary words are translated; everything will be translated once AI is connected.",
+  "tr8_translate_review_title": "Check the translation",
+  "tr8_translate_review_desc": "{changed} of {total} fields changed. Fix anything you need; it's saved when you confirm.",
+  "tr8_translate_save": "Save translation",
+  "tr8_translate_keep": "Don't translate",
+  "tr8_translate_keep_label": "Don't translate {field}, keep it as is",
+  "tr8_translate_kept": "Will stay as is",
+  "tr8_translate_unchanged": "Unchanged",
+  "tr8_translate_missing": "No translation returned",
+  "tr8_translate_after_label": "{field} translation",
+  "tr8_translate_edit": "Edit",
+  "tr8_translate_done_edit": "Done",
+  "tr8_translate_section_title": "Section title",
+  "tr8_translate_empty": "This CV has no text to translate. A copy is still created; dates and section titles change on their own.",
+  "tr8_translate_error": "Translation failed. Try again in a moment.",
+  "tr8_translate_retry": "Try again",
+  "tr8_translate_created": "\"{name}\" created",
+  "tr8_copy_mode": "How to add",
+  "tr8_copy_translate": "Translate and add",
+  "tr8_copy_as_is": "Add as is",
+  "tr8_copy_translate_hint_en": "The CV you chose is in English. The entry is translated to English; you'll see the translation before it's added.",
+  "tr8_copy_translate_hint_tr": "The CV you chose is in Turkish. The entry is translated to Turkish; you'll see the translation before it's added.",
+  "tr8_copy_linked_badge": "Has a linked entry",
+  "tr8_copy_linked": "This CV has a linked entry",
+  "tr8_copy_update_linked": "Update the linked entry",
+  "tr8_copy_add_new": "Add as a new entry",
+  "tr8_copy_link_note": "The two entries stay linked; if you change one later, you can update the other from here.",
+  "tr8_copy_review_desc": "Will be added to \"{name}\". Fix anything you need.",
+  "tr8_copy_submit_translated": "Add translation",
+  "tr8_copy_submit_update": "Update",
+  "tr8_copy_nothing": "This entry has no text to translate; it'll be added as is.",
+  "tr8_toast_updated_in_cv": "Linked entry updated in \"{name}\"",
+  "ap_template": "Template",
+  "ap_template_hint": "Switching templates doesn't lose any content.",
+  "ap_accent": "CV accent colour",
+  "ap_custom_color": "Custom colour",
+  "ap_font": "Font",
+  "ap_font_hint": "All support Turkish characters and are embedded in the PDF.",
+  "ap_serif": "Serif",
+  "ap_sans": "Sans serif",
+  "ap_size_spacing": "Size and spacing",
+  "ap_font_size": "Font size",
+  "ap_small": "Small",
+  "ap_normal": "Normal",
+  "ap_large": "Large",
+  "ap_spacing": "Spacing",
+  "ap_compact": "Compact",
+  "ap_relaxed": "Relaxed",
+  "ap_header_align": "Name header alignment",
+  "ap_left": "Left",
+  "ap_center": "Centre",
+  "ap_columns": "Column layout",
+  "ap_columns_hint": "Keep the side column short; contact details always sit at the top of the side column.",
+  "ap_column_for": "Column for the {name} section",
+  "ap_side_column": "Side",
+  "ap_main_column": "Main",
+  "ap_photo": "Photo",
+  "ap_photo_none": "Upload a photo in your personal details on the Content tab first.",
+  "ap_photo_show": "Show photo on the CV",
+  "ap_order": "Section order",
+  "ap_order_hint": "Reorder sections and entries on the Content tab by dragging the handle (⠿).",
+  "ai_label": "Ask AI",
+  "ai_placeholder": "What would you like to change in your CV? e.g. \"Make my experience bullets more measurable\"",
+  "ai_scope_label": "Scope",
+  "ai_scope_prefix": "Scope:",
+  "ai_scope_all": "Whole CV",
+  "ai_scope_selected": "Selected entry: {name}",
+  "ai_scope_sections": "Section",
+  "ai_send": "Send",
+  "ai_stop": "Stop",
+  "ai_working": "Preparing suggestions",
+  "ai_enter_hint": "Enter to send",
+  "ai_preview_note": "Preview: nothing is sent; the suggestions are samples.",
+  "ai_no_suggestions": "No sample suggestions for this scope.",
+  "ai_review_title": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} suggestion",
+        "countPlural=other": "{count} suggestions"
+      }
+    }
+  ],
+  "ai_accept_all": "Accept all",
+  "ai_reject_all": "Reject all",
+  "ai_accept": "Accept",
+  "ai_reject": "Reject",
+  "ai_accepted": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} suggestion applied · Ctrl+Z to undo",
+        "countPlural=other": "{count} suggestions applied · Ctrl+Z to undo"
+      }
+    }
+  ],
+  "ai_stale_skipped": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} suggestion not applied: the field changed after it was made",
+        "countPlural=other": "{count} suggestions not applied: the field changed after they were made"
+      }
+    }
+  ],
+  "ai_stale_removed": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} suggestion removed because the field changed",
+        "countPlural=other": "{count} suggestions removed because the field changed"
+      }
+    }
+  ],
+  "ai_note_tidy": "Bullet starts and endings made consistent; weak phrasing replaced with strong verbs.",
+  "ai_note_sample": "Sample suggestion: the summary is more specific.",
+  "ai2_note_sample_remove": "Sample suggestion: this entry could go.",
+  "ai2_note_sample_add": "Sample suggestion: a new entry was added.",
+  "ai2_note_sample_bullet": "Sample suggestion: a measurable bullet was added.",
+  "ai2_kind_add": "New entry",
+  "ai2_kind_remove": "To remove",
+  "ai2_error_invalid": "The response didn't come back in the expected format, so no suggestions were shown. Try again.",
+  "ai2_error_network": "Couldn't connect. Check your internet connection and try again.",
+  "ai2_error_rate": "Too many requests in a short time. Wait a moment and try again.",
+  "ai2_error_unknown": "Couldn't get suggestions. Try again.",
+  "ai2_dropped": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} suggestion wasn't shown because it was invalid",
+        "countPlural=other": "{count} suggestions weren't shown because they were invalid"
+      }
+    }
+  ],
+  "ai2_what_is_sent": "What's sent?",
+  "ai2_payload_title": "What's sent to the AI?",
+  "ai2_payload_desc": "Below is everything that would be sent for this request and scope.",
+  "ai2_payload_rules": "Your name is never sent. Emails, phone numbers and links in the text are masked with ⟦…⟧ placeholders and put back only in your browser when the reply arrives. Contact details are sent only if the request is about them.",
+  "ai2_payload_demo": "A sample provider is running right now: this data isn't sent anywhere.",
+  "ai2_live_note": "Only the selected scope is sent; suggestions apply only when you accept them.",
+  "ai2_oversized_mobile": [
+    {
+      "declarations": [
+        "input count",
+        "input names",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} entry is longer than a page, so it was split: {names}. You can shorten it on a computer.",
+        "countPlural=other": "{count} entries are longer than a page, so they were split: {names}. You can shorten them on a computer."
+      }
+    }
+  ],
+  "ai2_zoom_reset": "Reset to 100%",
+  "ai2_zoom_label": "Zoom",
+  "settings_title": "Settings",
+  "settings_appearance": "Appearance",
+  "settings_appearance_desc": "How the site looks. Your CV's colour and font are set in the editor's Appearance tab.",
+  "settings_dark": "Dark theme",
+  "settings_dark_hint": "CV pages always show as white paper.",
+  "settings_accent": "Site accent colour",
+  "settings_accent_hint": "Buttons and selected items use this colour.",
+  "settings_language": "Interface language",
+  "settings_language_hint": "Used for menus and buttons. Each CV keeps its own language.",
+  "accent_petrol": "Teal",
+  "accent_murekkep": "Ink",
+  "accent_kiremit": "Brick",
+  "accent_orman": "Forest",
+  "accent_grafit": "Graphite",
+  "ux_color_blue": "Blue",
+  "ux_color_mustard": "Mustard",
+  "ux_color_purple": "Purple",
+  "ux_color_navy": "Navy",
+  "settings_data": "Data and backup",
+  "settings_data_desc": "There's no server: your CVs live only in this browser, at this address. A backup file is both a safety net and the way to move to another computer.",
+  "settings_backup": "Back up all CVs",
+  "settings_backup_button": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "Back up {count} CV",
+        "countPlural=other": "Back up {count} CVs"
+      }
+    }
+  ],
+  "ux_settings_backup_empty": "No CVs to back up",
+  "settings_last_backup": "Last backup: {date}",
+  "settings_restore": "Restore from backup",
+  "settings_restore_hint": "Choose a CVeditör JSON backup file. Your existing CVs aren't deleted.",
+  "settings_restore_button": "Choose file",
+  "settings_persist": "Persistent storage",
+  "settings_persist_on": "The browser has confirmed it won't delete this site's data when space runs low.",
+  "settings_persist_off": "The browser may delete data when space runs low. Try asking for permission, and keep backups anyway.",
+  "settings_persist_unknown": "This browser doesn't report persistent storage status.",
+  "settings_persist_ok": "On",
+  "settings_persist_request": "Ask for permission",
+  "settings_persist_denied": "The browser didn't grant permission. Remember to back up regularly.",
+  "settings_brave_note": "In Brave, shield settings such as \"forget me when I close this site\", or clearing browser data, also delete your CVs. And if the address changes (e.g. a different port or the live site), your CVs won't show up; use a backup file to move them.",
+  "settings_browser": "Browser",
+  "settings_browser_desc": "A PDF that matches the preview exactly is guaranteed in Chromium-based browsers (Chrome, Edge, Brave).",
+  "settings_browser_ok": "You're using a Chromium-based browser; preview and PDF match exactly.",
+  "settings_browser_warn": "This browser isn't Chromium-based. The site works, but line breaks in the PDF may differ slightly from the preview. For best results, use Chrome, Edge or Brave.",
+  "settings_shortcuts": "Keyboard shortcuts",
+  "shortcut_save": "Save now",
+  "shortcut_search": "Search My CVs",
+  "shortcut_format": "Bold / italic in descriptions",
+  "settings_danger": "Danger zone",
+  "settings_danger_desc": "Actions that can't be undone.",
+  "clear_title": "Delete all data",
+  "clear_desc": "All CVs and backup info in this browser are deleted. This can't be undone.",
+  "clear_row_hint": "We recommend making a backup first.",
+  "clear_check": "I understand all my CVs will be permanently deleted from this browser.",
+  "clear_submit": "Delete everything",
+  "clear_done": "All data deleted",
+  "settings_about": "About",
+  "settings_about_body": "CVeditör {version} · V1 (interface running in the browser). Open source, MIT licensed. For now, PDFs are made with the browser's print dialog; one-click PDF and AI come in later versions.",
+  "restore_title": "Restore from backup",
+  "restore_found": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "Found {count} CV in the file.",
+        "countPlural=other": "Found {count} CVs in the file."
+      }
+    }
+  ],
+  "restore_exists": "Already in this browser",
+  "restore_failures": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} CV couldn't be read",
+        "countPlural=other": "{count} CVs couldn't be read"
+      }
+    }
+  ],
+  "restore_conflicts": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} CV is already in this browser. What should happen?",
+        "countPlural=other": "{count} CVs are already in this browser. What should happen?"
+      }
+    }
+  ],
+  "restore_keep_both": "Keep both",
+  "restore_replace": "Replace with the backup",
+  "restore_submit": "Restore",
+  "restore_done": "{added} added, {replaced} updated",
+  "cv_err_unreadable": "Couldn't read the CV data",
+  "cv_err_newer": "This CV was saved with a newer version of CVeditör",
+  "cv_err_schema": "Schema version {version} isn't supported",
+  "backup_err_json": "The file isn't valid JSON",
+  "backup_err_format": "This file isn't a CVeditör backup",
+  "backup_err_newer": "The backup was made with a newer version of CVeditör",
+  "fix_translate_unrestored": "Personal details lost, original kept",
+  "fix_pdf_too_long_title": "PDF is too long",
+  "fix_pdf_too_long_body": "Only PDFs of up to {max} pages can be read. Shorten your CV, or save just the CV pages separately and try again."
+}

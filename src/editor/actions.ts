@@ -212,8 +212,9 @@ export function switchTemplate(templateId: TemplateId) {
   })
 }
 
-/** Önerinin hedef alanının bugünkü değeri; alan yoksa undefined. */
+/** Alan önerisinin hedef alanının bugünkü değeri; alan yoksa (ya da öneri alan önerisi değilse) undefined. */
 export function currentSuggestionValue(cv: Cv, s: Suggestion): unknown {
+  if (s.kind !== 'field') return undefined
   if (s.target === 'personal') return (cv.personal as unknown as Record<string, unknown>)[s.field]
   const section = cv.sections.find((x) => x.id === s.sectionId)
   const item = (section?.items as unknown as Record<string, unknown>[] | undefined)?.find((i) => i.id === s.target)
@@ -221,36 +222,85 @@ export function currentSuggestionValue(cv: Cv, s: Suggestion): unknown {
 }
 
 /**
+ * Öneri hâlâ uygulanabilir mi? Alan önerisi: alan öneriden sonra değişmemiş.
+ * Ekleme: bölüm duruyor ve aynı id'li kayıt yok. Kaldırma: kayıt duruyor ve
+ * öneriden sonra değişmemiş.
+ */
+export function isSuggestionFresh(cv: Cv, s: Suggestion): boolean {
+  if (s.kind === 'field') return currentSuggestionValue(cv, s) === s.before
+  const section = cv.sections.find((x) => x.id === s.sectionId)
+  if (!section) return false
+  const items = section.items as AnyItem[]
+  if (s.kind === 'addItem') return !cv.sections.some((x) => (x.items as AnyItem[]).some((i) => i.id === s.item.id))
+  const item = items.find((i) => i.id === s.itemId)
+  return !!item && JSON.stringify(item) === s.snapshot
+}
+
+/**
  * Önerileri tek adımda uygular (toplu kabul = tek geri alma adımı).
- * Öneri üretildikten sonra alan değiştiyse o öneri uygulanmaz: kullanıcının
+ * Öneri üretildikten sonra hedef değiştiyse o öneri uygulanmaz: kullanıcının
  * sonradan yazdığı metin sessizce ezilmesin. Uygulanan öneri sayısını döndürür.
  */
 export function applySuggestions(list: Suggestion[]): number {
   const cv = useEditor.getState().cv
   if (!cv) return 0
-  const fresh = list.filter((s) => currentSuggestionValue(cv, s) === s.before)
+  const fresh = list.filter((s) => isSuggestionFresh(cv, s))
   if (fresh.length === 0) return 0
+  let applied = 0
   update((d) => {
+    // Aynı kaydın ardına birden çok ekleme: sıraları korunsun diye her biri bir öncekinin ardına.
+    const anchors = new Map<string, string | null>()
     for (const s of fresh) {
-      if (s.target === 'personal') {
-        ;(d.personal as unknown as Record<string, unknown>)[s.field] = s.after
-      } else if (s.sectionId) {
-        const item = findItem(d, s.sectionId, s.target)
-        if (item) item[s.field] = s.after
+      if (s.kind === 'field') {
+        if (s.target === 'personal') {
+          ;(d.personal as unknown as Record<string, unknown>)[s.field] = s.after
+          applied++
+        } else if (s.sectionId) {
+          const item = findItem(d, s.sectionId, s.target)
+          if (item) {
+            item[s.field] = s.after
+            applied++
+          }
+        }
+      } else if (s.kind === 'addItem') {
+        const section = findSection(d, s.sectionId)
+        if (!section) continue
+        const items = section.items as AnyItem[]
+        if (items.some((i) => i.id === s.item.id)) continue
+        const key = s.afterItemId ?? ''
+        const after = anchors.has(key) ? anchors.get(key)! : s.afterItemId
+        const index = after ? items.findIndex((i) => i.id === after) : -1
+        // Taslağa önerideki nesnenin kopyası girer (öneri listesi donmasın, paylaşılmasın).
+        const copy = JSON.parse(JSON.stringify(s.item)) as AnyItem
+        if (index >= 0) items.splice(index + 1, 0, copy)
+        else items.push(copy)
+        anchors.set(key, copy.id)
+        applied++
+      } else {
+        const section = findSection(d, s.sectionId)
+        const index = section ? (section.items as AnyItem[]).findIndex((i) => i.id === s.itemId) : -1
+        if (section && index >= 0) {
+          section.items.splice(index, 1)
+          applied++
+        }
       }
     }
   })
-  return fresh.length
+  return applied
 }
 
 /**
- * Kaydı başka bir CV'ye ekler (V1: çevirmeden, olduğu gibi). Aynı
- * translationGroupId'yi taşır; V3'te "çevirerek ekle" aynı bağı kullanacak.
+ * Kaydı başka bir CV'ye yeni kayıt olarak ekler (çevrilmiş ya da olduğu
+ * gibi). Hedefte bu çeviri grubundan kayıt yoksa aynı translationGroupId'yi
+ * taşır (bağlı kopya). Varsa ("Yeni kayıt olarak ekle") kopya bağımsızdır
+ * ve yeni grup alır: bir CV'de aynı gruptan iki kayıt olmaz, böylece
+ * findLinkedItem hep tek ve doğru kaydı bulur.
  */
 export async function copyItemToCv(targetCvId: string, sectionType: SectionType, item: AnyItem): Promise<string> {
   const target = await db.cvs.get(targetCvId)
   if (!target) throw new Error('CV bulunamadı')
-  const copy = { ...structuredClone(item), id: newId() } as AnyItem
+  const alreadyLinked = target.sections.some((s) => (s.items as AnyItem[]).some((i) => i.translationGroupId === item.translationGroupId))
+  const copy = { ...structuredClone(item), id: newId(), ...(alreadyLinked ? { translationGroupId: newId() } : {}) } as AnyItem
   let section = target.sections.find((s) => s.type === sectionType)
   if (!section) {
     section = createSection(sectionType)

@@ -21,6 +21,19 @@ const sizes: Record<Size, string> = {
   'icon-sm': 'size-7 rounded-md justify-center',
 }
 
+/** Düğme görünümü; düğme olmayan öğelerde (ör. `Link`) aynı sınıfları kullanmak için. */
+export function buttonClass({ variant = 'secondary', size = 'md', className }: { variant?: Variant; size?: Size; className?: string } = {}) {
+  return cn(
+    'inline-flex shrink-0 items-center font-medium whitespace-nowrap select-none',
+    'transition-[background-color,color,border-color,box-shadow,transform] duration-150 ease-out',
+    'active:translate-y-px disabled:active:translate-y-0',
+    '[&_svg]:size-4 [&_svg]:shrink-0',
+    variants[variant],
+    sizes[size],
+    className,
+  )
+}
+
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant
   size?: Size
@@ -34,15 +47,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     <button
       ref={ref}
       type={type}
-      className={cn(
-        'inline-flex shrink-0 items-center font-medium whitespace-nowrap select-none',
-        'transition-[background-color,color,border-color,box-shadow,transform] duration-150 ease-out',
-        'active:translate-y-px disabled:active:translate-y-0',
-        '[&_svg]:size-4 [&_svg]:shrink-0',
-        variants[variant],
-        sizes[size],
-        className,
-      )}
+      className={buttonClass({ variant, size, className })}
       {...props}
     />
   )

@@ -1,16 +1,22 @@
-import { ArrowUp, Check, ChevronDown, Info, Loader2, Square, X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { ArrowUp, Check, ChevronDown, Loader2, Square, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { buildEditPayload } from '@/ai/payload'
+import { operationsToSuggestions } from '@/ai/ops'
+import { getAiProvider } from '@/ai/provider'
+import { AiError } from '@/ai/types'
+import { parseEditResult } from '@/ai/validate'
 import { sectionTitle } from '@/cv/locale'
 import type { AnyItem, Cv } from '@/cv/schema'
 import { Button } from '@/components/ui/Button'
+import { Dialog } from '@/components/ui/Dialog'
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from '@/components/ui/Menu'
 import { toast } from '@/components/ui/Toaster'
 import { Tooltip } from '@/components/ui/Tooltip'
-import { applySuggestions, currentSuggestionValue } from '@/editor/actions'
-import { generateMockSuggestions } from '@/editor/mockSuggestions'
-import { useEditorUi, type AiScope, type Suggestion } from '@/editor/ui'
+import { applySuggestions, isSuggestionFresh } from '@/editor/actions'
+import { pendingMarkerCss, suggestionTargetId, useEditorUi, type AiScope, type Suggestion } from '@/editor/ui'
 import { cn } from '@/lib/cn'
 import { m } from '@/paraglide/messages'
+import { ITEM_FIELDS } from '../content/fieldDefs'
 import { itemLabel } from '../labels'
 
 function scopeLabel(cv: Cv, scope: AiScope): string {
@@ -23,38 +29,91 @@ function scopeLabel(cv: Cv, scope: AiScope): string {
   return item ? `${title}: ${itemLabel(section.type, item) || m.editor_untitled()}` : title
 }
 
-function suggestionTarget(cv: Cv, s: Suggestion): string {
-  if (s.target === 'personal') return m.editor_personal_title()
+const PERSONAL_LABELS: Record<string, () => string> = {
+  headline: m.f_headline,
+  email: m.f_email,
+  phone: m.f_phone,
+  location: m.f_location,
+  website: m.f_website,
+  linkedin: m.f_linkedin,
+  github: m.f_github,
+}
+
+/** Önerinin listede görünen başlığı (bölüm · kayıt) ve alt satırı (tür / alan + açıklama). */
+function describe(cv: Cv, s: Suggestion): { title: string; kind: string } {
+  if (s.kind === 'field' && s.target === 'personal') {
+    return { title: m.editor_personal_title(), kind: PERSONAL_LABELS[s.field]?.() ?? s.field }
+  }
   const section = cv.sections.find((x) => x.id === s.sectionId)
-  if (!section) return ''
-  const item = (section.items as AnyItem[]).find((i) => i.id === s.target)
-  const title = sectionTitle(cv.language, section.type, section.title)
+  if (!section) return { title: '', kind: '' }
+  const sTitle = sectionTitle(cv.language, section.type, section.title)
+  const item =
+    s.kind === 'addItem' ? s.item : (section.items as AnyItem[]).find((i) => i.id === (s.kind === 'field' ? s.target : s.itemId))
   const label = item ? itemLabel(section.type, item) : ''
-  return section.type === 'summary' || !label ? title : `${title} · ${label}`
+  const title = section.type === 'summary' || !label ? sTitle : `${sTitle} · ${label}`
+  if (s.kind === 'addItem') return { title, kind: m.ai2_kind_add() }
+  if (s.kind === 'removeItem') return { title, kind: m.ai2_kind_remove() }
+  const field = section.type === 'summary' ? undefined : ITEM_FIELDS[section.type].find((f) => f.key === s.field)
+  return { title, kind: field?.label() ?? '' }
+}
+
+const DOT: Record<Suggestion['kind'], string> = {
+  field: 'bg-[#e7c34a]',
+  addItem: 'bg-ok',
+  removeItem: 'bg-danger',
+}
+
+/**
+ * Sağ paneldeki kartlarda bekleyen öneri işareti: kartın solundaki boşlukta
+ * küçük nokta. Kartların id'si (item-…, personal-card) üzerinden; panel
+ * bileşenlerine dokunmadan.
+ */
+function PendingMarkers({ suggestions }: { suggestions: Suggestion[] }) {
+  const css = pendingMarkerCss(suggestions)
+  return css ? <style>{css}</style> : null
 }
 
 /** Önerilerin gözden geçirilmesi: tek tek ya da toplu kabul/ret. */
-function SuggestionReview({ cv }: { cv: Cv }) {
+function SuggestionReview({ cv, demo }: { cv: Cv; demo: boolean }) {
   const suggestions = useEditorUi((s) => s.suggestions)
   const remove = useEditorUi((s) => s.removeSuggestions)
   const focusItem = useEditorUi((s) => s.focusItem)
+  const highlightItem = useEditorUi((s) => s.highlightItem)
+  const revealSuggestion = useEditorUi((s) => s.revealSuggestion)
+  const flashItems = useEditorUi((s) => s.flashItems)
 
   const accept = (list: Suggestion[]) => {
     const applied = applySuggestions(list)
     remove(list.map((s) => s.id))
+    highlightItem(null)
     if (applied < list.length) toast({ message: m.ai_stale_skipped({ count: list.length - applied }) })
-    if (applied > 0) toast({ message: m.ai_accepted({ count: applied }) })
+    if (applied > 0) {
+      toast({ message: m.ai_accepted({ count: applied }) })
+      flashItems(list.filter((s) => s.kind !== 'removeItem').map(suggestionTargetId))
+    }
   }
-  const reject = (list: Suggestion[]) => remove(list.map((s) => s.id))
+  const reject = (list: Suggestion[]) => {
+    remove(list.map((s) => s.id))
+    highlightItem(null)
+  }
+  const show = (s: Suggestion) => {
+    revealSuggestion(s.id)
+    const target = suggestionTargetId(s)
+    // Yeni kaydın panelde kartı yok; yalnız önizlemede gösterilir.
+    if (s.kind !== 'addItem') focusItem(target, true)
+  }
 
   return (
     <div className="flex max-h-[46vh] flex-col animate-rise-in">
+      <PendingMarkers suggestions={suggestions} />
       <div className="flex items-center gap-2 px-4 pt-3 pb-2">
         <p className="flex-1 text-[13px] font-semibold">
           {m.ai_review_title({ count: suggestions.length })}
-          <span className="ml-2 rounded-full bg-warn-soft px-1.5 py-px text-[11px] font-medium text-warn">
-            {m.badge_sample()}
-          </span>
+          {demo && (
+            <span className="ml-2 rounded-full bg-warn-soft px-1.5 py-px text-[11px] font-medium text-warn">
+              {m.badge_sample()}
+            </span>
+          )}
         </p>
         <Button size="sm" variant="ghost" onClick={() => reject(suggestions)}>
           {m.ai_reject_all()}
@@ -65,61 +124,111 @@ function SuggestionReview({ cv }: { cv: Cv }) {
         </Button>
       </div>
       <ul className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-        {suggestions.map((s) => (
-          <li
-            key={s.id}
-            className="group flex items-start gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-surface-2"
-            onMouseEnter={() => s.target !== 'personal' && focusItem(s.target)}
-          >
-            <span className="mt-1.5 size-2 shrink-0 rounded-full bg-[#e7c34a]" aria-hidden />
-            <button
-              type="button"
-              className="min-w-0 flex-1 text-left"
-              onClick={() => s.target !== 'personal' && focusItem(s.target, true)}
+        {suggestions.map((s) => {
+          const { title, kind } = describe(cv, s)
+          return (
+            <li
+              key={s.id}
+              className="group flex items-start gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-surface-2"
+              onMouseEnter={() => highlightItem(suggestionTargetId(s))}
+              onMouseLeave={() => highlightItem(null)}
             >
-              <span className="block truncate text-[13px] font-medium">{suggestionTarget(cv, s)}</span>
-              <span className="block text-xs text-muted">{s.note}</span>
-            </button>
-            <Tooltip content={m.ai_reject()}>
-              <Button size="icon-sm" variant="ghost" aria-label={m.ai_reject()} onClick={() => reject([s])}>
-                <X />
-              </Button>
-            </Tooltip>
-            <Tooltip content={m.ai_accept()}>
-              <Button size="icon-sm" variant="ghost" className="text-ok hover:text-ok" aria-label={m.ai_accept()} onClick={() => accept([s])}>
-                <Check />
-              </Button>
-            </Tooltip>
-          </li>
-        ))}
+              <span className={cn('mt-1.5 size-2 shrink-0 rounded-full', DOT[s.kind])} aria-hidden />
+              <button type="button" className="min-w-0 flex-1 text-left" onClick={() => show(s)}>
+                <span className="block truncate text-[13px] font-medium">{title}</span>
+                <span className="block text-xs text-muted">
+                  {kind && (
+                    <span className={cn('font-medium', s.kind === 'removeItem' ? 'text-danger' : s.kind === 'addItem' ? 'text-ok' : 'text-text')}>
+                      {kind}
+                    </span>
+                  )}
+                  {kind && s.note && ' · '}
+                  {s.note}
+                </span>
+              </button>
+              <Tooltip content={m.ai_reject()}>
+                <Button size="icon-sm" variant="ghost" aria-label={m.ai_reject()} onClick={() => reject([s])}>
+                  <X />
+                </Button>
+              </Tooltip>
+              <Tooltip content={m.ai_accept()}>
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  className="text-ok hover:text-ok"
+                  aria-label={m.ai_accept()}
+                  onClick={() => accept([s])}
+                >
+                  <Check />
+                </Button>
+              </Tooltip>
+            </li>
+          )
+        })}
       </ul>
     </div>
   )
 }
 
+/** "Ne gönderilir?": bu istek ve kapsam için sağlayıcıya gidecek verinin tamamı. */
+function PayloadDialog({ cv, scope, prompt, demo, open, onClose }: { cv: Cv; scope: AiScope; prompt: string; demo: boolean; open: boolean; onClose: () => void }) {
+  const json = useMemo(() => (open ? JSON.stringify(buildEditPayload(cv, scope, prompt).payload, null, 2) : ''), [open, cv, scope, prompt])
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => !next && onClose()}
+      title={m.ai2_payload_title()}
+      description={m.ai2_payload_desc()}
+      className="w-[min(92vw,640px)]"
+    >
+      <p className="mb-3 text-[13px] leading-relaxed text-muted">
+        {m.ai2_payload_rules()}
+        {demo && <span className="mt-1.5 block font-medium text-text">{m.ai2_payload_demo()}</span>}
+      </p>
+      <pre
+        data-testid="ai-payload"
+        className="max-h-[52vh] overflow-auto rounded-lg border border-line bg-surface-2 p-3 font-mono text-[11.5px] leading-relaxed whitespace-pre-wrap break-words text-text"
+      >
+        {json}
+      </pre>
+    </Dialog>
+  )
+}
+
+function errorMessage(error: unknown): string {
+  const code = error instanceof AiError ? error.code : 'unknown'
+  if (code === 'invalid_response') return m.ai2_error_invalid()
+  if (code === 'network') return m.ai2_error_network()
+  if (code === 'rate_limited') return m.ai2_error_rate()
+  return m.ai2_error_unknown()
+}
+
+const isAbort = (error: unknown) =>
+  (error instanceof AiError && error.code === 'aborted') || (error instanceof Error && error.name === 'AbortError')
+
 /**
  * Sağ altta sabit prompt kutusu. Kapsam varsayılanı Tüm CV; istenirse bölüm
- * ya da tek kayda daraltılır. V1'de istek atılmaz: örnek öneri üretilir.
+ * ya da tek kayda daraltılır. İstek ai/ katmanından geçer: payload (yalnız
+ * kapsam, maskeli) → sağlayıcı → doğrulama → öneriler.
  */
 export function PromptBox({ cv }: { cv: Cv }) {
   const scope = useEditorUi((s) => s.aiScope)
   const setScope = useEditorUi((s) => s.setAiScope)
   const suggestions = useEditorUi((s) => s.suggestions)
   const setSuggestions = useEditorUi((s) => s.setSuggestions)
-  const focusedItemId = useEditorUi((s) => s.focusedItemId)
+  const lastFocusedItemId = useEditorUi((s) => s.lastFocusedItemId)
+  const provider = getAiProvider()
   const [prompt, setPrompt] = useState('')
   const [busy, setBusy] = useState(false)
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [showPayload, setShowPayload] = useState(false)
+  const request = useRef<AbortController | null>(null)
 
-  useEffect(() => () => {
-    if (timer.current) clearTimeout(timer.current)
-  }, [])
+  useEffect(() => () => request.current?.abort(), [])
 
-  // Öneri bekleyen alan sonradan değiştiyse (elle yazma, geri al) o öneri artık geçersiz.
+  // Öneri bekleyen hedef sonradan değiştiyse (elle yazma, geri al) o öneri artık geçersiz.
   useEffect(() => {
     if (suggestions.length === 0) return
-    const stale = suggestions.filter((s) => currentSuggestionValue(cv, s) !== s.before)
+    const stale = suggestions.filter((s) => !isSuggestionFresh(cv, s))
     if (stale.length === 0) return
     useEditorUi.getState().removeSuggestions(stale.map((s) => s.id))
     toast({ message: m.ai_stale_removed({ count: stale.length }) })
@@ -133,37 +242,52 @@ export function PromptBox({ cv }: { cv: Cv }) {
     if (missing) setScope({ kind: 'all' })
   }, [cv.sections, scope, setScope])
 
-  const focusedSection = focusedItemId
-    ? cv.sections.find((s) => (s.items as AnyItem[]).some((i) => i.id === focusedItemId))
+  const focusedSection = lastFocusedItemId
+    ? cv.sections.find((s) => (s.items as AnyItem[]).some((i) => i.id === lastFocusedItemId))
     : undefined
   const focusedItem = focusedSection
-    ? (focusedSection.items as AnyItem[]).find((i) => i.id === focusedItemId)
+    ? (focusedSection.items as AnyItem[]).find((i) => i.id === lastFocusedItemId)
     : undefined
 
-  const submit = () => {
+  const submit = async () => {
     if (!prompt.trim() || busy) return
+    // Öneriler isteğin gönderildiği andaki CV'ye göre kurulur; arada değişen alanın önerisi bayat sayılır.
+    const snapshot = cv
+    const { payload, unmask } = buildEditPayload(snapshot, scope, prompt)
+    const controller = new AbortController()
+    request.current = controller
     setBusy(true)
-    timer.current = setTimeout(() => {
-      setBusy(false)
-      const list = generateMockSuggestions(cv, scope)
+    try {
+      const result = parseEditResult(await provider.edit(payload, controller.signal))
+      if (controller.signal.aborted) return
+      const { suggestions: list, dropped } = operationsToSuggestions(snapshot, result, unmask, payload)
+      if (dropped > 0) toast({ message: m.ai2_dropped({ count: dropped }) })
       if (list.length === 0) {
         toast({ message: m.ai_no_suggestions() })
         return
       }
       setSuggestions(list)
       setPrompt('')
-    }, 1100)
+    } catch (error) {
+      if (!isAbort(error)) toast({ message: errorMessage(error), tone: 'error' })
+    } finally {
+      if (request.current === controller) {
+        request.current = null
+        setBusy(false)
+      }
+    }
   }
 
   const cancel = () => {
-    if (timer.current) clearTimeout(timer.current)
+    request.current?.abort()
+    request.current = null
     setBusy(false)
   }
 
   if (suggestions.length > 0) {
     return (
       <div className="border-t border-line bg-surface shadow-[0_-8px_24px_rgb(0_0_0/0.04)]">
-        <SuggestionReview cv={cv} />
+        <SuggestionReview cv={cv} demo={provider.isDemo} />
       </div>
     )
   }
@@ -177,13 +301,12 @@ export function PromptBox({ cv }: { cv: Cv }) {
         )}
       >
         <textarea
-          ref={textareaRef}
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault()
-              submit()
+              void submit()
             }
           }}
           rows={2}
@@ -235,7 +358,7 @@ export function PromptBox({ cv }: { cv: Cv }) {
             </Tooltip>
           ) : (
             <Tooltip content={m.ai_send()}>
-              <Button size="icon-sm" variant="primary" aria-label={m.ai_send()} disabled={!prompt.trim()} onClick={submit}>
+              <Button size="icon-sm" variant="primary" aria-label={m.ai_send()} disabled={!prompt.trim()} onClick={() => void submit()}>
                 <ArrowUp />
               </Button>
             </Tooltip>
@@ -243,13 +366,23 @@ export function PromptBox({ cv }: { cv: Cv }) {
         </div>
       </div>
       <p className="mt-1.5 flex items-center gap-1.5 px-1 text-[11.5px] text-faint">
-        {m.ai_preview_note()}
-        <Tooltip content={m.ai_privacy_note()} side="top">
-          <button type="button" aria-label={m.ai_privacy_title()} className="rounded text-faint hover:text-text">
-            <Info className="size-3.5" />
-          </button>
-        </Tooltip>
+        <span className="min-w-0 flex-1">{provider.isDemo ? m.ai_preview_note() : m.ai2_live_note()}</span>
+        <button
+          type="button"
+          onClick={() => setShowPayload(true)}
+          className="shrink-0 rounded font-medium text-muted underline decoration-line-strong underline-offset-2 transition-colors hover:text-text"
+        >
+          {m.ai2_what_is_sent()}
+        </button>
       </p>
+      <PayloadDialog
+        cv={cv}
+        scope={scope}
+        prompt={prompt}
+        demo={provider.isDemo}
+        open={showPayload}
+        onClose={() => setShowPayload(false)}
+      />
     </div>
   )
 }

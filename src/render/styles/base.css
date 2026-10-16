@@ -159,27 +159,13 @@ ul {
 /* Satır içi liste: ayırıcı önceki öğeye yapışık, satır başında "·" kalmaz */
 .cv-contact li {
   display: inline;
+  /* Öğe (adres) kendi içinde kırılmaz; liste öğeler arasındaki boşlukta kırılır */
+  white-space: nowrap;
 }
 
 .cv-contact .sep {
   padding-right: 1.2mm;
   color: color-mix(in srgb, var(--muted) 55%, #fff);
-}
-
-.col-side .cv-contact {
-  margin-top: 0;
-}
-
-.col-side .cv-contact li {
-  display: block;
-}
-
-.col-side .cv-contact li + li {
-  margin-top: 1mm;
-}
-
-.col-side .cv-contact .sep {
-  display: none;
 }
 
 a {
@@ -349,6 +335,53 @@ body.interactive .is-focused {
   }
 }
 
+/* Önerilen yeni kayıt (geçici) ve kaldırılması önerilen kayıt */
+.sg-added,
+body.interactive .sg-added:hover,
+body.interactive .sg-added.is-focused {
+  background: #e6f7ec;
+  box-shadow:
+    0 0 0 1.2mm #e6f7ec,
+    -1.2mm 0 0 0.4mm #3aa864;
+  animation: sg-add-in 280ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.sg-removed,
+body.interactive .sg-removed:hover,
+body.interactive .sg-removed.is-focused {
+  background: #fdeceb;
+  box-shadow:
+    0 0 0 1.2mm #fdeceb,
+    -1.2mm 0 0 0.4mm #d4483b;
+  color: #8a2c22;
+}
+
+.sg-removed *,
+.sg-removed {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  text-decoration-color: color-mix(in srgb, #b42318 60%, transparent);
+}
+
+@keyframes sg-add-in {
+  from {
+    opacity: 0;
+    transform: translateY(-1.5mm);
+  }
+}
+
+/* Kabul edilen değişikliğin kısa parlaması (önizleme; PDF'te yok) */
+.sg-flash {
+  animation: sg-flash 900ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+@keyframes sg-flash {
+  from {
+    background: color-mix(in srgb, var(--accent) 16%, #fff);
+    box-shadow: 0 0 0 1.8mm color-mix(in srgb, var(--accent) 16%, #fff);
+  }
+}
+
 .page-enter {
   animation: page-in 260ms cubic-bezier(0.2, 0.7, 0.2, 1);
 }
@@ -411,5 +444,10 @@ body.interactive .is-focused {
 
   .page-enter {
     animation: none;
+  }
+
+  /* Şablon geçişinin solan kopyası (CvFrame) baskıya asla girmez */
+  #cv-ghost {
+    display: none;
   }
 }

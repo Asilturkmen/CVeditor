@@ -5,16 +5,17 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Cv } from '@/cv/schema'
 import { db } from '@/db/db'
 import { getMeta, META_LAST_BACKUP } from '@/db/repo'
-import { Button } from '@/components/ui/Button'
+import { Button, buttonClass } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
 import { Input } from '@/components/ui/Field'
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from '@/components/ui/Menu'
-import { deleteWithUndo, duplicate, exportAllJson, exportCvJson, rename } from '@/features/cv-actions'
+import { deleteWithUndo, duplicate, exportAllJson, exportCvJson, exportJsonResume, rename } from '@/features/cv-actions'
 import { cn } from '@/lib/cn'
-import { daysSince, relativeTime } from '@/lib/time'
+import { daysSince, formatDateTime, relativeTime } from '@/lib/time'
 import { m } from '@/paraglide/messages'
 import { CvFrame } from '@/render/CvFrame'
 import { getTemplate } from '@/render/templates'
+import { TEMPLATE_TEXT } from '@/features/templates/TemplatesPage'
 
 const BACKUP_REMIND_DAYS = 7
 
@@ -36,16 +37,16 @@ function CvCard({ cv, onRename, onDelete }: { cv: Cv; onRename: () => void; onDe
       </Link>
       <div className="flex items-start gap-2 px-0.5">
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-[15px] font-semibold tracking-tight" title={cv.name}>
+          <h3 className="line-clamp-2 text-[15px] leading-snug font-semibold tracking-tight break-words sm:min-h-[2lh]" title={cv.name}>
             {cv.name}
           </h3>
           <p className="mt-0.5 flex items-center gap-1.5 text-[13px] text-muted">
             <span className="rounded bg-surface-2 px-1.5 py-px text-[11px] font-semibold tracking-wide text-text uppercase">
               {cv.language}
             </span>
-            <span>{getTemplate(cv.templateId).name}</span>
+            <span>{TEMPLATE_TEXT[getTemplate(cv.templateId).id].name()}</span>
             <span className="text-faint">·</span>
-            <span title={new Date(cv.updatedAt).toLocaleString()}>{relativeTime(cv.updatedAt)}</span>
+            <span title={formatDateTime(cv.updatedAt)}>{relativeTime(cv.updatedAt)}</span>
           </p>
         </div>
         <Menu>
@@ -66,6 +67,9 @@ function CvCard({ cv, onRename, onDelete }: { cv: Cv; onRename: () => void; onDe
             </MenuItem>
             <MenuItem icon={<Download />} onSelect={() => exportCvJson(cv)}>
               {m.list_export_json()}
+            </MenuItem>
+            <MenuItem icon={<Download />} onSelect={() => exportJsonResume(cv)}>
+              {m.imp_json_export()}
             </MenuItem>
             <MenuSeparator />
             <MenuItem icon={<Trash2 />} danger onSelect={onDelete}>
@@ -242,16 +246,16 @@ export function CvListPage() {
               aria-label={m.list_search()}
               className="w-64 pr-8 pl-9"
             />
-            <kbd className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded border border-line px-1.5 text-[11px] text-faint">
+            <kbd className="pointer-events-none absolute top-1/2 right-2.5 hidden -translate-y-1/2 rounded border border-line px-1.5 text-[11px] text-faint sm:block pointer-coarse:hidden">
               /
             </kbd>
           </div>
         )}
         <Link
           to="/sablonlar"
-          className="inline-flex h-9 items-center gap-2 rounded-lg bg-accent px-3.5 text-sm font-medium text-accent-fg shadow-sm transition-colors hover:bg-accent-hover"
+          className={buttonClass({ variant: 'primary' })}
         >
-          <Plus className="size-4" />
+          <Plus />
           {m.list_new_cv()}
         </Link>
       </div>
@@ -264,7 +268,7 @@ export function CvListPage() {
           <p className="mt-1.5 max-w-sm text-muted">{m.list_empty_body()}</p>
           <Link
             to="/sablonlar"
-            className="mt-5 inline-flex h-9 items-center gap-2 rounded-lg bg-accent px-3.5 text-sm font-medium text-accent-fg hover:bg-accent-hover"
+            className={buttonClass({ variant: 'primary', className: 'mt-5' })}
           >
             {m.list_empty_cta()}
           </Link>
