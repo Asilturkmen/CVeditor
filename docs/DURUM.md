@@ -23,6 +23,10 @@ Sunucu ve gerçek yapay zekâ dışındaki her şey yapıldı. Geriye iki iş ka
 
 Testler: Vitest birim testleri ve Playwright uçtan uca testleri. Komutlar için CLAUDE.md'ye bak.
 
+## Sırada bekleyen: 10 yeni şablon
+
+Araştırması ve planı hazır, Asil'in onayını bekliyor: `docs/sablonlar/PLAN.md`. Uygulamaya o plandaki kararları onaylatarak başla.
+
 ## 1. Yapay zekâyı bağlamak
 
 Arayüzün hiçbir yeri değişmez. Yapılacaklar:

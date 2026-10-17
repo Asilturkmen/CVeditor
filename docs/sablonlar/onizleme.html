@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&family=DM+Serif+Display&family=Archivo:wght@400;500;700;800;900&family=Playfair+Display:wght@400;700&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;700;800&family=Space+Grotesk:wght@400;500;700&family=Fraunces:ital,wght@0,400;0,600;1,600&display=swap">
+<style>
+/* ---------- ortak taban (base.css'in sadeleştirilmiş hali) ---------- */
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:#9aa0a6;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+#pages{display:flex;flex-wrap:wrap;gap:20px;padding:20px}
+.page{width:210mm;height:297mm;background:var(--paper,#fff);position:relative;overflow:hidden;color:var(--ink);font-family:var(--font);font-size:var(--fs,9.2pt);line-height:var(--lh,1.38);
+  --pad-x:14mm;--pad-y:13mm;--block-gap:2.4mm;--section-gap:4.6mm}
+.page-inner{height:100%;display:flex;flex-direction:column}
+.page-body{flex:1;min-height:0;display:flex}
+.col{display:flex;flex-direction:column;gap:var(--block-gap);padding:0 var(--pad-x) var(--pad-y);min-width:0}
+.col-main{flex:1}
+.col-side{flex:none;width:var(--side-width,34%)}
+.cols-2 .col-side{padding-right:calc(var(--pad-x)*.6)}
+.cols-2 .col-main{padding-left:calc(var(--pad-x)*.6)}
+.cv-header{padding:var(--pad-y) var(--pad-x) var(--section-gap);display:flex;gap:5mm;align-items:center}
+.cv-identity{min-width:0;flex:1}
+.cv-photo{width:26mm;height:26mm;object-fit:cover;flex:none}
+h1,h2,p,ul{margin:0}
+.cv-name{font-size:2.4em;line-height:1.08;font-weight:700}
+.cv-headline{font-size:1.15em;margin-top:.8mm}
+.cv-contact{list-style:none;padding:0;margin-top:2mm;display:flex;flex-wrap:wrap;gap:0 1.2mm;color:var(--muted)}
+.section-title{font-size:1em;margin-top:calc(var(--section-gap) - var(--block-gap))}
+.col > .section-title:first-child{margin-top:0}
+.entry-head{display:flex;justify-content:space-between;gap:3mm;align-items:baseline}
+.entry-title{font-weight:600}
+.entry-date{flex:none;color:var(--muted);font-size:.92em;white-space:nowrap}
+.entry-sub{color:var(--muted)}
+.entry-body ul{padding-left:4mm;margin-top:.6mm}
+.entry-body li{margin:.3mm 0}
+.entry-line .line-label{font-weight:600}
+.rich p{margin:0}
+
+/* ======================= 1 ZARİF ======================= */
+.t-zarif{--paper:#fbf8f1;--ink:#2b2621;--muted:#756c60;--accent:#7a2e2e;--rule:#d8cdb9;--font:'EB Garamond',serif;--fs:10.6pt;--lh:1.32;--pad-x:18mm}
+.t-zarif .cv-header{flex-direction:column;text-align:center;gap:0;padding-bottom:4mm;margin:0 18mm;border-bottom:.3mm solid var(--rule);padding-left:0;padding-right:0}
+.t-zarif .cv-name{font-weight:500;font-size:3.1em;letter-spacing:.01em;line-height:1}
+.t-zarif .cv-headline{text-transform:uppercase;letter-spacing:.05em;font-size:.82em;color:var(--accent);margin-top:2mm}
+.t-zarif .cv-contact{justify-content:center;font-size:.9em}
+.t-zarif .col-main{padding-top:5mm}
+.t-zarif .summary{font-style:italic;text-align:center;padding:0 8mm;color:#4a433b}
+.t-zarif .section-title{display:flex;align-items:center;gap:3mm;text-transform:uppercase;letter-spacing:.05em;font-size:.8em;font-weight:600;color:var(--accent);margin-top:3mm}
+.t-zarif .section-title::before,.t-zarif .section-title::after{content:'';flex:1;border-top:.25mm solid var(--rule)}
+.t-zarif .entry-sub{font-style:italic}
+.t-zarif .entry-title{font-weight:600}
+.t-zarif .entry-date{font-style:italic}
+.t-zarif .inline{text-align:center}
+
+/* ======================= 2 PANEL ======================= */
+.t-panel{--paper:#fff;--ink:#1c2430;--muted:#5d6b7c;--accent:#2f8f7f;--side-bg:#1f2a37;--side-ink:#e6ebf1;--side-muted:#9babbd;--font:'Inter',sans-serif;--fs:8.8pt;--side-width:34%;
+  background:linear-gradient(90deg,var(--side-bg) 0 34%,var(--paper) 34%)}
+.t-panel .cv-header{display:grid;grid-template-columns:34% 1fr;padding:0;gap:0;align-items:stretch}
+.t-panel .cv-photo{width:34mm;height:34mm;border-radius:50%;justify-self:center;align-self:center;margin:12mm 0 8mm;outline:1.2mm solid rgba(255,255,255,.14);outline-offset:1.2mm}
+.t-panel .cv-identity{grid-column:2;padding:14mm 14mm 8mm 9mm;align-self:center}
+.t-panel .cv-name{font-size:2.6em;letter-spacing:-.02em;line-height:1.02}
+.t-panel .cv-headline{color:var(--accent);font-weight:600;font-size:1.1em;margin-top:1.6mm}
+.t-panel .cv-contact{display:grid;grid-template-columns:1fr 1fr;gap:.6mm 4mm;margin-top:4mm;font-size:.92em}
+.t-panel .cv-contact .sep{display:none}
+.t-panel .col-side{color:var(--side-ink);padding-top:2mm}
+.t-panel .col-side .section-title{color:#fff;text-transform:uppercase;letter-spacing:.05em;font-size:.86em;font-weight:700;border-bottom:.3mm solid rgba(255,255,255,.18);padding-bottom:1.2mm}
+.t-panel .col-side .entry-sub,.t-panel .col-side .entry-date{color:var(--side-muted)}
+.t-panel .col-side .line-label{display:block;color:#fff}
+.t-panel .col-main{padding-top:2mm}
+.t-panel .col-main .section-title{text-transform:uppercase;letter-spacing:.05em;font-size:.9em;font-weight:700;display:flex;align-items:center;gap:2mm}
+.t-panel .col-main .section-title::before{content:'';width:5mm;height:.9mm;background:var(--accent)}
+.t-panel .col-main .entry-sub{color:var(--accent);font-weight:500}
+
+/* ======================= 3 BANT ======================= */
+.t-bant{--paper:#fff;--ink:#1d2939;--muted:#667085;--accent:#0f4c75;--band:#0f4c75;--font:'Source Sans 3',sans-serif;--fs:9.6pt}
+.t-bant .cv-header{background:var(--band);color:#fff;padding:13mm 14mm 11mm;align-items:flex-start;margin-bottom:9mm}
+.t-bant .cv-name{font-family:'Poppins',sans-serif;font-weight:700;font-size:2.7em;letter-spacing:-.01em}
+.t-bant .cv-headline{opacity:.88;font-family:'Poppins';font-weight:500;font-size:1.05em}
+.t-bant .cv-contact{color:rgba(255,255,255,.86);margin-top:4mm}
+.t-bant .cv-header{display:grid;grid-template-columns:1fr auto;column-gap:8mm}
+.t-bant .cv-identity{grid-column:1;grid-row:1}
+.t-bant .cv-photo{grid-column:2;grid-row:1;width:38mm;height:38mm;border-radius:50%;border:1.6mm solid #fff;margin-bottom:-24mm;align-self:end}
+.t-bant .section-title{font-family:'Poppins';font-weight:600;font-size:1.12em;color:var(--accent);padding-bottom:1.2mm;background:linear-gradient(var(--accent),var(--accent)) no-repeat left bottom/8mm .9mm}
+.t-bant .entry-title{font-weight:700}
+.t-bant .entry-sub{color:var(--accent)}
+.t-bant .col-side{background:#eef4f9;border-radius:2mm;padding:5mm;margin:0 0 var(--pad-y) var(--pad-x);align-self:flex-start;width:31%}
+.t-bant .col-main{padding-left:7mm}
+
+/* ======================= 4 MANŞET ======================= */
+.t-manset{--paper:#fff;--ink:#111;--muted:#666;--accent:#c2410c;--font:'Archivo',sans-serif;--fs:8.6pt;--side-width:31%}
+.t-manset .cv-header{align-items:flex-start;padding-top:12mm;padding-bottom:5mm;margin:0 14mm 6mm;padding-left:0;padding-right:0;border-bottom:.7mm solid #111}
+.t-manset .cv-name{font-family:'DM Serif Display',serif;font-weight:400;font-size:8.4em;line-height:.88;letter-spacing:-.02em;max-width:112mm}
+.t-manset .cv-headline{font-weight:700;text-transform:uppercase;letter-spacing:.05em;font-size:.95em;margin-top:4mm;color:var(--accent)}
+.t-manset .cv-contact{font-size:.95em;color:#333}
+.t-manset .cv-header{display:grid;grid-template-columns:1fr auto;column-gap:8mm}
+.t-manset .cv-identity{grid-column:1;grid-row:1}
+.t-manset .cv-photo{grid-column:2;grid-row:1;width:36mm;height:46mm;filter:grayscale(1)}
+.t-manset .section-title{font-weight:800;text-transform:uppercase;letter-spacing:.05em;font-size:.85em;border-top:.25mm solid #111;padding-top:1.4mm}
+.t-manset .summary{font-family:'DM Serif Display';font-size:1.55em;line-height:1.22}
+.t-manset .entry-title{font-weight:700}
+.t-manset .col-side .line-label{display:block}
+
+/* ======================= 5 GECE ======================= */
+.t-gece{--paper:#14171f;--ink:#ece6d9;--muted:#a39b8b;--accent:#d4a85a;--line:rgba(236,230,217,.28);--font:'Inter',sans-serif;--fs:8.7pt;--pad-x:11mm}
+.t-gece .page-inner{margin:7mm;height:calc(100% - 14mm);border:.3mm solid var(--line)}
+.t-gece .cv-header{border-bottom:.3mm solid var(--line);padding:10mm 11mm 8mm;gap:7mm}
+.t-gece .cv-photo{width:32mm;height:32mm;border-radius:50%}
+.t-gece .cv-name{font-family:'Playfair Display',serif;font-weight:700;text-transform:uppercase;font-size:3.6em;line-height:.95;letter-spacing:.01em}
+.t-gece .cv-headline{color:var(--accent);text-transform:uppercase;letter-spacing:.05em;font-size:.86em;font-weight:600;margin-top:2.4mm}
+.t-gece .col-main{padding-top:7mm}
+.t-gece .summary{font-family:'Playfair Display';font-size:1.45em;line-height:1.3}
+.t-gece .section-title{color:var(--accent);text-transform:uppercase;letter-spacing:.05em;font-size:.82em;font-weight:600;border-top:.3mm solid var(--line);padding-top:3mm;margin-top:3mm}
+.t-gece .entry-title{font-weight:600;color:#fff}
+.t-gece .rich li::marker{color:var(--accent)}
+.t-gece .inline{color:var(--ink)}
+
+/* ======================= 6 İSVİÇRE ======================= */
+.t-isvicre{--paper:#fff;--ink:#161616;--muted:#6e6e6e;--accent:#d62828;--rule:#d6d6d6;--font:'IBM Plex Sans',sans-serif;--fs:8.8pt;--label:27%}
+.t-isvicre .cv-header{padding-top:16mm;padding-bottom:9mm;padding-left:calc(var(--pad-x) + (210mm - 2*var(--pad-x))*.27 + 0mm)}
+.t-isvicre .cv-identity{border-left:1.1mm solid var(--accent);padding-left:5mm}
+.t-isvicre .cv-name{font-weight:300;font-size:3.2em;letter-spacing:-.02em;line-height:1}
+.t-isvicre .cv-headline{text-transform:uppercase;letter-spacing:.05em;font-size:.82em;font-weight:500;color:var(--muted);margin-top:2mm}
+.t-isvicre .cv-contact{font-family:'IBM Plex Mono',monospace;font-size:.86em;color:#333}
+.t-isvicre .col-main > :not(.section-title){margin-left:var(--label)}
+.t-isvicre .section-title{height:0;overflow:visible;border-top:.25mm solid var(--rule);padding-top:2.4mm;box-sizing:content-box;margin-top:3mm}
+.t-isvicre .section-title span{display:block;width:calc(var(--label) - 6mm);text-align:right;text-transform:uppercase;letter-spacing:.05em;font-size:.8em;font-weight:600}
+.t-isvicre .entry-date{font-family:'IBM Plex Mono';font-size:.82em}
+.t-isvicre .entry-title{font-weight:600}
+
+/* ======================= 7 ÇİZELGE ======================= */
+.t-cizelge{--paper:#fff;--ink:#1d2433;--muted:#667085;--accent:#e0663a;--font:'Manrope',sans-serif;--fs:8.8pt}
+.t-cizelge .cv-header{align-items:flex-start;padding-bottom:8mm}
+.t-cizelge .cv-name{font-weight:800;font-size:2.9em;letter-spacing:-.03em;line-height:1}
+.t-cizelge .cv-headline{color:var(--accent);font-weight:700}
+.t-cizelge .cv-contact{flex-direction:column;align-items:flex-end;text-align:right;margin-top:0;gap:.5mm}
+.t-cizelge .cv-contact .sep{display:none}
+.t-cizelge .cv-identity{display:flex;justify-content:space-between;gap:6mm;flex:1}
+.t-cizelge .col-main{background:linear-gradient(var(--accent),var(--accent)) no-repeat calc(var(--pad-x) + 2.2mm) 0/.7mm 100%;padding-left:calc(var(--pad-x) + 9mm)}
+.t-cizelge .section-title{position:relative;font-weight:800;font-size:1.15em;letter-spacing:-.01em}
+.t-cizelge .section-title::before{content:'';position:absolute;left:-9mm;top:50%;width:5mm;height:5mm;margin-top:-2.5mm;border-radius:50%;background:var(--accent)}
+.t-cizelge .entry{position:relative}
+.t-cizelge .entry::before{content:'';position:absolute;left:-8.2mm;top:.9mm;width:3.4mm;height:3.4mm;border-radius:50%;background:#fff;border:.7mm solid var(--accent)}
+.t-cizelge .entry-date{background:color-mix(in srgb,var(--accent) 13%,#fff);color:#9a3412;border-radius:2mm;padding:.2mm 1.8mm;font-weight:700;font-size:.85em}
+.t-cizelge .entry-title{font-weight:700}
+.t-cizelge .chips{display:flex;flex-wrap:wrap;gap:1.4mm}
+.t-cizelge .chips span{border:.3mm solid #d0d5dd;border-radius:3mm;padding:.3mm 2.2mm}
+.t-cizelge .chips .sep{display:none}
+
+/* ======================= 8 ÇİFT TON ======================= */
+.t-cift{--paper:#3d3a7a;--ink:#f3f1ff;--muted:#c6c2ef;--accent:#ffcf70;--side-bg:#e7e3f7;--side-ink:#25224a;--side-muted:#5d5893;--font:'Space Grotesk',sans-serif;--fs:8.8pt;--side-width:37%;
+  background:linear-gradient(90deg,var(--side-bg) 0 37%,var(--paper) 37%)}
+.t-cift .cv-header{display:grid;grid-template-columns:37% 1fr;padding:0;gap:0;align-items:end}
+.t-cift .cv-photo{width:40mm;height:40mm;border-radius:50%;justify-self:center;margin:13mm 0 6mm;border:1.4mm solid #fff}
+.t-cift .cv-identity{grid-column:2;padding:13mm 14mm 6mm 9mm}
+.t-cift .cv-name{font-weight:700;font-size:3em;line-height:.98;letter-spacing:-.02em}
+.t-cift .cv-headline{color:var(--accent);font-weight:500;margin-top:2mm}
+.t-cift .col-side{color:var(--side-ink);padding-top:4mm}
+.t-cift .col-side .entry-sub,.t-cift .col-side .entry-date{color:var(--side-muted)}
+.t-cift .col-side .section-title{color:var(--side-ink)}
+.t-cift .section-title{font-weight:700;font-size:1.15em;letter-spacing:-.01em}
+.t-cift .col-main{padding-top:4mm}
+.t-cift .col-main .section-title{color:var(--accent)}
+.t-cift .col-side .line-label{display:block}
+.t-cift .cv-contact{color:var(--muted)}
+
+/* ======================= 9 AFİŞ ======================= */
+.t-afis{--paper:#fff;--ink:#0b0b0b;--muted:#555;--accent:#ffd400;--font:'Archivo',sans-serif;--fs:8.8pt}
+.t-afis .cv-header{align-items:flex-start;border-bottom:2mm solid #0b0b0b;margin:0 14mm 5mm;padding:12mm 0 5mm}
+.t-afis .cv-name{font-weight:900;text-transform:uppercase;font-size:4.4em;line-height:.88;letter-spacing:-.02em;background:linear-gradient(transparent 62%,var(--accent) 62%,var(--accent) 92%,transparent 92%);display:inline;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+.t-afis .cv-headline{font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-top:3mm}
+.t-afis .cv-header{display:grid;grid-template-columns:1fr auto;column-gap:8mm}
+.t-afis .cv-identity{grid-column:1;grid-row:1}
+.t-afis .cv-photo{grid-column:2;grid-row:1;width:30mm;height:36mm;filter:grayscale(1) contrast(1.1)}
+.t-afis .section-title{align-self:flex-start;background:#0b0b0b;color:#fff;text-transform:uppercase;letter-spacing:.04em;font-weight:800;font-size:.86em;padding:.9mm 2.4mm}
+.t-afis .entry-title{font-weight:800}
+.t-afis .entry-title strong{background:linear-gradient(transparent 55%,var(--accent) 55%)}
+.t-afis .entry-date{color:#0b0b0b;font-weight:600}
+.t-afis .col-side .line-label{display:block}
+
+/* ======================= 10 ÇERÇEVE ======================= */
+.t-cerceve{--paper:#fffdf8;--ink:#23262b;--muted:#6b6f76;--accent:#8c2f39;--font:'Source Sans 3',sans-serif;--fs:9.2pt;--pad-x:13mm;border:6.5mm solid var(--accent)}
+.t-cerceve .page-inner{outline:.3mm solid color-mix(in srgb,var(--accent) 55%,transparent);outline-offset:-2.6mm}
+.t-cerceve .cv-header{padding-top:11mm;gap:6mm}
+.t-cerceve .cv-photo{border-radius:2mm;width:28mm;height:32mm}
+.t-cerceve .cv-name{font-family:'Fraunces',serif;font-weight:600;font-size:2.9em;letter-spacing:-.01em}
+.t-cerceve .cv-headline{font-family:'Fraunces';font-style:italic;font-weight:600;color:var(--accent)}
+.t-cerceve .cv-contact{border-top:.3mm solid #e4d9cf;padding-top:1.6mm}
+.t-cerceve .section-title{font-family:'Fraunces';font-style:italic;font-weight:600;font-size:1.32em;color:var(--accent)}
+.t-cerceve .col-side{border-right:.3mm solid #e4d9cf}
+.t-cerceve .entry-title{font-weight:700}
+.t-cerceve .col-side .line-label{display:block}
+</style>
+</head>
+<body>
+<div id="pages"></div>
+<script>
+const PHOTO = 'data:image/svg+xml;utf8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 120"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9b8a6"/><stop offset="1" stop-color="#8f7b69"/></linearGradient></defs><rect width="100" height="120" fill="url(#g)"/><circle cx="50" cy="46" r="21" fill="#f1dfcf"/><path d="M14 120c4-27 19-40 36-40s32 13 36 40z" fill="#3b4a5a"/><path d="M29 44c0-17 9-25 21-25s21 8 21 25c-4-8-10-12-21-12s-17 4-21 12z" fill="#3a2a22"/></svg>`)
+const contact = ['deniz.arslan@ornek.com', '+90 532 000 00 00', 'İstanbul, Türkiye', 'linkedin.com/in/denizarslan']
+const S = {
+  ozet: ['Özet', `<p class="summary">Kullanıcı araştırmasını ölçülebilir ürün kararlarına çeviren, sekiz yıllık deneyime sahip ürün tasarımcısı. Ödeme ve lojistik alanlarında çok ekipli projelere liderlik ettim.</p>`],
+  deneyim: ['Deneyim', [
+    ['<strong>Kıdemli Ürün Tasarımcısı</strong>', 'Mart 2021 – Günümüz', 'Kuzey Yazılım · İstanbul', ['Ödeme akışını yeniden tasarladım; terk oranı %18 düştü.', 'Tasarım sistemini kurup dört ekibe yaydım.', 'Haftalık kullanıcı görüşmesi düzenini başlattım.']],
+    ['<strong>Ürün Tasarımcısı</strong>', 'Haz 2018 – Şub 2021', 'Ege Lojistik · İzmir', ['Sürücü uygulamasının bilgi mimarisini sadeleştirdim.', 'Erişilebilirlik denetimiyle WCAG AA uyumunu sağladım.']],
+    ['<strong>Arayüz Tasarımcısı</strong>', 'Eyl 2016 – May 2018', 'Atölye Dijital · Ankara', ['Kurumsal müşteriler için 20+ web arayüzü tasarladım.', 'Marka kılavuzlarını dijital bileşen kitaplığına dönüştürdüm.']],
+    ['<strong>Tasarım Stajyeri</strong>', 'Haz 2015 – Eyl 2015', 'Mavi Ajans · İstanbul', ['Kampanya sayfaları için görsel hazırlık ve kullanılabilirlik testleri yürüttüm.', 'Ekip içi tasarım eleştirisi oturumlarının notlarını tuttum.']],
+  ]],
+  egitim: ['Eğitim', [
+    ['<strong>Endüstriyel Tasarım, Lisans</strong>', '2012 – 2016', 'Orta Doğu Teknik Üniversitesi', []],
+    ['<strong>Anadolu Lisesi</strong>', '2008 – 2012', 'Ankara', []],
+  ]],
+  proje: ['Projeler', [
+    ['<strong>Açık kaynak ikon seti</strong>', '2023', 'GitHub · 1.200 yıldız', ['Türkçe arayüzler için 300 ikonluk set.']],
+    ['<strong>Erişilebilirlik kontrol listesi</strong>', '2022', 'Blog yazı dizisi', ['Tasarımcılar için 40 maddelik, örnekli kontrol listesi.']],
+  ]],
+  yetenek: ['Yetenekler', ['Tasarım: Figma, prototipleme, tasarım sistemi', 'Araştırma: görüşme, kullanılabilirlik testi', 'Teknik: HTML, CSS, temel React']],
+  dil: ['Diller', ['Türkçe — Ana dil', 'İngilizce — İleri (C1)', 'Almanca — Başlangıç (A2)']],
+  sert: ['Sertifikalar', ['Google UX Tasarım Sertifikası · 2022', 'Nielsen Norman UX Sertifikası · 2020']],
+}
+const entries = (list) => list.map(([t, d, sub, b]) => `<div class="entry"><div class="entry-head"><div class="entry-title">${t}</div><div class="entry-date">${d}</div></div><div class="entry-sub">${sub}</div>${b.length ? `<div class="entry-body rich"><ul>${b.map(x => `<li>${x}</li>`).join('')}</ul></div>` : ''}</div>`).join('')
+const lines = (list, mode) => mode === 'chips' ? `<div class="chips">${list.map(x => `<span>${x.split(': ').pop()}</span>`).join('')}</div>` : mode === 'inline' ? `<p class="inline">${list.join(' · ')}</p>` : list.map(x => { const [a, b] = x.includes(': ') ? x.split(': ') : x.split(' — '); return `<div class="entry-line"><strong class="line-label">${a}${x.includes(': ') ? ':' : ''}</strong> <span class="line-value">${b ?? ''}</span></div>` }).join('')
+const sec = (k, opt = {}) => { const [title, body] = S[k]; const t = opt.span ? `<span>${title}</span>` : title; const html = typeof body === 'string' ? body : (k === 'yetenek' || k === 'dil' || k === 'sert') ? lines(body, opt.lines) : entries(body); return `<h2 class="section-title">${t}</h2>${html}` }
+function page(tpl, { side = null, main, photo = true, lineMode, span } = {}) {
+  const o = { lines: lineMode, span }
+  return `<div class="page t-${tpl} ${side ? 'cols-2' : 'cols-1'}" id="p-${tpl}"><div class="page-inner has-header">
+  <header class="cv-header">${photo ? `<img class="cv-photo" src="${PHOTO}" alt="">` : ''}<div class="cv-identity">${tpl === 'cizelge' ? '<div>' : ''}<h1 class="cv-name">Deniz Arslan</h1><p class="cv-headline">Kıdemli Ürün Tasarımcısı</p>${tpl === 'cizelge' ? '</div>' : ''}<ul class="cv-contact">${contact.map((c, i) => `<li>${c}${i < contact.length - 1 ? '<span class="sep"> ·</span>' : ''}</li>`).join('')}</ul></div></header>
+  <div class="page-body">${side ? `<div class="col col-side">${side.map(k => sec(k, o)).join('')}</div>` : ''}<div class="col col-main">${main.map(k => sec(k, o)).join('')}</div></div></div></div>`
+}
+const P = location.hash.includes('nophoto') ? false : true
+document.getElementById('pages').innerHTML = [
+  page('zarif', { main: ['ozet', 'deneyim', 'egitim', 'proje', 'yetenek', 'dil'], photo: false, lineMode: 'inline' }),
+  page('panel', { side: ['yetenek', 'dil', 'egitim', 'sert'], main: ['ozet', 'deneyim', 'proje'], photo: P }),
+  page('bant', { side: ['yetenek', 'dil', 'sert'], main: ['ozet', 'deneyim', 'egitim', 'proje'], photo: P }),
+  page('manset', { side: ['yetenek', 'dil', 'egitim', 'sert'], main: ['ozet', 'deneyim', 'proje'], photo: P }),
+  page('gece', { main: ['ozet', 'deneyim', 'egitim', 'yetenek', 'dil'], photo: P, lineMode: 'inline' }),
+  page('isvicre', { main: ['ozet', 'deneyim', 'egitim', 'proje', 'yetenek', 'dil'], photo: false, span: true }),
+  page('cizelge', { main: ['ozet', 'deneyim', 'egitim', 'proje', 'yetenek', 'dil'], photo: false, lineMode: 'chips' }),
+  page('cift', { side: ['yetenek', 'dil', 'egitim', 'sert'], main: ['ozet', 'deneyim', 'proje'], photo: P }),
+  page('afis', { side: ['yetenek', 'dil', 'sert'], main: ['ozet', 'deneyim', 'egitim', 'proje'], photo: P }),
+  page('cerceve', { side: ['yetenek', 'dil', 'egitim', 'sert'], main: ['ozet', 'deneyim', 'proje'], photo: P }),
+].join('')
+</script>
+</body>
+</html>
