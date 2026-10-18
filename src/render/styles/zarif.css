@@ -1,0 +1,180 @@
+/*
+ * Zarif (`zarif`): docs/sablonlar/sartname.md §4.1. Ortalı klasik tırnaklı yazı, fildişi kâğıt,
+ * bölüm başlıklarının iki yanında ince çizgi; renk bloğu yok. Tek sütun.
+ * Her kural `.tpl-zarif` ile başlar; yalnız görünümü değiştirir (yapı base.css'te).
+ * Okunabilecek değişkenler, markup kancaları ve fotoğrafsız hâl: base.css başındaki sözleşme.
+ * Renk takımları, yazı tipleri ve desteklenen sütunlar: src/render/templateMeta.ts.
+ *
+ * Başlık hizası Görünüm'den sola da alınabilir: o zaman ad ve iletişim sola yaslanır,
+ * bölüm başlığının yalnız sağında çizgi kalır.
+ */
+
+/* EB Garamond küçük görünür: gövde 9.75 pt → 10.6 pt, satır aralığı biraz sık (1.4 → 1.33). */
+.tpl-zarif {
+  font-size: calc(var(--fs) * 1.087);
+  line-height: calc(var(--lh) * 0.95);
+}
+
+/* ---------- Başlık ---------- */
+
+.tpl-zarif .cv-header {
+  margin: 0 var(--pad-x) calc(var(--section-gap) * 0.8);
+  padding: calc(var(--pad-y) * 0.93) 0 4mm;
+  gap: 0;
+  border-bottom: 0.3mm solid var(--rule);
+}
+
+/* Editörün üzerine gelme vurgusu başlığa köşe yuvarlatır; alt çizgi düz kalsın. */
+#cv-pages.tpl-zarif .cv-header {
+  border-radius: 0;
+}
+
+.tpl-zarif.align-center .cv-identity {
+  flex: none;
+  width: 100%;
+}
+
+/* Fotoğraf (isteğe bağlı): adın üstünde ortada 24 mm daire. Boşluğu yalnız fotoğrafta. */
+.tpl-zarif .cv-photo {
+  width: 24mm;
+  height: 24mm;
+  border-radius: 50%;
+}
+
+.tpl-zarif.align-center .cv-photo {
+  margin-bottom: 4mm;
+}
+
+/* Sola yaslı başlıkta fotoğraf adın solunda */
+.tpl-zarif.align-left .cv-header {
+  gap: 6mm;
+}
+
+.tpl-zarif .cv-name {
+  font-weight: 500;
+  /* Boy sınırı (base.css .cv-name): sola yaslı, fotoğraflı, geniş boşlukta adın yeri ~144 mm */
+  --name-size: 3.1em;
+  --name-room: 144mm;
+  --name-char: 0.64;
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+
+.tpl-zarif .cv-name.is-long {
+  --name-size: 2.6em;
+}
+
+.tpl-zarif .cv-headline {
+  margin-top: 2mm;
+  font-size: 0.82em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent-ink);
+}
+
+.tpl-zarif .cv-contact {
+  margin-top: 2mm;
+  font-size: 0.9em;
+  color: var(--muted);
+}
+
+.tpl-zarif .cv-contact .sep {
+  color: var(--muted);
+}
+
+/* ---------- Bölüm başlığı: iki yanında ince çizgi ---------- */
+
+.tpl-zarif .section-title {
+  display: flex;
+  align-items: center;
+  gap: 3mm;
+  margin-top: calc(var(--section-gap) * 0.55);
+  font-family: var(--font-display);
+  font-size: 0.8em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent-ink);
+}
+
+.tpl-zarif .col > .section-title:first-child {
+  margin-top: 0;
+}
+
+.tpl-zarif .section-title::before,
+.tpl-zarif .section-title::after {
+  content: '';
+  flex: 1;
+  border-top: 0.25mm solid var(--rule);
+}
+
+.tpl-zarif .section-title > span {
+  flex: none;
+  max-width: 80%;
+  text-align: center;
+}
+
+/* Sola yaslı başlıkta çizgi yalnız sağda */
+.tpl-zarif.align-left .section-title::before {
+  content: none;
+}
+
+/* ---------- Kayıtlar ---------- */
+
+.tpl-zarif .entry-title strong {
+  font-weight: 600;
+}
+
+.tpl-zarif .entry-date {
+  font-style: italic;
+  font-size: 0.95em;
+}
+
+.tpl-zarif .entry-sub {
+  font-style: italic;
+}
+
+.tpl-zarif .rich a {
+  text-decoration-color: var(--rule);
+}
+
+/* Özet: ortalı italik paragraf (madde listesi sola yaslı kalır) */
+.tpl-zarif .entry-summary {
+  padding: 0 8mm;
+  font-style: italic;
+  text-align: center;
+  color: color-mix(in srgb, var(--ink) 82%, var(--muted));
+}
+
+.tpl-zarif .entry-summary ul {
+  text-align: left;
+}
+
+.tpl-zarif.align-left .entry-summary {
+  padding: 0;
+  text-align: left;
+}
+
+/* Beceri ve dil satırları ortalı (her satır ayrı sayfalama bloğu; satır içi liste olmaz) */
+.tpl-zarif .entry-skills,
+.tpl-zarif .entry-languages {
+  text-align: center;
+}
+
+.tpl-zarif.align-left .entry-skills,
+.tpl-zarif.align-left .entry-languages {
+  text-align: left;
+}
+
+.tpl-zarif .entry-skills + .entry-skills,
+.tpl-zarif .entry-languages + .entry-languages {
+  margin-top: calc(var(--block-gap) * -0.6);
+}
+
+.tpl-zarif .line-label {
+  font-weight: 600;
+}
+
+.tpl-zarif .entry-languages .line-sep {
+  color: var(--muted);
+}

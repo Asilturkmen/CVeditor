@@ -9,6 +9,7 @@ export interface Toast {
   message: string
   tone?: 'default' | 'error'
   action?: { label: string; run: () => void }
+  /** ms; `Infinity` kendiliğinden kapanmaz */
   duration?: number
 }
 

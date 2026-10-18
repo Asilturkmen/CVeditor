@@ -1,10 +1,12 @@
-import { cloneElement, Fragment, type ReactElement, type ReactNode } from 'react'
+import { cloneElement, Fragment, type CSSProperties, type ReactElement, type ReactNode } from 'react'
 import { formatDateRange, formatYearMonth } from '@/cv/dates'
 import { isItemEmpty } from '@/cv/factory'
 import { NAME_PLACEHOLDER, sectionTitle } from '@/cv/locale'
 import type { AnyItem, Cv, CvLanguage, Section } from '@/cv/schema'
 import { diffHtml, diffText } from './diff'
 import { displayUrl, isRichTextEmpty, sanitizeDiffHtml, sanitizeRichText, toHref } from './richtext'
+import { nameMetrics } from './nameMetrics'
+import { getTemplate, supportedColumns } from './templates'
 import { visibleSections } from './visibleSections'
 
 /**
@@ -75,6 +77,33 @@ function Joined({ parts }: { parts: ReactNode[] }) {
           {p}
         </span>
       ))}
+    </>
+  )
+}
+
+/**
+ * Virgülle ayrılmış anahtar kelimeler: her biri `.kw`, ayırıcı `.kw-sep` (", " metin olarak
+ * kalır; ATS "TypeScript, JavaScript" okur). Şablon kelimeleri çip gibi çizebilir; ayırıcıyı
+ * gizlemek yerine görünür bırakmalı ya da zemin rengine boyamalı (metin silinmez).
+ */
+function Keywords({ value }: { value: string }) {
+  const parts = value.split(/(,\s*)/)
+  if (parts.length === 1) return <>{value}</>
+  return (
+    <>
+      {parts.map((part, i) =>
+        i % 2 === 1 ? (
+          <span key={i} className="kw-sep">
+            {part}
+          </span>
+        ) : part.trim() ? (
+          <span key={i} className="kw">
+            {part}
+          </span>
+        ) : (
+          part
+        ),
+      )}
     </>
   )
 }
@@ -185,7 +214,9 @@ function ItemBlock({ section, item, ctx }: { section: Section; item: AnyItem; ct
         <div {...entryAttrs(section, item, 'skills')}>
           <div className="entry-line">
             {it.name && <strong className="line-label">{t('name', it.name)}: </strong>}
-            <span className="line-value">{t('keywords', it.keywords)}</span>
+            <span className="line-value">
+              {hasSuggestion(ctx, item.id, 'keywords') ? t('keywords', it.keywords) : <Keywords value={it.keywords} />}
+            </span>
           </div>
         </div>
       )
@@ -313,7 +344,7 @@ function SectionBlocks({ section, ctx }: { section: Section; ctx: Ctx }) {
   }
   return (
     <>
-      <h2 className="section-title" data-block="" data-keep-with-next="" data-section-id={section.id}>
+      <h2 className="section-title" data-block="" data-keep-with-next="" data-section-id={section.id} data-section-type={section.type}>
         <span>{sectionTitle(ctx.lang, section.type, section.title)}</span>
       </h2>
       {rows.map(({ item, mark }) => {
@@ -326,28 +357,35 @@ function SectionBlocks({ section, ctx }: { section: Section; ctx: Ctx }) {
   )
 }
 
+/**
+ * Bu uzunluktan (karakter) uzun iletişim öğesi `li.is-long` alır: başlığın tam satırına bile
+ * sığmayabilir; yalnız o, son çare olarak satır sonunda bölünebilir (base.css). Gerisi bölünmez.
+ */
+const LONG_CONTACT = 64
+
 function ContactList({ cv, ctx }: { cv: Cv; ctx: Ctx }) {
   const p = cv.personal
-  const items: ReactNode[] = []
-  const push = (field: keyof typeof p, node: ReactNode) => {
-    if (hasSuggestion(ctx, 'personal', field)) items.push(<Text ctx={ctx} target="personal" field={field} value={String(p[field] ?? '')} />)
-    else if (p[field]) items.push(node)
+  const items: { node: ReactNode; length: number }[] = []
+  const push = (field: keyof typeof p, node: ReactNode, shown = String(p[field] ?? '')) => {
+    if (hasSuggestion(ctx, 'personal', field)) {
+      items.push({ node: <Text ctx={ctx} target="personal" field={field} value={String(p[field] ?? '')} />, length: 0 })
+    } else if (p[field]) items.push({ node, length: [...shown].length })
   }
   push('email', <a href={toHref(p.email)}>{p.email}</a>)
   push('phone', <a href={`tel:${p.phone.replace(/\s/g, '')}`}>{p.phone}</a>)
   push('location', <span>{p.location}</span>)
-  push('website', <Link value={p.website} />)
-  push('linkedin', <Link value={p.linkedin} />)
-  push('github', <Link value={p.github} />)
+  push('website', <Link value={p.website} />, displayUrl(p.website))
+  push('linkedin', <Link value={p.linkedin} />, displayUrl(p.linkedin))
+  push('github', <Link value={p.github} />, displayUrl(p.github))
   if (items.length === 0) return null
   return (
     <ul className="cv-contact">
-      {items.map((node, i) => (
+      {items.map(({ node, length }, i) => (
         // Her öğe bölünmez bir birim (adres ortasından satıra kırılmaz); liste yalnız öğeler
         // arasındaki boşlukta kırılır. Ayırıcı önceki öğeye yapışık, satır başında "·" kalmaz.
         <Fragment key={i}>
           {i > 0 && ' '}
-          <li>
+          <li className={length > LONG_CONTACT ? 'is-long' : undefined}>
             {node}
             {i < items.length - 1 && <span className="sep">{' ·'}</span>}
           </li>
@@ -357,22 +395,41 @@ function ContactList({ cv, ctx }: { cv: Cv; ctx: Ctx }) {
   )
 }
 
-function Header({ cv, ctx, placeholders }: { cv: Cv; ctx: Ctx; placeholders: boolean }) {
+function Header({ cv, ctx, placeholders, photoHint }: { cv: Cv; ctx: Ctx; placeholders: boolean; photoHint?: string }) {
   const p = cv.personal
-  const showPhoto = cv.template.showPhoto && p.photo
+  const photo = cv.template.showPhoto ? p.photo : null
+  // Fotoğraf açık ama yüklenmemiş: önizlemede fotoğraf yerinde kesikli kutu. Ekranda düzen
+  // fotoğraflı hâldir; baskıda kutu `display:none` olur (base.css), PDF'e ve ATS metnine girmez.
+  const photoSlot = !photo && placeholders && cv.template.showPhoto && !!photoHint
   const name = p.fullName.trim()
+  const headerClass = ['cv-header', photo || photoSlot ? 'has-photo' : 'no-photo', photoSlot && 'photo-ph'].filter(Boolean).join(' ')
+  // Boş adda önizleme yer tutucuyu çizer; boy da ona göre.
+  const metrics = nameMetrics(name || (placeholders ? NAME_PLACEHOLDER[ctx.lang] : ''))
+  const nameClass = ['cv-name', metrics.isLong && 'is-long', metrics.hasLongWord && 'has-long-word'].filter(Boolean).join(' ')
+  const nameStyle = { '--name-longest': metrics.longest } as CSSProperties
   return (
-    <header className={`cv-header${showPhoto ? ' has-photo' : ''}`} data-block="" data-target="personal">
-      {showPhoto && <img className="cv-photo" src={p.photo!} alt="" />}
+    <header className={headerClass} data-block="" data-target="personal">
+      {photo && <img className="cv-photo" src={photo} alt="" />}
+      {photoSlot && (
+        <div className="cv-photo ph ph-photo" aria-hidden="true">
+          <span className="ph-photo-text">{photoHint}</span>
+        </div>
+      )}
       <div className="cv-identity">
-        <h1 className="cv-name">
-          {name || (placeholders ? <span className="ph">{NAME_PLACEHOLDER[ctx.lang]}</span> : '')}
-        </h1>
-        {(p.headline || hasSuggestion(ctx, 'personal', 'headline')) && (
-          <p className="cv-headline">
-            <Text ctx={ctx} target="personal" field="headline" value={p.headline} />
-          </p>
-        )}
+        {/* Ad + unvan bir arada (ör. Çizelge: solda ad bloğu, sağda iletişim). DOM sırası aynı. */}
+        <div className="cv-heading">
+          <h1 className={nameClass} style={nameStyle}>
+            {/* İç span: satır satır vurgu (Afiş'in fosforlu adı, box-decoration-break) */}
+            <span className="cv-name-text">
+              {name || (placeholders ? <span className="ph">{NAME_PLACEHOLDER[ctx.lang]}</span> : '')}
+            </span>
+          </h1>
+          {(p.headline || hasSuggestion(ctx, 'personal', 'headline')) && (
+            <p className="cv-headline">
+              <Text ctx={ctx} target="personal" field="headline" value={p.headline} />
+            </p>
+          )}
+        </div>
         {/* İletişim her düzende başlıkta (tam genişlik): dar yan sütunda adresler satıra bölünürdü. */}
         <ContactList cv={cv} ctx={ctx} />
       </div>
@@ -385,15 +442,21 @@ export function CvSource({
   suggestions,
   placeholders = false,
   emptyHint,
+  photoHint,
 }: {
   cv: Cv
   suggestions?: SuggestionMap
   placeholders?: boolean
   /** Hiç içerik yokken önizlemede görünen soluk ipucu (baskıda gizli) */
   emptyHint?: string
+  /** Fotoğraf yer tutucusunun yazısı ("Fotoğraf ekle"; baskıda gizli) */
+  photoHint?: string
 }) {
   const ctx: Ctx = { lang: cv.language, suggestions }
-  const two = cv.template.columns === 2
+  // Bilinmeyen şablon (eski/bozuk kayıt) varsayılana, desteklenmeyen sütun sayısı desteklenene
+  // düşer: çizim her zaman var olan bir şablonun gerçek düzenidir (cvStyles da aynı şablonu yükler).
+  const template = getTemplate(cv.templateId)
+  const two = supportedColumns(template, cv.template.columns) === 2
   // Boş bölüme önerilen kayıt da görünsün.
   const visible = new Set(visibleSections(cv))
   const sections = cv.sections.filter((s) => visible.has(s) || (!s.hidden && !!suggestions?.added?.get(s.id)?.length))
@@ -402,9 +465,9 @@ export function CvSource({
   const main = sections.filter((s) => !sideIds.has(s.id))
 
   return (
-    <div className={`cv tpl-${cv.templateId} cols-${two ? 2 : 1} align-${cv.template.headerAlign}`}>
+    <div className={`cv tpl-${template.id} cols-${two ? 2 : 1} align-${cv.template.headerAlign === 'center' ? 'center' : 'left'}`}>
       <div data-flow="header">
-        <Header cv={cv} ctx={ctx} placeholders={placeholders} />
+        <Header cv={cv} ctx={ctx} placeholders={placeholders} photoHint={photoHint} />
       </div>
       {two && (
         <div data-flow="side">

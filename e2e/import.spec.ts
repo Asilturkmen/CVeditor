@@ -1,12 +1,12 @@
 import { readFileSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'
 import { encryptedPdf, enCvPdf, fakePdf, imageOnlyPdf, trCvPdf } from './fixtures/pdfs.ts'
-import { createCv, preview } from './helpers.ts'
+import { preview } from './helpers.ts'
 
-/** Şablonlar → Klasik → (dil) → "Eski CV'yi içe aktar" → PDF seçimi ekranı */
+/** Şablonlar → Zarif → (dil) → "Eski CV'yi içe aktar" → PDF seçimi ekranı */
 async function openImport(page: Page, language: 'Türkçe' | 'İngilizce' = 'Türkçe') {
   await page.goto('/sablonlar')
-  await page.getByRole('button', { name: /Klasik şablonunu seç/ }).click()
+  await page.getByRole('button', { name: /Zarif şablonunu seç/ }).click()
   await page.getByRole('radio', { name: language }).click()
   await page.getByRole('button', { name: 'Devam' }).click()
   await page.getByRole('radio', { name: /Eski CV'yi içe aktar/ }).click()
@@ -100,50 +100,5 @@ test('parolalı PDF açık "parolalı" hatası verir; CV oluşturulamaz', async 
   const alert = page.getByRole('alert')
   await expect(alert).toContainText(tr.imp_err_encrypted_title)
   await expect(alert).toContainText(tr.imp_err_encrypted_body)
-  await expect(page.getByRole('button', { name: "CV'yi oluştur" })).toBeDisabled()
-})
-
-test('JSON Resume dışa aktarılır ve aynı dosyadan yeni CV oluşturulur', async ({ page }) => {
-  await createCv(page, { start: 'sample' })
-  await page.getByRole('button', { name: 'Diğer işlemler' }).click()
-  const [download] = await Promise.all([
-    page.waitForEvent('download'),
-    page.getByRole('menuitem', { name: 'JSON Resume olarak dışa aktar' }).click(),
-  ])
-  expect(download.suggestedFilename()).toMatch(/\.resume\.json$/)
-  const json = readFileSync((await download.path())!, 'utf8')
-  const resume = JSON.parse(json)
-  expect(resume.basics.name).toBe('Deniz Aksoy')
-  expect(resume.work.length).toBeGreaterThan(0)
-
-  await page.goto('/sablonlar')
-  await page.getByRole('button', { name: /Modern şablonunu seç/ }).click()
-  await page.getByLabel('CV adı').fill('JSON kopyası')
-  await page.getByRole('button', { name: 'Devam' }).click()
-  await page.getByRole('radio', { name: /JSON Resume dosyası/ }).click()
-  await expect(page.getByRole('button', { name: "CV'yi oluştur" })).toBeDisabled()
-  await page.getByTestId('json-resume-file').setInputFiles({
-    name: 'deniz.resume.json',
-    mimeType: 'application/json',
-    buffer: Buffer.from(json),
-  })
-  await expect(page.getByTestId('json-resume-summary')).toContainText('deniz.resume.json')
-  await page.getByRole('button', { name: "CV'yi oluştur" }).click()
-  await page.waitForURL(/\/editor\//)
-  const firstPage = preview(page).locator('.page').first()
-  await expect(firstPage).toContainText('Deniz Aksoy')
-  await expect(firstPage).toContainText(resume.work[0].name)
-  await expect(firstPage).toContainText(resume.work[0].position)
-})
-
-test('bozuk JSON dosyası açık hata verir', async ({ page }) => {
-  await page.goto('/sablonlar')
-  await page.getByRole('button', { name: /Klasik şablonunu seç/ }).click()
-  await page.getByRole('button', { name: 'Devam' }).click()
-  await page.getByRole('radio', { name: /JSON Resume dosyası/ }).click()
-  await page.getByTestId('json-resume-file').setInputFiles({ name: 'x.json', mimeType: 'application/json', buffer: Buffer.from('{bozuk') })
-  await expect(page.getByRole('alert')).toContainText('Dosya JSON olarak okunamadı.')
-  await page.getByTestId('json-resume-file').setInputFiles({ name: 'y.json', mimeType: 'application/json', buffer: Buffer.from('{"foo":1}') })
-  await expect(page.getByRole('alert')).toContainText('JSON Resume değil')
   await expect(page.getByRole('button', { name: "CV'yi oluştur" })).toBeDisabled()
 })

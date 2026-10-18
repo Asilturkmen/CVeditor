@@ -1,5 +1,4 @@
 import { duplicateCv } from '@/cv/factory'
-import { toJsonResume } from '@/cv/jsonResume'
 import { createBackup } from '@/cv/migrate'
 import type { Cv } from '@/cv/schema'
 import { db } from '@/db/db'
@@ -33,11 +32,6 @@ export async function rename(cv: Cv, name: string) {
 
 export function exportCvJson(cv: Cv) {
   downloadText(`${fileSafe(cv.name)}.cveditor.json`, JSON.stringify(createBackup([cv]), null, 2))
-}
-
-/** jsonresume.org biçiminde dışa aktarım (başka araçlarda ve yeniden içe aktarmada kullanılır) */
-export function exportJsonResume(cv: Cv) {
-  downloadText(`${fileSafe(cv.name)}.resume.json`, JSON.stringify(toJsonResume(cv), null, 2))
 }
 
 export async function exportAllJson(cvs: Cv[]) {

@@ -1,6 +1,6 @@
 import { useNavigate } from '@tanstack/react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowLeft, Braces, Copy, FileText, FileUp } from 'lucide-react'
+import { ArrowLeft, Copy, FileText, FileUp } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { createCv, defaultSections, duplicateCv } from '@/cv/factory'
 import type { Cv, CvLanguage, Section } from '@/cv/schema'
@@ -13,13 +13,12 @@ import { Segmented } from '@/components/ui/Segmented'
 import { cn } from '@/lib/cn'
 import { useChanged } from '@/lib/useChanged'
 import { m } from '@/paraglide/messages'
-import { getTemplate, templateSettingsFor, type TemplateId } from '@/render/templates'
+import { getTemplate, templateSettingsFor, templateSettingsForCopy, type TemplateId } from '@/render/templates'
 import { ImportPreview, type ImportSelection } from '@/features/import/ImportPreview'
-import { JsonResumeImport } from '@/features/import/JsonResumeImport'
 import { TEMPLATE_TEXT } from './templateText'
 
 type Step = 'details' | 'start' | 'import'
-type StartMode = 'blank' | 'import' | 'copy' | 'json'
+type StartMode = 'blank' | 'import' | 'copy'
 
 const defaultName = (lang: CvLanguage) => m.new_cv_default_name({ lang: lang.toUpperCase() })
 
@@ -93,7 +92,6 @@ export function NewCvDialog({ templateId, onClose }: { templateId: TemplateId | 
   // Seçilmediyse en son düzenlenen CV
   const copyFrom = chosenCopyFrom || (cvs[0]?.id ?? '')
   const [importSelection, setImportSelection] = useState<ImportSelection | null>(null)
-  const [jsonSelection, setJsonSelection] = useState<ImportSelection | null>(null)
   const [busy, setBusy] = useState(false)
 
   // Her şablon seçiminde baştan başlanır.
@@ -104,7 +102,6 @@ export function NewCvDialog({ templateId, onClose }: { templateId: TemplateId | 
     setNameTouched(false)
     setMode('blank')
     setImportSelection(null)
-    setJsonSelection(null)
     setBusy(false)
   }
 
@@ -135,10 +132,9 @@ export function NewCvDialog({ templateId, onClose }: { templateId: TemplateId | 
       if (!source) return
       const copy = duplicateCv(source, { name: cvName, language })
       copy.templateId = templateId
-      copy.template = { ...templateSettingsFor(templateId, copy.sections), accentColor: source.template.accentColor }
+      // Vurgu rengi şablon değiştirme kuralıyla: kaynağın hazır takımıysa yeni şablonun varsayılanı
+      copy.template = templateSettingsForCopy(source, templateId, copy.sections)
       await finish(copy)
-    } else if (mode === 'json') {
-      if (jsonSelection) await createFrom(jsonSelection)
     } else {
       setStep('import')
     }
@@ -185,7 +181,7 @@ export function NewCvDialog({ templateId, onClose }: { templateId: TemplateId | 
         </Button>
         <Button
           variant="primary"
-          disabled={busy || (mode === 'copy' && !copyFrom) || (mode === 'json' && !hasImport(jsonSelection))}
+          disabled={busy || (mode === 'copy' && !copyFrom)}
           onClick={() => void create()}
         >
           {mode === 'import' ? m.common_continue() : m.new_cv_create()}
@@ -292,15 +288,6 @@ export function NewCvDialog({ templateId, onClose }: { templateId: TemplateId | 
                   <p className="text-xs text-warn">{m.start_copy_language_note()}</p>
                 )}
               </div>
-            </StartOption>
-            <StartOption
-              selected={mode === 'json'}
-              onSelect={() => setMode('json')}
-              icon={<Braces />}
-              title={m.imp_json_title()}
-              body={m.imp_json_desc()}
-            >
-              <JsonResumeImport language={language} onChange={setJsonSelection} />
             </StartOption>
           </div>
         )}

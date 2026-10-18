@@ -2,16 +2,19 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { Cv, TemplateSettings } from '@/cv/schema'
 import { CvSource, type SuggestionMap } from './CvMarkup'
+import { colorVariables } from './colors'
 import { escapeHtml } from './diff'
-import { FONTS, fontFaceCss } from './fonts'
+import { FONTS, fontDef, fontFaceCss, type FontDef } from './fonts'
 import baseCss from './styles/base.css?raw'
-import { getTemplate } from './templates'
+import { activeColorSet, getTemplate, resolvedBaseColor, type TemplateDef } from './templates'
 
 export interface RenderOptions {
   suggestions?: SuggestionMap
-  /** Boş ad yerine soluk yer tutucu (yalnız önizleme; baskıda gizli) */
+  /** Boş ad yerine soluk yer tutucu, fotoğraf yerinde "Fotoğraf ekle" kutusu (yalnız önizleme; baskıda gizli) */
   placeholders?: boolean
   emptyHint?: string
+  /** Fotoğraf yer tutucusunun yazısı (placeholders ile) */
+  photoHint?: string
 }
 
 export function renderCvSource(cv: Cv, options: RenderOptions = {}): string {
@@ -21,6 +24,7 @@ export function renderCvSource(cv: Cv, options: RenderOptions = {}): string {
       suggestions: options.suggestions,
       placeholders: options.placeholders,
       emptyHint: options.emptyHint,
+      photoHint: options.photoHint,
     }),
   )
 }
@@ -33,16 +37,36 @@ const SPACING: Record<TemplateSettings['spacing'], Record<string, string>> = {
   relaxed: { '--block-gap': '4mm', '--section-gap': '7mm', '--pad-x': '18mm', '--pad-y': '16mm', '--lh': '1.48' },
 }
 
-/** CV'ye özgü değişkenler: şablon CSS'leri yalnız bunları okur. */
-export function cvVariables(settings: TemplateSettings): string {
+/** Şablonun ve CV'nin yazı tipleri: gövde (Görünüm'deki seçim), başlık ve eş aralıklı aile. */
+export function cvFonts(template: TemplateDef, settings: Pick<TemplateSettings, 'font'>): { body: FontDef; display: FontDef; mono: FontDef } {
+  const body = FONTS[settings.font] ?? FONTS.inter
+  return {
+    body,
+    display: fontDef(template.fonts.display),
+    mono: template.fonts.mono ? fontDef(template.fonts.mono) : body,
+  }
+}
+
+/**
+ * CV'ye özgü değişkenler: şablon CSS'leri yalnız bunları okur (sözleşme: base.css başı).
+ * Renkler colors.ts'te türetilir; ayarlar şablonun hazır bir takımıyla aynıysa o takımın
+ * elle seçilmiş tonları (ColorSet.vars) türetilenlerin yerine geçer.
+ */
+export function cvVariables(settings: TemplateSettings, template: TemplateDef = getTemplate('')): string {
+  const fonts = cvFonts(template, settings)
   const vars: Record<string, string> = {
-    '--accent': settings.accentColor,
-    '--accent-ink': `color-mix(in srgb, ${settings.accentColor} 82%, #000)`,
-    '--ink': '#1c1c1e',
-    '--muted': '#5a5a60',
-    '--rule': '#d6d6db',
-    '--paper': '#ffffff',
-    '--font': FONTS[settings.font].stack,
+    ...colorVariables({
+      accent: settings.accentColor,
+      base: resolvedBaseColor(template, settings),
+      paper: template.paper,
+      ink: template.ink,
+      muted: template.muted,
+      rule: template.rule,
+    }),
+    ...activeColorSet(template, settings)?.vars,
+    '--font': fonts.body.stack,
+    '--font-display': fonts.display.stack,
+    '--font-mono': fonts.mono.stack,
     '--fs': FONT_SIZES[settings.fontSize],
     ...SPACING[settings.spacing],
   }
@@ -53,7 +77,8 @@ export function cvVariables(settings: TemplateSettings): string {
 
 /** Bir CV'yi çizmek için gereken bütün CSS (yazı tipleri hariç). */
 export function cvStyles(cv: Cv): string {
-  return `${baseCss}\n${getTemplate(cv.templateId).css}\n${cvVariables(cv.template)}`
+  const template = getTemplate(cv.templateId)
+  return `${baseCss}\n${template.css}\n${cvVariables(cv.template, template)}`
 }
 
 /**

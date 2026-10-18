@@ -7,7 +7,7 @@ import { z } from 'zod'
  *
  * Şema değişirse CURRENT_SCHEMA_VERSION artırılır ve migrate.ts'e göç eklenir.
  */
-export const CURRENT_SCHEMA_VERSION = 1
+export const CURRENT_SCHEMA_VERSION = 2
 
 export const CV_LANGUAGES = ['tr', 'en'] as const
 export const LanguageSchema = z.enum(CV_LANGUAGES)
@@ -174,12 +174,31 @@ export const PersonalSchema = z.object({
 })
 export type Personal = z.infer<typeof PersonalSchema>
 
-export const FONT_IDS = ['inter', 'ibm-plex-sans', 'source-sans-3', 'source-serif-4', 'literata'] as const
+/** Gövde yazı tipleri (Görünüm'de seçilir). Yeni aile eklemek geriye uyumludur; çıkarmak göç ister. */
+export const FONT_IDS = [
+  'inter',
+  'ibm-plex-sans',
+  'source-sans-3',
+  'source-serif-4',
+  'literata',
+  'eb-garamond',
+  'archivo',
+  'manrope',
+  'space-grotesk',
+] as const
 export const FontIdSchema = z.enum(FONT_IDS)
 export type FontId = z.infer<typeof FontIdSchema>
 
+const HexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/)
+
 export const TemplateSettingsSchema = z.object({
-  accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  accentColor: HexColor,
+  /**
+   * Zemin rengi: renk bloğu vurgudan ayrı bir renk taşıyan şablonlarda (Panel'in yan
+   * sütunu, Gece'nin sayfası, Çift Ton'un koyu yarısı). null → şablonun varsayılanı.
+   * Zemin kullanmayan şablon bunu yok sayar. (Şema 2)
+   */
+  baseColor: HexColor.nullable(),
   font: FontIdSchema,
   fontSize: z.enum(['sm', 'md', 'lg']),
   spacing: z.enum(['compact', 'normal', 'relaxed']),

@@ -26,7 +26,7 @@ You will design microservices, mentor engineers and own data pipelines end to en
 
 function sampleText(language: 'tr' | 'en') {
   const sections = sampleSections(language)
-  const cv = createCv({ name: 'x', language, templateId: 'klasik', template: templateSettingsFor('klasik', sections), personal: samplePersonal(language), sections })
+  const cv = createCv({ name: 'x', language, templateId: 'zarif', template: templateSettingsFor('zarif', sections), personal: samplePersonal(language), sections })
   return cvPlainText(cv)
 }
 

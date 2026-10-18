@@ -176,7 +176,7 @@ Arayüz kuran ya da değiştiren her kodlama oturumu bu dosyaya uyar. Değerler 
 
 - **Kabuk (`AppShell`):** yapışkan üst çubuk `h-14`, `border-b border-line`, `bg-bg`. Solda `Wordmark`, yanında sekmeler **CV'lerim · Şablonlar** (altında kayan vurgu çizgisi), sağda tema düğmesi ve Ayarlar. İçerik `max-w-[1240px] px-6 pt-8 pb-24`.
 - **Sayfa başlığı deseni:** solda `page-title` (+ varsa `rounded-full bg-surface-2` sayaç) ve altında `text-muted` tek cümle; sağda araçlar (arama, `/` kısayolu `kbd` ile gösterilir) ve en sağda tek birincil eylem. Başlık ile içerik arası `mb-7`/`mb-8`.
-- **Izgaralar:** CV'lerim `repeat(auto-fill, minmax(220px, 1fr))`, `gap-x-6 gap-y-8`. Şablonlar en çok 2 sütun, `max-w-[920px]`, `gap-x-10 gap-y-12`. Ayarlar `max-w-[920px]`, her bölüm `260px | 1fr` iki sütun, aralarında `border-b`.
+- **Izgaralar:** CV'lerim `repeat(auto-fill, minmax(220px, 1fr))`, `gap-x-6 gap-y-8`. Şablonlar (galeri) kategorisiz tek ızgara, 10 kart tek ekrana sığar: `grid-cols-2 sm:3 lg:4 xl:5`, `gap-x-4 sm:gap-x-6 gap-y-8`, kabuk genişliği (1240px). Kart: `rounded-2xl bg-canvas p-3` içinde A4 küçük resim, altında ad (`title-md`), küçük etiketler (sütun düzeni + şablonu ayırt eden tek özellik, ör. "İki sütun", "Koyu zemin"; `rounded-full border text-[11px] text-muted`) ve 2-3 satırlık açıklama. Kartın tamamı tek düğmedir ("X şablonunu seç"). Ayarlar `max-w-[920px]`, her bölüm `260px | 1fr` iki sütun, aralarında `border-b`.
 - **Editör (masaüstü, ≥ 900px):** tam yükseklik; üst çubuk `h-14 bg-surface` (geri, CV adı, dil rozeti, kaydetme göstergesi | geri al/yinele, sayfa sayısı, tema, ⋯ menü, **PDF al**).
   - Sol: `PreviewPane`, `bg-canvas`, A4 sayfalar gölgeli; sağ altta yüzen `ZoomControl` (−, %, +, Sığdır, 100%).
   - Orta: `Splitter`, 1px `bg-line`, hover/odakta vurgu; sürükle, ok tuşu (24px), çift tık sıfırlar.
@@ -300,25 +300,33 @@ Etkileyici = amaçlı, gösterişli değil. Her hareket bir şeyi anlatır: nere
 CV çizimi site arayüzünden ayrıdır: iframe içinde, site stilinden izole, önizleme ve PDF için **aynı** HTML ve CSS (`src/render`). Kâğıt temadan etkilenmez; koyu temada da beyazdır.
 
 **Şablon = ayar + küçük CSS.** Yeni şablon ayrı bir kod yığını değildir:
-1. `src/render/templates.ts`'e bir `TemplateDef` (ad, CSS, varsayılan `TemplateSettings`).
-2. `src/render/styles/<id>.css`: her kural `.tpl-<id>` ile başlar, yalnız CV değişkenlerini okur (`--accent`, `--accent-ink`, `--ink`, `--muted`, `--rule`, `--paper`, `--font`, `--fs`, `--block-gap`, `--section-gap`, `--pad-x`, `--pad-y`, `--lh`).
-3. Yapı (`.page`, `.col-main`, `.col-side`, `.cv-header`, `.entry`) `base.css`'te sabittir; şablon yalnız görünümü değiştirir. Her şablon tek ve iki sütunu, üç boşluk ölçeğini, üç yazı boyunu, fotoğraf açık/kapalıyı ve sola/ortaya hizalı başlığı kaldırmalı.
+1. `src/render/templateMeta.ts`'e bir kayıt (kimlik, desteklenen sütunlar, renk takımları, yazı tipleri, etiketler, kâğıt/metin renkleri); `templates.ts` CSS'i bağlar ve `TemplateDef`'i (ad/açıklama mesaj anahtarı `template_<id>_name/_desc`, varsayılan `TemplateSettings`) kurar.
+2. `src/render/styles/<id>.css`: her kural `.tpl-<id>` ile başlar, yalnız CV değişkenlerini ve markup kancalarını okur. Sözleşmenin tamamı `base.css` başındaki yorumda (renk: `--accent`, `--accent-ink`, `--on-accent`, `--accent-mark`, `--accent-soft/-light/-dark`, `--base`, `--on-base`, `--base-soft`, `--base-ink`, `--accent-on-base`; kâğıt: `--paper`, `--ink`, `--muted`, `--rule`; yazı: `--font`, `--font-display`, `--font-mono`, `--fs`; boşluk: `--block-gap`, `--section-gap`, `--pad-x`, `--pad-y`, `--lh`).
+3. Yapı (`.page`, `.col-main`, `.col-side`, `.cv-header`, `.entry`) `base.css`'te sabittir; şablon yalnız görünümü değiştirir. Her şablon **kendi desteklediği** sütun düzenlerini (kayıttaki `columns`), üç boşluk ölçeğini, üç yazı boyunu, fotoğraflı/fotoğrafsız hâli (`.cv-header.has-photo` / `.no-photo`) kaldırmalı. Tek düzenli şablonda Görünüm sekmesi sütun seçeneğini göstermez.
 
-**Mevcut şablonlar:** **Klasik** (tırnaklı, varsayılan Source Serif 4, tek sütun, vurgu renkli büyük harf bölüm başlığı + ince alt çizgi) ve **Modern** (Inter, iki sütun, ad bandının altında kalın vurgu çizgisi, yan sütun %7 vurgu tonu, başlık önünde kısa vurgu çubuğu).
+**Şablonlar (10, galeri sırasıyla):** Zarif, Panel, Bant, Manşet, Gece, İsviçre, Çizelge, Çift Ton, Afiş, Çerçeve. Tarifleri `docs/sablonlar/sartname.md`'de. Sütun: Panel ve Çift Ton yalnız 2; Zarif, Gece, İsviçre, Çizelge yalnız 1; Bant, Manşet, Afiş, Çerçeve varsayılan 2, tek sütunu da destekler. Eski Klasik → Zarif, Modern → Panel (şema 2 göçü).
+
+**Renk takımları:** her şablonun 3-4 uyumlu takımı (vurgu, gerekirse zemin: `TemplateSettings.baseColor`) ve serbest "Özel renk" (zemin kullanan şablonda "Özel zemin" de). Metin olarak kullanılan renk kâğıda karşı 4.5:1'in altındaysa kendiliğinden koyulaşır/açılır (`--accent-ink`, `src/render/colors.ts`). Koyu zeminli şablonlarda (Gece, Çift Ton) Görünüm'de kısa mürekkep notu.
+
+**Fotoğraf:** yeni CV'de `showPhoto` açık. Fotoğraf yüklenmemişse editör önizlemesinde fotoğraf yerinde kesikli "Fotoğraf ekle" kutusu (`.ph-photo`) durur; baskıda `display:none`, PDF'e ve ATS metnine girmez. Galeri örneğinde çizilmiş silüet (gerçek/yapay yüz yok; kullanıcının CV'sine yazılmaz).
 
 **Ölçüler:**
 - Sayfa A4, `210mm × 297mm`, `@page { margin: 0 }`; kenar boşluğu `--pad-x/--pad-y` ile içeriden.
 - Yazı boyu `sm 9.25pt · md 9.75pt · lg 10.5pt`; ad 2.3-2.5em, unvan 1.15em, iletişim 0.95em, tarih 0.93em `tabular-nums`.
 - Boşluk ölçeği yukarıdaki `cv-compact / cv-normal / cv-relaxed` tablosu.
-- Renk: metin `#1c1c1e`, ikincil `#5a5a60`, çizgi `#d6d6db`; vurgu CV ayarından (8 hazır renk + özel), kullanıcının site vurgusundan bağımsız.
-- Yazı tipleri (Inter, IBM Plex Sans, Source Sans 3, Source Serif 4, Literata) siteyle sunulur, latin-ext içerir (ş, ğ, ı, İ), PDF'e gömülür. Ağırlık başına **statik** woff2 (`@fontsource/*`; 400, 500, 600, 700, italik 400/700): değişken yazı tipi Chrome PDF'inde Type3 olur. Şablon CSS'inde yalnız bu ağırlıklar kullanılır (650/750 gibi ara değer yok).
+- Renk: kâğıt, metin, ikincil ve çizgi şablonun kaydından (`templateMeta.ts`); vurgu (ve varsa zemin) CV ayarından (şablonun renk takımları + özel), kullanıcının site vurgusundan bağımsız.
+- Yazı tipleri siteyle sunulur, latin-ext içerir (ş, ğ, ı, İ), PDF'e gömülür. Ağırlık başına **statik** woff2 (`@fontsource/*`, değişken olmayan paketler; `npm run fonts`): değişken yazı tipi Chrome PDF'inde Type3 olur. **Gövde** (Görünüm'de seçilir): Inter, IBM Plex Sans, Source Sans 3, Manrope, Space Grotesk, Archivo, Source Serif 4, Literata, EB Garamond. **Yalnız şablonun başlık/ad ailesi** (`--font-display`, seçilmez): Poppins, DM Serif Display, Playfair Display, Fraunces; eş aralıklı `--font-mono`: IBM Plex Mono. Hangi ailenin hangi yüzleri sunulduğu `scripts/copy-fonts.mjs`'te; şablon CSS'inde yalnız onlar kullanılır (650/750 gibi ara değer yok).
 
 **ATS kuralları (zorunlu):**
-- DOM sırası okuma sırasıdır. CSS `order`, `position: absolute`, `flex-direction: *-reverse`, grid ile yer değiştirme yasak. İki sütunda yan sütun kısa ve DOM'da mantıklı sırada.
-- Önemli metni `::before/::after` ile üretme (Modern'deki boş dekor çubuğu gibi süs serbest).
+- DOM sırası okuma sırasıdır. CSS `order`, `flex-direction: *-reverse` yasak; metin grid/flex ile DOM sırasından farklı bir sıraya taşınmaz. **Tek istisna metinsiz fotoğraf:** `img.cv-photo` başlık ızgarasında başka hücreye (ör. sağa, `grid-column`) yerleşebilir (onaylı 5. karar); ad, unvan ve iletişim DOM sırasıyla akar. İki sütunda yan sütun kısa ve DOM'da mantıklı sırada.
+- **Metin taşıyan öğe kendi boyama katmanını açmaz:** `position` (relative dahil), `opacity < 1`, `transform`, `filter`, `z-index`, `mix-blend-mode`, `isolation: isolate`, `will-change: transform/opacity` yasak. Chromium bu öğeleri PDF'e sayfanın geri kalanından ayrı ve sonra basar: içerik akışında metin yerinden kayar, opacity/filter'da metin resim olarak basılıp hiç çıkmayabilir. Süs (metinsiz sözde öğe, kenarlık, arka plan) ve fotoğraf serbest; yalnız `.page` konumludur. `e2e/ats.spec.ts` (`styleAudit`) bunları hesaplanmış stilden denetler.
+- `font-synthesis: none`: sunulmayan kalınlık ya da italik istenmez (sahte kalın/italik Type3 basılırdı); şablon CSS'i yalnız `scripts/copy-fonts.mjs`'teki yüzleri kullanır, olmayan yüz en yakın gerçek ağırlığa düşer.
+- Önemli metni `::before/::after` ile üretme (içeriksiz süs — çizgi, nokta, çubuk — serbest).
 - Metin seçilebilir; görsel içinde metin, tablo ya da metin kutusu ile düzen kurma.
 - Büyük harf başlıkta `letter-spacing` en çok 0.05em: ~0.1em'den genişi PDF ayrıştırıcılarında harf harf çıkar ("D E N E Y İ M").
-- İletişim her düzende tam genişlik başlıkta (ad ve unvanın altında); yan sütunda değil. Her iletişim öğesi bölünmez birim (`white-space: nowrap`), satır yalnız öğeler arasında kırılır; adres ortadan bölünmez.
+- İletişim her düzende tam genişlik başlıkta (ad ve unvanın altında); yan sütunda değil. Her iletişim öğesi bölünmez birim (`white-space: nowrap`), satır yalnız öğeler arasında kırılır; adres ortadan bölünmez. Sütunlu iletişim (Panel) yarıma sığmayan öğeyi kendi satırına alır. Yalnız başlığın tam satırına bile sığmayacak kadar uzun öğe (`li.is-long`, 64+ karakter) son çare satır sonunda bölünür.
+- **Ad kelime ortasından bölünmez.** Adın boyu, en uzun kelimesi adın yerine sığacak kadarla sınırlıdır (`--name-longest` × `--name-char` ≤ `--name-room`, base.css `.cv-name`); ölçü mm cinsinden sabittir (kutu genişliğine bağlı `cqi`/% yok), böylece baskıda başlık ekrandakinden uzun olmaz. Dev adlı şablon `--name-size`, `--name-room`, `--name-char` verir.
+- Uzun metin sayfadan taşmaz: virgülsüz uzun beceri değeri, uzun ad ve adresler `e2e/stress.spec.ts`'te her şablonda denetlenir.
 - `<html lang>` CV dilinden gelir (Türkçe büyük İ); `hyphens: manual`, kelime bölme yok.
 - Zengin metin yalnız `p, ul/li, strong, em, a`; renk ve boyut şablondan gelir, metin içinde değişmez.
 - Bölüm başlıkları CV diline göre `locale.ts`'ten gelir; şablon değiştirmek içerik kaybettirmez.
@@ -340,5 +348,5 @@ CV çizimi site arayüzünden ayrıdır: iframe içinde, site stilinden izole, �
 - **Yazı ölçeği:** 14px kök ve px/rem karışık boyutlar korunsun mu, rol token'larına mı geçilsin?
 - **Şablon değiştirme akışı:** opaklık geçişi yeterli mi, yoksa blokların yeni yerine kaydığı gerçek akış mı istenir?
 - **Öneri rengi:** sarı (`.sg-*`, `#e7c34a`) token'a alınsın; koyu temada panel tarafındaki karşılığı belirlensin.
-- **İlk şablonun özgün tasarımı:** "karışık kaynak" süreci (Claude önerisi + Claude Design + Asil'in örnekleri) yapılmadı; Klasik ve Modern geçici taban.
+- **Şablon tasarımı:** 10 şablon onaylandı (2026-10-18, `docs/sablonlar/PLAN.md`); 2. aşamada şartnameye göre CSS'leri yazılıyor.
 - **Kesme ve gizli kontrol düzeltmeleri** (Do's and Don'ts altındaki liste) ne zaman yapılacak.

@@ -1,0 +1,138 @@
+/*
+ * Afiş (`afis`): siyah-beyaz; kocaman 900 ağırlıklı büyük harfli ad ve altında fosforlu şerit,
+ * başlığın altında kalın siyah çizgi, beyaz yazılı siyah etiket kutusu bölüm başlıkları,
+ * iş unvanlarının altında fosforlu kalem.
+ * Tarif: docs/sablonlar/sartname.md §4.9. Sözleşme (değişkenler, kancalar): base.css başı.
+ *
+ * - Fosforlu kalem `--accent-mark` (üstündeki koyu metin ≥ 4.5:1 okunur) ile `background`
+ *   gradyanı; metin aynen kalır. Satıra kırılan adda her satır kendi şeridini alır
+ *   (iç span inline + box-decoration-break: clone).
+ * - Büyük harf (ad, unvan, bölüm başlıkları) yalnız CSS'te; Türkçe i→İ için <html lang> CV dilinden gelir.
+ * - Fotoğraf ızgaranın 2. sütununda; sol aralık fotoğrafın kendi kenar boşluğu.
+ * - Uzun adda (> 24 karakter: `.is-long`) ve tek uzun kelimede (12+ harf: `.has-long-word`)
+ *   ad küçülür; boy, en uzun kelime satıra sığacak kadarla da sınırlı (base.css --name-*), bölünmez.
+ */
+
+.tpl-afis {
+  --side-width: 34%;
+  font-size: calc(var(--fs) * 0.9);
+}
+
+/* ---------- Başlık ---------- */
+
+.tpl-afis .cv-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0;
+  margin: 0 var(--pad-x) 5mm;
+  padding: calc(var(--pad-y) - 2mm) 0 5mm;
+  border-bottom: 2mm solid var(--ink);
+}
+
+.tpl-afis .cv-identity {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.tpl-afis .cv-name {
+  font-family: var(--font-display);
+  font-weight: 900;
+  /* Boy sınırı: büyük harf Archivo 900; fotoğraflı, geniş boşlukta adın yeri ~135 mm */
+  --name-size: 4.4em;
+  --name-room: 135mm;
+  --name-char: 0.86;
+  line-height: 0.92;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+}
+
+.tpl-afis .cv-name.is-long {
+  --name-size: 3.6em;
+}
+
+.tpl-afis .cv-name.has-long-word {
+  --name-size: 3.3em;
+}
+
+.tpl-afis .cv-name.is-long.has-long-word {
+  --name-size: 3em;
+}
+
+/* Fosforlu şerit adın alt yarısında; satıra kırılırsa her satırda */
+.tpl-afis .cv-name-text {
+  background: linear-gradient(transparent 62%, var(--accent-mark) 62% 92%, transparent 92%);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.tpl-afis .cv-headline {
+  margin-top: 3mm;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.15em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tpl-afis .cv-contact {
+  margin-top: 2mm;
+  color: var(--muted);
+}
+
+.tpl-afis .cv-photo {
+  grid-column: 2;
+  grid-row: 1;
+  width: 30mm;
+  height: 36mm;
+  margin-left: 8mm;
+  filter: grayscale(1) contrast(1.1);
+}
+
+/* ---------- Bölüm başlıkları: siyah etiket kutusu ---------- */
+
+.tpl-afis .section-title {
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 0.9mm 2.4mm;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.86em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Siyah kutudaki öneri farkı koyu zemine göre */
+.tpl-afis .section-title .sg {
+  --sg-surface: var(--ink);
+  --sg-ink: var(--paper);
+}
+
+/* ---------- Kayıtlar ---------- */
+
+.tpl-afis .entry-title {
+  font-weight: 800;
+}
+
+.tpl-afis .entry-title strong {
+  background: linear-gradient(transparent 55%, var(--accent-mark) 55%);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.tpl-afis .entry-date {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.tpl-afis .entry-sub {
+  color: var(--muted);
+}
+
+/* Yan sütunda "Etiket" ayrı satırda, değer altında */
+.tpl-afis .col-side .entry-skills .line-label {
+  display: block;
+  font-weight: 700;
+}

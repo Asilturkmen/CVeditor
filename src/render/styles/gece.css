@@ -1,0 +1,176 @@
+/*
+ * Gece (`gece`): docs/sablonlar/sartname.md §4.5. Bütün sayfa zemin renginde (--paper = --base),
+ * 7 mm içeride ince bir çerçeve, büyük harfli Playfair ad, vurgu renginde küçük etiketler.
+ * Yalnız tek sütun (templateMeta.ts). Metin renkleri zeminden türer (colors.ts); metinde
+ * vurgunun kontrast korumalı hâli --accent-ink kullanılır.
+ *
+ * Sayfa kapasitesi: çerçeve .page'in iç boşluğudur (padding). .page-inner yüksekliği %100 =
+ * çerçevenin içi; sütunun alt sınırı da orası. paginate sütunun kendi kutusunu ölçtüğü için
+ * çerçeve her sayfada (2., 3. sayfa dahil) kullanılabilir yüksekliği doğru azaltır.
+ */
+.tpl-gece {
+  font-size: calc(var(--fs) * 0.9);
+  /*
+   * Çerçeve içindeki boşluk: sayfa kenarından toplam uzaklık boşluk ölçeğine göre değişsin
+   * (normal: 7 + 11 = 18 mm yatay, 7 + 10 = 17 mm dikey). Değişken kendini okuyamadığı için
+   * ara değişkenle: .tpl-gece'de hesaplanır, .page'de --pad-x/--pad-y'nin yerine geçer.
+   */
+  --gece-frame: 7mm;
+  --gece-pad-x: calc(var(--pad-x) - 5mm);
+  --gece-pad-y: calc(var(--pad-y) - 4mm);
+}
+
+.tpl-gece .page {
+  --pad-x: var(--gece-pad-x);
+  --pad-y: var(--gece-pad-y);
+  padding: var(--gece-frame);
+  background: var(--paper);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* İnce iç çerçeve (yalnız kenarlık, metin sırası etkilenmez) */
+.tpl-gece .page-inner {
+  border: 0.3mm solid var(--rule);
+}
+
+/* Başlık ve bölüm başlıkları: Playfair'in bağ harfleri (fi, fl) PDF metninde tek glif olmasın */
+.tpl-gece .cv-name,
+.tpl-gece .entry-summary .entry-body {
+  font-variant-ligatures: no-common-ligatures no-discretionary-ligatures;
+}
+
+/* ---------- Başlık ---------- */
+.tpl-gece .cv-header {
+  gap: 7mm;
+  padding: var(--pad-y) var(--pad-x) calc(var(--section-gap) + 2.4mm);
+}
+
+/*
+ * Başlığın altında çerçeve genişliğinde aynı ince çizgi. Başlığa değil gövdeye çizilir:
+ * editörde başlık köşesi yuvarlatılmış tıklanabilir alandır, çizginin uçları kıvrılırdı.
+ */
+.tpl-gece .page-inner.has-header .page-body {
+  border-top: 0.3mm solid var(--rule);
+}
+
+.tpl-gece .cv-photo {
+  width: 32mm;
+  height: 32mm;
+  border-radius: 50%;
+}
+
+/* Büyük harf yalnız CSS'te; Türkçe İ/I dönüşümü <html lang>'dan (CV dili) gelir. */
+.tpl-gece .cv-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  /* Boy sınırı (base.css .cv-name): büyük harf Playfair; fotoğraflı, geniş boşlukta ~130 mm */
+  --name-size: 3.6em;
+  --name-room: 130mm;
+  --name-char: 0.82;
+  line-height: 0.95;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+/* Uzun ad (> 24 karakter) ya da çok uzun kelime: büyük harfli dev ad satırdan taşmasın */
+.tpl-gece .cv-name.is-long {
+  --name-size: 2.9em;
+}
+
+.tpl-gece .cv-name.has-long-word {
+  --name-size: 2.7em;
+}
+
+.tpl-gece .cv-headline {
+  margin-top: 2.4mm;
+  font-size: 0.86em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent-ink);
+}
+
+.tpl-gece .cv-contact {
+  margin-top: 2.6mm;
+  color: var(--muted);
+}
+
+.tpl-gece .cv-contact .sep {
+  color: color-mix(in srgb, var(--muted) 70%, var(--paper));
+}
+
+/* ---------- Gövde ---------- */
+.tpl-gece .page-inner.has-header .col {
+  padding-top: calc(var(--section-gap) + 1.4mm);
+}
+
+.tpl-gece .section-title {
+  margin-top: calc(var(--section-gap) - var(--block-gap) + 1.6mm);
+  padding-top: 3mm;
+  border-top: 0.3mm solid var(--rule);
+  font-size: 0.82em;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--accent-ink);
+}
+
+/* Sayfanın ilk bölümünde çizgi yok: başlık çizgisi (ya da çerçeve) zaten üstünde */
+.tpl-gece .col > .section-title:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+/* Özet: Playfair "giriş paragrafı" */
+.tpl-gece .entry-summary .entry-body {
+  font-family: var(--font-display);
+  font-size: 1.45em;
+  line-height: 1.3;
+  color: var(--ink);
+}
+
+.tpl-gece .entry-title {
+  font-weight: 600;
+  color: var(--on-base);
+}
+
+.tpl-gece .entry-title strong {
+  font-weight: 600;
+}
+
+/* Projede rol adın yanında: sade */
+.tpl-gece .entry-title .part + .part {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.tpl-gece .entry-sub,
+.tpl-gece .entry-date {
+  color: var(--muted);
+}
+
+.tpl-gece .rich strong {
+  font-weight: 600;
+  color: var(--on-base);
+}
+
+.tpl-gece .rich li::marker {
+  color: var(--accent-ink);
+}
+
+/* Beceri ve dil: "Etiket: değer" satırları (her beceri ayrı sayfalama bloğu, satır içi liste yok) */
+.tpl-gece .line-label {
+  font-weight: 600;
+  color: var(--on-base);
+}
+
+/* Kaldırılması önerilen kayıt (önizleme): kaydın tamamı önerinin kırmızısını alsın */
+.tpl-gece .sg-removed .entry-title,
+.tpl-gece .sg-removed .entry-sub,
+.tpl-gece .sg-removed .entry-date,
+.tpl-gece .sg-removed .line-label,
+.tpl-gece .sg-removed .rich strong {
+  color: inherit;
+}

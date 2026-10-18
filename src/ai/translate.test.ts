@@ -29,8 +29,8 @@ function sampleCv(): Cv {
   return createCv({
     name: 'Genel TR',
     language: 'tr',
-    templateId: 'modern',
-    template: templateSettingsFor('modern', sections),
+    templateId: 'panel',
+    template: templateSettingsFor('panel', sections),
     personal: samplePersonal('tr'),
     sections,
   })

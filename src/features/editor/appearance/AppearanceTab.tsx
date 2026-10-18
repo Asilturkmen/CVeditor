@@ -1,35 +1,33 @@
 import { DndContext, type DragEndEvent, type UniqueIdentifier } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { Check } from 'lucide-react'
-import { useMemo, type ReactNode } from 'react'
+import { Check, Printer } from 'lucide-react'
+import { useDeferredValue, useMemo, type ReactNode } from 'react'
 import { sectionTitle } from '@/cv/locale'
-import { FONT_IDS, type Cv, type CvLanguage, type Section, type TemplateSettings } from '@/cv/schema'
+import type { Cv, CvLanguage, Section, TemplateSettings } from '@/cv/schema'
 import { Segmented } from '@/components/ui/Segmented'
 import { Switch } from '@/components/ui/Switch'
-import { moveSection, setTemplateSetting, switchTemplate, toggleSideSection } from '@/editor/actions'
+import { moveSection, setColorSet, setTemplateSetting, switchTemplate, toggleSideSection } from '@/editor/actions'
 import { cn } from '@/lib/cn'
 import { m } from '@/paraglide/messages'
 import { CvFrame } from '@/render/CvFrame'
-import { FONTS } from '@/render/fonts'
-import { defaultSideSections, getTemplate, TEMPLATE_LIST, TEMPLATES, type TemplateId } from '@/render/templates'
+import { BODY_FONT_ORDER, FONTS } from '@/render/fonts'
+import {
+  activeColorSet,
+  getTemplate,
+  resolvedBaseColor,
+  settingsForTemplate,
+  supportedColumns,
+  TEMPLATE_LIST,
+  TEMPLATES,
+  type TemplateDef,
+  type TemplateId,
+} from '@/render/templates'
 import { visibleSections } from '@/render/visibleSections'
-import { TEMPLATE_TEXT } from '@/features/templates/templateText'
+import { colorSetName, TEMPLATE_TEXT } from '@/features/templates/templateText'
 import { dndScreenReaderInstructions, useDndAnnouncements } from '../content/dndA11y'
 import { useSortDnd } from '../content/keyboardSort'
 import { DragHandle } from '../content/sortable'
 import { useSortableStyle, verticalOnly } from '../content/sortableStyle'
-
-/** CV vurgu renkleri; ekran okuyucu için Türkçe adlarıyla. */
-const ACCENT_PRESETS: { color: string; name: () => string }[] = [
-  { color: '#1f5f8b', name: () => m.ux_color_blue() },
-  { color: '#2f6f62', name: () => m.accent_petrol() },
-  { color: '#24543d', name: () => m.accent_orman() },
-  { color: '#7a3e2b', name: () => m.accent_kiremit() },
-  { color: '#8a5a14', name: () => m.ux_color_mustard() },
-  { color: '#5b3f7a', name: () => m.ux_color_purple() },
-  { color: '#3a3a3a', name: () => m.accent_grafit() },
-  { color: '#1c2b4a', name: () => m.ux_color_navy() },
-]
 
 function Group({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   return (
@@ -44,32 +42,21 @@ function Group({ title, hint, children }: { title: string; hint?: string; childr
 }
 
 function TemplateChoice({ cv, id }: { cv: Cv; id: TemplateId }) {
-  const active = cv.templateId === id
+  // Bilinmeyen kimlik çizimde varsayılan şablona düşer; seçili görünen de o olsun.
+  const active = getTemplate(cv.templateId).id === id
   const preview = useMemo<Cv>(() => {
     if (active) return cv
-    // switchTemplate ile aynı kural: kullanıcı değiştirmediyse renk/yazı tipi yeni şablonunki.
-    const previous = getTemplate(cv.templateId).defaults
-    const next = TEMPLATES[id].defaults
-    return {
-      ...cv,
-      templateId: id,
-      template: {
-        ...cv.template,
-        columns: next.columns,
-        accentColor: cv.template.accentColor === previous.accentColor ? next.accentColor : cv.template.accentColor,
-        font: cv.template.font === previous.font ? next.font : cv.template.font,
-        sideSections: cv.template.sideSections.length ? cv.template.sideSections : defaultSideSections(cv.sections),
-      },
-    }
+    // switchTemplate ile aynı kural (settingsForTemplate): küçük resim, seçince olacak olanı gösterir.
+    return { ...cv, templateId: id, template: settingsForTemplate(getTemplate(cv.templateId), TEMPLATES[id], cv.template, cv.sections) }
   }, [cv, id, active])
-  const template = TEMPLATE_LIST.find((t) => t.id === id)!
+  const template = TEMPLATES[id]
   return (
     <button
       type="button"
       role="radio"
       aria-checked={active}
       onClick={() => switchTemplate(id)}
-      className="group flex flex-col gap-2 text-left"
+      className="group flex min-w-0 flex-col gap-1.5 text-left"
     >
       <div
         className={cn(
@@ -89,6 +76,76 @@ function TemplateChoice({ cv, id }: { cv: Cv; id: TemplateId }) {
         <p className="text-xs text-muted">{TEMPLATE_TEXT[id].layout()}</p>
       </div>
     </button>
+  )
+}
+
+/** Renk yuvarlağı: takımın zemini ve vurgusu (zeminsiz takımda yalnız vurgu). */
+function swatchBackground(accent: string, base?: string) {
+  return base ? `linear-gradient(135deg, ${base} 0 50%, ${accent} 50% 100%)` : accent
+}
+
+function ColorChoices({ cv, template }: { cv: Cv; template: TemplateDef }) {
+  const t = cv.template
+  const active = activeColorSet(template, t)
+  const usesBase = template.colorSets.some((set) => set.base)
+  const base = resolvedBaseColor(template, t)
+  return (
+    <>
+      <div className="flex flex-wrap items-center gap-2" role="radiogroup" aria-label={m.ap_color_sets()}>
+        {template.colorSets.map((set) => {
+          const selected = active?.id === set.id
+          const name = colorSetName(set.id)
+          return (
+            <button
+              key={set.id}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              aria-label={name}
+              title={name}
+              onClick={() => setColorSet(set)}
+              className={cn(
+                'flex size-8 items-center justify-center rounded-full ring-offset-2 ring-offset-surface transition-[transform,box-shadow] duration-150 hover:scale-105',
+                selected ? 'ring-2 ring-text' : 'ring-1 ring-black/10 ring-inset dark:ring-white/25',
+              )}
+              style={{ background: swatchBackground(set.accent, set.base) }}
+            >
+              {selected && (
+                <span className="flex size-4 items-center justify-center rounded-full bg-black/45">
+                  <Check className="size-3 text-white" strokeWidth={3} />
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <ColorInput label={m.ap_custom_color()} value={t.accentColor} onChange={(v) => setTemplateSetting('accentColor', v)} />
+        {usesBase && <ColorInput label={m.ap_custom_base()} value={base} onChange={(v) => setTemplateSetting('baseColor', v)} />}
+      </div>
+      {template.inkHeavy && (
+        <p className="flex items-start gap-1.5 text-xs text-muted">
+          <Printer className="mt-px size-3.5 shrink-0" />
+          {m.ap_ink_note()}
+        </p>
+      )}
+    </>
+  )
+}
+
+function ColorInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <label className="relative flex h-8 cursor-pointer items-center gap-2 rounded-full border border-line pr-3 pl-1 text-xs text-muted hover:border-line-strong">
+      <span className="size-6 rounded-full border border-line" style={{ background: value }} />
+      {label}
+      <input
+        type="color"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="absolute inset-0 cursor-pointer opacity-0"
+        aria-label={label}
+      />
+    </label>
   )
 }
 
@@ -155,57 +212,31 @@ export function AppearanceTab({ cv }: { cv: Cv }) {
   const t = cv.template
   const set = <K extends keyof TemplateSettings>(key: K) => (value: TemplateSettings[K]) => setTemplateSetting(key, value)
   const sections = visibleSections(cv)
+  const template = getTemplate(cv.templateId)
+  // 10 küçük resim her değişiklikte yeniden çizilir; yazarken öncelik panelde kalsın.
+  const thumbnailCv = useDeferredValue(cv)
+  // Çizimle aynı kural: desteklenmeyen sütun sayısı (eski/bozuk kayıt) desteklenene düşer.
+  const columns = supportedColumns(template, t.columns)
+  const twoColumns = columns === 2
+  const columnChoice = template.columns.length > 1
 
   return (
     <div className="flex flex-col">
       <Group title={m.ap_template()} hint={m.ap_template_hint()}>
-        <div role="radiogroup" aria-label={m.ap_template()} className="grid grid-cols-2 gap-4">
+        <div role="radiogroup" aria-label={m.ap_template()} className="grid grid-cols-3 gap-x-3 gap-y-4">
           {TEMPLATE_LIST.map((tpl) => (
-            <TemplateChoice key={tpl.id} cv={cv} id={tpl.id} />
+            <TemplateChoice key={tpl.id} cv={thumbnailCv} id={tpl.id} />
           ))}
         </div>
       </Group>
 
-      <Group title={m.ap_accent()}>
-        <div className="flex flex-wrap items-center gap-2" role="radiogroup" aria-label={m.ap_accent()}>
-          {ACCENT_PRESETS.map(({ color, name }) => {
-            const active = t.accentColor.toLowerCase() === color
-            return (
-              <button
-                key={color}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                aria-label={name()}
-                title={name()}
-                onClick={() => set('accentColor')(color)}
-                className={cn(
-                  'flex size-8 items-center justify-center rounded-full ring-offset-2 ring-offset-surface transition-[transform,box-shadow] duration-150 hover:scale-105',
-                  active ? 'ring-2 ring-text' : 'ring-1 ring-black/10 ring-inset dark:ring-white/25',
-                )}
-                style={{ background: color }}
-              >
-                {active && <Check className="size-3.5 text-white" strokeWidth={3} />}
-              </button>
-            )
-          })}
-          <label className="relative flex h-8 cursor-pointer items-center gap-2 rounded-full border border-line pr-3 pl-1 text-xs text-muted hover:border-line-strong">
-            <span className="size-6 rounded-full border border-line" style={{ background: t.accentColor }} />
-            {m.ap_custom_color()}
-            <input
-              type="color"
-              value={t.accentColor}
-              onChange={(e) => set('accentColor')(e.target.value)}
-              className="absolute inset-0 cursor-pointer opacity-0"
-              aria-label={m.ap_custom_color()}
-            />
-          </label>
-        </div>
+      <Group title={m.ap_accent()} hint={m.ap_colors_hint()}>
+        <ColorChoices cv={cv} template={template} />
       </Group>
 
       <Group title={m.ap_font()} hint={m.ap_font_hint()}>
         <div className="grid grid-cols-1 gap-1.5" role="radiogroup" aria-label={m.ap_font()}>
-          {FONT_IDS.map((id) => {
+          {BODY_FONT_ORDER.map((id) => {
             const font = FONTS[id]
             const active = t.font === id
             return (
@@ -271,40 +302,45 @@ export function AppearanceTab({ cv }: { cv: Cv }) {
         </div>
       </Group>
 
-      <Group title={m.ap_columns()} hint={t.columns === 2 ? m.ap_columns_hint() : undefined}>
-        <Segmented
-          stretch
-          value={String(t.columns) as '1' | '2'}
-          onChange={(v) => set('columns')(v === '2' ? 2 : 1)}
-          aria-label={m.ap_columns()}
-          options={[
-            { value: '1', label: m.layout_one_column() },
-            { value: '2', label: m.layout_two_columns() },
-          ]}
-        />
-        {t.columns === 2 && (
-          <ul className="mt-1 flex flex-col divide-y divide-line rounded-lg border border-line">
-            {sections.map((section) => {
-              const side = t.sideSections.includes(section.id)
-              return (
-                <li key={section.id} className="flex items-center justify-between gap-3 px-3 py-2">
-                  <span className="text-[13px]">{sectionTitle(cv.language, section.type, section.title)}</span>
-                  <Segmented
-                    size="sm"
-                    value={side ? 'side' : 'main'}
-                    onChange={(v) => (v === 'side') !== side && toggleSideSection(section.id)}
-                    aria-label={m.ap_column_for({ name: sectionTitle(cv.language, section.type, section.title) })}
-                    options={[
-                      { value: 'side', label: m.ap_side_column() },
-                      { value: 'main', label: m.ap_main_column() },
-                    ]}
-                  />
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </Group>
+      {/* Tek düzenli şablonda sütun seçeneği yok; yalnız iki sütunlu şablonda yan sütun listesi kalır. */}
+      {(columnChoice || twoColumns) && (
+        <Group title={m.ap_columns()} hint={columnChoice ? (twoColumns ? m.ap_columns_hint() : undefined) : m.ap_columns_only_two()}>
+          {columnChoice && (
+            <Segmented
+              stretch
+              value={String(columns) as '1' | '2'}
+              onChange={(v) => set('columns')(v === '2' ? 2 : 1)}
+              aria-label={m.ap_columns()}
+              options={[
+                { value: '1', label: m.layout_one_column() },
+                { value: '2', label: m.layout_two_columns() },
+              ]}
+            />
+          )}
+          {twoColumns && (
+            <ul className="mt-1 flex flex-col divide-y divide-line rounded-lg border border-line">
+              {sections.map((section) => {
+                const side = t.sideSections.includes(section.id)
+                return (
+                  <li key={section.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                    <span className="text-[13px]">{sectionTitle(cv.language, section.type, section.title)}</span>
+                    <Segmented
+                      size="sm"
+                      value={side ? 'side' : 'main'}
+                      onChange={(v) => (v === 'side') !== side && toggleSideSection(section.id)}
+                      aria-label={m.ap_column_for({ name: sectionTitle(cv.language, section.type, section.title) })}
+                      options={[
+                        { value: 'side', label: m.ap_side_column() },
+                        { value: 'main', label: m.ap_main_column() },
+                      ]}
+                    />
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </Group>
+      )}
 
       <Group title={m.ap_photo()} hint={cv.personal.photo ? undefined : m.ap_photo_none()}>
         <label className="flex items-center justify-between gap-3">

@@ -1,5 +1,5 @@
 import type { FontId } from '@/cv/schema'
-import { FONTS, fontFaceCss } from './fonts'
+import { FONTS, fontFaceCss, fontLoadQueries, type FontDef } from './fonts'
 
 /**
  * Tarayıcının kendi "Yazdır" menüsü için CV aynası.
@@ -17,17 +17,20 @@ import { FONTS, fontFaceCss } from './fonts'
 export const PRINT_MIRROR_ID = 'cv-print-mirror'
 const FONT_STYLE_ID = 'cv-print-fonts'
 
-/** CV yazı tiplerini üst belgeye tanımlar ve seçili yazı tipinin ağırlıklarını önceden yükler. */
-export function warmMirrorFonts(font: FontId) {
+/**
+ * CV yazı tiplerini üst belgeye tanımlar ve verilen ailelerin (gövde; CvFrame çizdikçe
+ * şablonun başlık aileleri de) bütün yüzlerini önceden yükler.
+ */
+export function warmMirrorFonts(fonts: FontId | FontDef[]) {
   if (!document.getElementById(FONT_STYLE_ID)) {
     const style = document.createElement('style')
     style.id = FONT_STYLE_ID
     style.textContent = fontFaceCss()
     document.head.append(style)
   }
-  const family = FONTS[font].stack.split(',')[0]
+  const defs = typeof fonts === 'string' ? [FONTS[fonts] ?? FONTS.inter] : fonts
   const sample = 'Aa ğüşıöçĞÜŞİÖÇ'
-  for (const w of ['400', '500', '600', '700', 'italic 400']) void document.fonts.load(`${w} 12px ${family}`, sample).catch(() => [])
+  for (const query of new Set(defs.flatMap(fontLoadQueries))) void document.fonts.load(query, sample).catch(() => [])
 }
 
 /**
@@ -42,7 +45,7 @@ export function shadowCopyOfPages(doc: Document, host: HTMLElement, extraCss = '
   const root = host.shadowRoot ?? host.attachShadow({ mode: 'open' })
   const style = doc.createElement('style')
   style.textContent = `${css.replace(/:root/g, ':host')}
-:host{display:block;color:var(--ink);font-family:var(--font);font-size:var(--fs);line-height:var(--lh);-webkit-font-smoothing:antialiased;font-kerning:normal;overflow-wrap:break-word;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+:host{display:block;color:var(--ink);font-family:var(--font);font-size:var(--fs);line-height:var(--lh);-webkit-font-smoothing:antialiased;font-kerning:normal;font-synthesis:none;overflow-wrap:break-word;print-color-adjust:exact;-webkit-print-color-adjust:exact}
 .page-enter{animation:none}${extraCss}`
   root.replaceChildren(style, pages.cloneNode(true))
   return true

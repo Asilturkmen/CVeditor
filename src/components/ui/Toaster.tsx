@@ -5,6 +5,8 @@ import { useToasts, type Toast } from './toast'
 function ToastItem({ t }: { t: Toast }) {
   const dismiss = useToasts((s) => s.dismiss)
   useEffect(() => {
+    // Süresiz bildirim (ör. "sayfayı yenile") kendiliğinden kapanmaz.
+    if (t.duration === Infinity) return
     const timer = setTimeout(() => dismiss(t.id), t.duration ?? (t.action ? 7000 : 3500))
     return () => clearTimeout(timer)
   }, [t, dismiss])

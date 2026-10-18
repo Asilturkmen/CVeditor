@@ -16,8 +16,8 @@ async function seedSampleCv(page: Page, name: string, language: 'tr' | 'en'): Pr
     const cv = createCv({
       name: ${JSON.stringify(name)},
       language: ${JSON.stringify(language)},
-      templateId: 'klasik',
-      template: templateSettingsFor('klasik', sections),
+      templateId: 'zarif',
+      template: templateSettingsFor('zarif', sections),
       personal: samplePersonal(${JSON.stringify(language)}),
       sections,
     })

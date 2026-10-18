@@ -27,14 +27,14 @@ function parse(html: string) {
 
 describe('CV kaynağı (çizim)', () => {
   it('bölüm başlıkları CV dilinde gelir', () => {
-    expect(renderCvSource(cvWith('klasik', 'tr'))).toContain('Deneyim')
-    const en = renderCvSource(cvWith('klasik', 'en'))
+    expect(renderCvSource(cvWith('zarif', 'tr'))).toContain('Deneyim')
+    const en = renderCvSource(cvWith('zarif', 'en'))
     expect(en).toContain('Experience')
     expect(en).not.toContain('Deneyim')
   })
 
   it('her kayıt ayrı blok ve kalıcı kayıt id taşır', () => {
-    const cv = cvWith('klasik')
+    const cv = cvWith('zarif')
     const doc = parse(renderCvSource(cv))
     const experience = cv.sections.find((s) => s.type === 'experience')!
     for (const item of experience.items) {
@@ -44,7 +44,7 @@ describe('CV kaynağı (çizim)', () => {
   })
 
   it('gizli kayıt, gizli bölüm ve boş kayıt çizilmez', () => {
-    const cv = structuredClone(cvWith('klasik'))
+    const cv = structuredClone(cvWith('zarif'))
     const experience = cv.sections.find((s) => s.type === 'experience')!
     experience.items[0].hidden = true
     cv.sections.find((s) => s.type === 'projects')!.hidden = true
@@ -54,7 +54,7 @@ describe('CV kaynağı (çizim)', () => {
   })
 
   it('iki sütunda DOM sırası okuma sırasıdır: başlık, yan sütun, ana sütun', () => {
-    const cv = cvWith('modern')
+    const cv = cvWith('panel')
     const doc = parse(renderCvSource(cv))
     const flows = Array.from(doc.querySelectorAll('[data-flow]')).map((el) => el.getAttribute('data-flow'))
     expect(flows).toEqual(['header', 'side', 'main'])
@@ -68,7 +68,7 @@ describe('CV kaynağı (çizim)', () => {
   })
 
   it('iletişim öğeleri ayrı birimler; ayırıcı önceki öğeye yapışık, öğeler arasında boşluk', () => {
-    const doc = parse(renderCvSource(cvWith('modern')))
+    const doc = parse(renderCvSource(cvWith('panel')))
     const list = doc.querySelector('.cv-contact')!
     const items = Array.from(list.querySelectorAll('li'))
     expect(items.map((li) => li.textContent)).toContain('linkedin.com/in/deniz-aksoy-ornek\u00a0·')
@@ -78,27 +78,28 @@ describe('CV kaynağı (çizim)', () => {
   })
 
   it('tek sütunda iletişim başlıkta, yan sütun yok', () => {
-    const doc = parse(renderCvSource(cvWith('klasik')))
+    const doc = parse(renderCvSource(cvWith('zarif')))
     expect(doc.querySelector('[data-flow="side"]')).toBeNull()
     expect(doc.querySelector('[data-flow="header"] .cv-contact')!.textContent).toContain('deniz.aksoy@example.com')
   })
 
   it('metin seçilebilir kalır: iletişim ve tarihler düz metin', () => {
-    const doc = parse(renderCvSource(cvWith('klasik')))
+    const doc = parse(renderCvSource(cvWith('zarif')))
     expect(doc.body.textContent).toContain('Şub 2024 – Günümüz')
     expect(doc.querySelectorAll('img').length).toBe(0)
   })
 
   it('fotoğraf yalnız açıkken çizilir', () => {
-    const cv = structuredClone(cvWith('klasik'))
+    const cv = structuredClone(cvWith('zarif'))
     cv.personal.photo = 'data:image/jpeg;base64,AAAA'
+    cv.template.showPhoto = false
     expect(renderCvSource(cv)).not.toContain('cv-photo')
     cv.template.showPhoto = true
     expect(renderCvSource(cv)).toContain('cv-photo')
   })
 
   it('boş adda yer tutucu yalnız istenirse çizilir', () => {
-    const cv = structuredClone(cvWith('klasik'))
+    const cv = structuredClone(cvWith('zarif'))
     cv.personal.fullName = ''
     expect(renderCvSource(cv)).not.toContain('Adın Soyadın')
     expect(renderCvSource(cv, { placeholders: true })).toContain('Adın Soyadın')

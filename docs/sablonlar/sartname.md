@@ -111,8 +111,8 @@ Bilerek dışarıda bırakılanlar:
 
 ### 3) Bant (`bant`): tam genişlik renkli bant + bandı kesen foto
 - **Tanınma:** üstte koyu mavi blok, içinde beyaz ad; sağda bandın alt kenarını kesen beyaz halkalı büyük daire foto; altta açık mavi yuvarlak köşeli yan kart.
-- **Geometri:** başlık tam genişlikte, iç boşluk 13/14/11 mm, `margin-bottom` = taşma + 3 mm. Gövdede yan sütun %31; yan sütun bir kart: `#eef4f9`, köşe 2 mm, iç boşluk 5 mm, `align-self:flex-start`.
-- **Renkler:** bant ve vurgu `#0f4c75`, metin `#1d2939`, soluk `#667085`, kart `#eef4f9`. Seçenekler: zümrüt `#0b5d4b`, mürdüm `#5b2a4e`, grafit `#2b2f36`.
+- **Geometri:** başlık tam genişlikte, iç boşluk 13/14/11 mm, `margin-bottom` = taşma + 3 mm. Gövdede yan sütun %31; yan sütun bir kart: `#eef5f9`, köşe 2 mm, iç boşluk 5 mm, `align-self:flex-start`.
+- **Renkler:** bant ve vurgu `#0f4c75`, metin `#1d2939`, soluk `#667085`, kart `#eef5f9` (soluk metin ≥ 4.5:1 için; ilk taslakta `#eef4f9` 4.49:1 idi). Seçenekler: zümrüt `#0b5d4b`, mürdüm `#5b2a4e`, grafit `#2b2f36`.
 - **Yazı tipi:** başlık ve bölüm başlıkları Poppins 600/700, gövde Source Sans 3 400/600/700 (9.6 pt).
 - **Başlık:** ad Poppins 700, 2.7×, beyaz; unvan Poppins 500, %88 opaklık; iletişim tek satır, beyaz %86. Foto 38 mm daire, 1.6 mm beyaz kenar, ızgaranın 2. sütununda, `align-self:end; margin-bottom:-12mm` ile banttan dışarı taşar. Taşma `margin-bottom` olduğundan absolute yok.
 - **Bölüm başlığı:** Poppins 600, 1.12×, vurgu renginde; altında 8×0.9 mm kısa çubuk (`background` ile).

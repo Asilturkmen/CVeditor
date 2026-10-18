@@ -17,8 +17,8 @@ async function seedBrokenCv(page: Page) {
     const cv = factory.createCv({
       name: 'İncelenecek CV',
       language: 'tr',
-      templateId: 'klasik',
-      template: templates.templateSettingsFor('klasik', sections),
+      templateId: 'zarif',
+      template: templates.templateSettingsFor('zarif', sections),
       personal: sample.samplePersonal('tr'),
       sections,
     })
@@ -166,6 +166,17 @@ test('Düzenle eksik bölümü ekleyip ilk kaydına, sayfa sayısında Görünü
     const db = (window as unknown as { __cveditorDb: { cvs: { get: (id: string) => Promise<{ sections: { type: string }[] }>; put: (cv: unknown) => Promise<unknown> } } }).__cveditorDb
     const cv = await db.cvs.get(id)
     cv.sections = cv.sections.filter((s) => s.type !== 'education')
+    // Sayfa sayısı bulgusu için CV birden çok sayfa olsun (şablonun yoğunluğundan bağımsız).
+    const exp = cv.sections.find((s) => s.type === 'experience') as unknown as { items: Record<string, unknown>[] }
+    for (let i = 1; i <= 6; i++) {
+      exp.items.push({
+        ...structuredClone(exp.items[0]),
+        id: `ek-${i}`,
+        translationGroupId: `ek-grup-${i}`,
+        position: `Ek Görev ${i}`,
+        description: '<ul>' + [1, 2, 3].map((k) => `<li>Görev ${i} maddesi ${k} ölçülebilir bir sonucu kısaca anlatır.</li>`).join('') + '</ul>',
+      })
+    }
     await db.cvs.put(cv)
   }, cvId)
   await page.goto(`/inceleme?cv=${cvId}`)
@@ -182,10 +193,10 @@ test('Düzenle eksik bölümü ekleyip ilk kaydına, sayfa sayısında Görünü
   await page.keyboard.press('Control+z')
   await expect(section).toHaveCount(0)
 
-  // Örnek CV iki sayfa: sayfa sayısı bulgusu Görünüm sekmesini açar
+  // Uzatılmış örnek CV birden çok sayfa: sayfa sayısı bulgusu Görünüm sekmesini açar
   await page.goto(`/inceleme?cv=${cvId}`)
   const pages = page.locator('[data-finding="pages"]')
-  await expect(pages).toContainText('CV 2 sayfa')
+  await expect(pages).toContainText(/CV [2-9] sayfa/)
   await pages.getByRole('button', { name: /Düzenle/ }).click()
   await page.waitForURL(`**/editor/${cvId}`)
   await expect(page.getByRole('radio', { name: 'Görünüm' })).toBeChecked()

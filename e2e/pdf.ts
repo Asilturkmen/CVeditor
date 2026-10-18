@@ -67,6 +67,8 @@ export interface PdfItem {
   x: number
   y: number
   width: number
+  /** Yazı boyu (pt): metin dönüşümünün ölçeği */
+  size: number
 }
 
 export interface PdfPage {
@@ -94,7 +96,8 @@ export async function pdfText(pdf: Buffer): Promise<PdfPage[]> {
       const items: PdfItem[] = []
       for (const item of content.items) {
         if (!('str' in item) || item.str === '') continue
-        items.push({ str: item.str, x: item.transform[4], y: item.transform[5], width: item.width })
+        const [a, b] = item.transform as number[]
+        items.push({ str: item.str, x: item.transform[4], y: item.transform[5], width: item.width, size: Math.hypot(a, b) || item.height || 10 })
       }
       pages.push({ width, height, items })
     }
@@ -108,15 +111,23 @@ export async function pdfText(pdf: Buffer): Promise<PdfPage[]> {
  * Parçaları geometriye göre birleştirir: aynı satırda bitişik parçalar
  * (ör. yazı tipi alt kümesi değişince bölünen "Geli" + "ş" + "tirici")
  * boşluksuz, satır değişince ya da arada boşluk varsa boşlukla.
+ *
+ * Eşikler yazı boyuna oranlıdır: dev boyda (Manşet'in 70 pt adı) harf aralığı ve
+ * kerning yüzünden bitişik parçalar arasında birkaç pt'lik açıklık olur; sabit 1 pt
+ * eşik orada kelimenin içine boşluk koyardı ("Ay ş e"). Kelime boşluğu ~0.25em.
  */
+export const JOIN_GAP_EM = 0.12
+
 export function joinItems(items: PdfItem[]): string {
   let out = ''
   let prev: PdfItem | null = null
   for (const item of items) {
     if (prev) {
-      const sameLine = Math.abs(item.y - prev.y) < 1.5
+      const size = Math.max(prev.size, item.size)
+      const sameLine = Math.abs(item.y - prev.y) < Math.max(1.5, size * 0.3)
       const gap = item.x - (prev.x + prev.width)
-      if (!sameLine || gap > 1 || gap < -1) out += ' '
+      const limit = Math.max(1, size * JOIN_GAP_EM)
+      if (!sameLine || gap > limit || gap < -limit) out += ' '
     }
     out += item.str
     prev = item

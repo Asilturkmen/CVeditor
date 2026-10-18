@@ -1,4 +1,4 @@
-# Durum (2026-10-17): yayın öncesi
+# Durum (2026-10-18): yayın öncesi
 
 Sunucu ve gerçek yapay zekâ dışındaki her şey yapıldı. Geriye iki iş kaldı:
 
@@ -13,19 +13,16 @@ Sunucu ve gerçek yapay zekâ dışındaki her şey yapıldı. Geriye iki iş ka
 | --- | --- |
 | Yapay zekâ katmanı | `src/ai`. Tek sözleşme (`types.ts`), sağlayıcı seçimi (`provider.ts`), örnek sağlayıcı. Giden veri kapsamla sınırlı, iletişim bilgileri gerekmedikçe gönderilmez, ad hiç gönderilmez, metinde geçen iletişim bilgileri maskelenir. Yanıtlar Zod ile doğrulanır. Öneri türleri: alan değişikliği, kayıt ekleme, kayıt kaldırma. Prompt kutusunda iptal ve "Ne gönderilir?" penceresi var. |
 | Eski CV içe aktarma | PDF metni tarayıcıda okunur (pdfjs-dist); dosya hiçbir yere gönderilmez. Metin yoksa, PDF parolalıysa ya da dosya PDF değilse açık hata verilir. Dil algılanır ve uyuşmazlıkta uyarılır. İletişim bilgileri kuralla çıkarılır. Kayıtlar kurala dayalı ön ayrıştırmayla bulunur, sen kayıt kayıt onaylarsın. Okunan ham metin de gösterilir. |
-| JSON Resume | İçe aktarma (yeni CV adımında) ve dışa aktarma (CV menüleri). |
+| JSON Resume | Kaldırıldı (2026-10-18, Asil'in kararı). Ayarlar'daki JSON yedek ve geri yükleme duruyor. |
 | Çeviri | "Diğer dile çevir" yeni bir CV oluşturur; "Başka CV'ye ekle" kaydı çevirerek ekler. Her ikisinde de çeviri önce gösterilir, alan alan düzenlenebilir; bağlı kayıt güncellenebilir. Örnek çevirmen yalnız küçük bir sözlüğü çevirir. |
 | CV İnceleme (`/inceleme`) | Kurala dayalı ATS kontrolleri hem kendi CV'lerinde hem yüklenen PDF'te çalışır. "ATS'nin gördüğü metin" paneli ve iş ilanıyla anahtar kelime karşılaştırması var. Puan ya da yüzde yok; her bulgunun "Düzenle" bağlantısı var. |
 | PDF/ATS kalitesi | Yazı tipleri sabit ağırlıklı dosyalar, PDF'e gerçek TrueType olarak gömülüyor (önceden Type3'tü). Başlık harf aralığı düşürüldü (önceden harf harf okunuyordu). İletişim her düzende başlıkta (iki sütunda adresler bölünmüyor). `e2e/ats.spec.ts` PDF metni üzerinden okuma sırasını ve Türkçe karakterleri denetliyor. |
 | Arayüz | İngilizce arayüz ve dil seçici (Ayarlar). DESIGN.md taslağı. Tasarım denetiminin bulguları düzeltildi: kontrast, koyu tema, hizalar, kesilen metinler, yakınlaştırma çubuğu, şablon geçiş animasyonu, odak vurgusu. Klavyeyle sürükleme çalışıyor. |
 | Son tamamlama turu (2026-10-17) | Canlı CV varsayılan olarak bir sayfanın tamamı ekrana sığacak biçimde açılır (üstte/altta boşlukla; dizüstünden 27" ekrana). Görünüm'de bölüm sırası. Fotoğraf yükleme tek geri alma adımı. Tarayıcının kendi Yazdır menüsü de yalnız CV'yi basar; önizlemeye odaklıyken kısayollar çalışır. Safari'ye özgü 7 gün uyarısı. Bütün alanlarda örnek ipucu. CV İnceleme: kendi CV'lerin için de "ATS'nin gördüğü metin", sorunlu her bulguda "Düzenle"; yapay zekâ yorumu ve ilanla anlam eşleştirmesi örnek sağlayıcıyla çalışır. Ortak hata iletileri ve parola penceresi. Gizlilik: serbest metindeki adres ve referans adları da maskelenir. ATS testleri her şablon × sütun düzeninde. |
+| 10 şablon (2026-10-18) | Zarif, Panel, Bant, Manşet, Gece, İsviçre, Çizelge, Çift Ton, Afiş, Çerçeve (`docs/sablonlar/`). Kayıt `src/render/templateMeta.ts`, görünüm `src/render/styles/<id>.css`. Şablon başına sütun düzeni, renk takımları (`colors.ts`, kontrast korumalı), 9 yeni statik yazı tipi. Fotoğraf varsayılan açık; fotoğraf yoksa editörde baskıda gizli "Fotoğraf ekle" kutusu, galeride silüet. Şema 2: Klasik → Zarif, Modern → Panel göçü, yeni `baseColor` alanı. ATS testi her şablon × desteklediği sütun × fotoğraflı/fotoğrafsız; `e2e/stress.spec.ts` uzun ad, uzun iletişim ve uzun beceri satırıyla 10 şablonu zorlar. Bağımsız kod incelemesinin 11 bulgusu düzeltildi. |
 | Repo güvenliği | `npm run scan` (kişisel bilgi ve sır taraması), elle kurulan isteğe bağlı pre-push kancası, `.env.example`. |
 
 Testler: Vitest birim testleri ve Playwright uçtan uca testleri. Komutlar için CLAUDE.md'ye bak.
-
-## Sırada bekleyen: 10 yeni şablon
-
-Araştırması ve planı hazır, Asil'in onayını bekliyor: `docs/sablonlar/PLAN.md`. Uygulamaya o plandaki kararları onaylatarak başla.
 
 ## 1. Yapay zekâyı bağlamak
 
@@ -78,4 +75,4 @@ Arayüzün hiçbir yeri değişmez. Yapılacaklar:
 - DOCX içe ve dışa aktarma.
 - OCR (görsel PDF'ler).
 - Hesap, kullanıcı başına token hakkı, BYOK, istatistik.
-- Yeni şablonlar: her şablon `e2e/ats.spec.ts`'ten geçmeli.
+- Yeni şablonlar: her şablon `e2e/ats.spec.ts` ve `e2e/stress.spec.ts`'ten geçmeli; kurallar `src/render/styles/base.css` başındaki sözleşmede.

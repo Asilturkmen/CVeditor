@@ -13,6 +13,9 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: [['list']],
+  // Paralel işçiler aynı anda PDF basıp okuyor (ATS ve zorlama matrisi); yük altında ilk
+  // önizleme ve pdf.js ayrıştırması 5 sn'lik varsayılanı aşabiliyor.
+  expect: { timeout: 10_000 },
   use: {
     baseURL: `http://localhost:${PORT}`,
     trace: 'retain-on-failure',

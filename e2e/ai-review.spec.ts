@@ -19,8 +19,8 @@ async function seedCv(page: Page) {
     const cv = factory.createCv({
       name: 'Yorumlanacak CV',
       language: 'tr',
-      templateId: 'klasik',
-      template: templates.templateSettingsFor('klasik', sections),
+      templateId: 'zarif',
+      template: templates.templateSettingsFor('zarif', sections),
       personal: sample.samplePersonal('tr'),
       sections,
     })

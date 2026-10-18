@@ -8,7 +8,7 @@ import { columnInterleaving, detectDateStyles, pdfErrorFinding, reviewCv, review
 
 const NOW = new Date('2026-10-16')
 
-function sampleCv(language: CvLanguage = 'tr', template: 'klasik' | 'modern' = 'klasik'): Cv {
+function sampleCv(language: CvLanguage = 'tr', template: 'zarif' | 'panel' = 'zarif'): Cv {
   const sections = sampleSections(language)
   return createCv({
     name: 'Örnek',
@@ -282,8 +282,8 @@ describe('reviewCv: biçim ve düzen', () => {
   })
 
   it('iki sütun: tek sütun ok, deneyim yan sütunda uyarı, uzun yan sütun uyarı', () => {
-    expect(byId(review(sampleCv('tr', 'klasik')), 'layout')?.severity).toBe('ok')
-    const cv = sampleCv('tr', 'modern')
+    expect(byId(review(sampleCv('tr', 'zarif')), 'layout')?.severity).toBe('ok')
+    const cv = sampleCv('tr', 'panel')
     expect(byId(review(cv), 'layout')?.severity).toBe('info')
     const exp = section(cv, 'experience')
     cv.template.sideSections.push(exp.id)
@@ -401,7 +401,7 @@ const BROKEN: { name: string; build: () => Cv; pages?: number }[] = [
   {
     name: 'iki sütun',
     build: () => {
-      const cv = sampleCv('tr', 'modern')
+      const cv = sampleCv('tr', 'panel')
       const exp = section(cv, 'experience')
       cv.template.sideSections.push(exp.id)
       exp.items[0].description = `<ul>${'<li>Yan sütunda uzun bir madde, ATS sütunları karıştırırsa okunmaz.</li>'.repeat(20)}</ul>`
@@ -411,7 +411,7 @@ const BROKEN: { name: string; build: () => Cv; pages?: number }[] = [
   {
     name: 'İngilizce iki sütunlu CV, fotoğraf',
     build: () => {
-      const cv = sampleCv('en', 'modern')
+      const cv = sampleCv('en', 'panel')
       cv.personal.photo = 'data:image/jpeg;base64,AAAA'
       cv.template.showPhoto = true
       return cv

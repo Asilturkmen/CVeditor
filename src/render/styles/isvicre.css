@@ -1,0 +1,221 @@
+/*
+ * İsviçre (`isvicre`): sol etiket sütunu, hafif grotesk (docs/sablonlar/sartname.md §4.6).
+ * Her kural `.tpl-isvicre` ile başlar; yalnız görünümü değiştirir (yapı base.css'te).
+ *
+ * Etiket sütunu: sütun bir ızgaradır (etiket %27 | içerik). Bölüm başlığı (h2) 1. sütuna, diğer
+ * her blok 2. sütuna yerleşir; otomatik yerleşim h2'yi ilk kaydıyla AYNI satıra koyar, sonraki
+ * kayıtlar alt satırlara iner. DOM sırası (= okuma sırası) değişmez: order, float, absolute yok.
+ * Şartnamedeki "sıfır yükseklikli h2" yerine bu yol seçildi: etiket iki-üç satıra kırılırsa satır
+ * kendiliğinden uzar (taşma, üst üste binme, `min-height` hilesi yok) ve sayfalama başlığın
+ * gerçek yüksekliğini ölçer. Başlık son blok olarak sayfa dibinde kalırsa paginate onu ilk
+ * kaydıyla birlikte sonraki sayfaya taşır (data-keep-with-next), ızgara bunu değiştirmez.
+ * Etiketin taban çizgisi ilk kaydın ilk satırınınkiyle aynı hizada: y'ye göre sıralı PDF
+ * okumasında etiket, x'i küçük olduğu için kaydın başlığından önce okunur.
+ */
+.tpl-isvicre {
+  font-size: calc(var(--fs) * 0.9);
+  /* Etiket sütunu, içerik genişliğinin %27'si (başlıkta ve gövdede aynı oran) */
+  --label-ratio: 0.27;
+  --label: calc(var(--label-ratio) * 100%);
+  /* Etiketin sağındaki boşluk */
+  --label-gap: 6mm;
+  /* Bölüm çizgisi ile ilk satır arası */
+  --rule-pad: 2.6mm;
+}
+
+/* ---------- Başlık: ad içerik sütununa hizalı, fotoğraf etiket sütununda ---------- */
+
+.tpl-isvicre .cv-header {
+  display: grid;
+  grid-template-columns: var(--label) minmax(0, 1fr);
+  gap: 0;
+  align-items: start;
+  padding-top: calc(var(--pad-y) + 2mm);
+  padding-bottom: calc(var(--section-gap) + 2.4mm);
+}
+
+/* Kare fotoğraf, adın hizasında; sağ kenarı etiketlerin sağ kenarıyla aynı */
+.tpl-isvicre .cv-photo {
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: end;
+  width: 26mm;
+  height: 26mm;
+  margin-right: var(--label-gap);
+}
+
+.tpl-isvicre .cv-identity {
+  grid-column: 2;
+  grid-row: 1;
+  border-left: 1.1mm solid var(--accent);
+  padding-left: 5mm;
+}
+
+.tpl-isvicre .cv-name {
+  font-weight: 300;
+  /* Boy sınırı (base.css .cv-name): içerik sütununda adın yeri geniş boşlukta ~120 mm */
+  --name-size: 3.2em;
+  --name-room: 120mm;
+  --name-char: 0.66;
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+}
+
+.tpl-isvicre .cv-headline {
+  margin-top: 2mm;
+  font-family: var(--font-display);
+  font-size: 0.82em;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.tpl-isvicre .cv-contact {
+  margin-top: 2.6mm;
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  line-height: 1.55;
+  color: color-mix(in srgb, var(--ink) 84%, var(--paper));
+}
+
+/* Ortalı başlık (Görünüm'de seçilirse): etiket sütunu payı yok, kırmızı çizgi adın üstünde kısa çubuk */
+.tpl-isvicre.align-center .cv-header {
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  row-gap: 5mm;
+}
+
+.tpl-isvicre.align-center .cv-photo {
+  grid-column: 1;
+  margin-right: 0;
+  justify-self: center;
+}
+
+.tpl-isvicre.align-center .cv-identity {
+  grid-column: 1;
+  grid-row: auto;
+  border-left: 0;
+  padding-left: 0;
+}
+
+.tpl-isvicre.align-center .cv-identity::before {
+  content: '';
+  display: block;
+  width: 12mm;
+  height: 1.1mm;
+  margin: 0 auto 4mm;
+  background: var(--accent);
+}
+
+/* ---------- Gövde: etiket sütunu ---------- */
+
+.tpl-isvicre .col {
+  display: grid;
+  grid-template-columns: var(--label) minmax(0, 1fr);
+  align-content: start;
+  column-gap: 0;
+  row-gap: var(--block-gap);
+}
+
+.tpl-isvicre .col > * {
+  grid-column: 2;
+  min-width: 0;
+}
+
+.tpl-isvicre .section-title {
+  grid-column: 1;
+  /* Çizginin üstündeki boşluk satır aralığıyla birlikte tam bir bölüm aralığı */
+  margin-top: calc(var(--section-gap) - var(--block-gap));
+  padding-top: var(--rule-pad);
+  padding-right: var(--label-gap);
+  text-align: right;
+  font-family: var(--font-display);
+  font-size: 0.8em;
+  line-height: var(--lh);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--ink);
+  overflow-wrap: normal;
+}
+
+/*
+ * Taban çizgisi hizası: 0.8em'lik etiketin ilk satırı, 1em'lik kayıt satırıyla aynı tabana
+ * iner. Satır kutusunda taban ≈ boy × (lh/2 + 0.375) (IBM Plex ve benzeri grotesklerde);
+ * fark 0.2 × gövde = 0.25 × etiket em'i.
+ */
+.tpl-isvicre .section-title > span {
+  display: block;
+  padding-top: calc((var(--lh) / 2 + 0.375) * 0.25em);
+}
+
+/*
+ * Bölüm çizgisi: içerik genişliği boyunca ince çizgi (metinsiz süs). Başlık konumlandırılmaz:
+ * konumlu öğeler PDF'e sayfanın geri kalanından sonra çizilir ve içerik akışında etiketler
+ * sona düşerdi. Çizgi `.page`'e (base.css'te konumlu) göre yatayda yerleşir, dikeyde statik
+ * yerinde (başlığın iç boşluğunun altı) kalır; eksi kenar boşluğu onu başlığın tepesine çeker.
+ */
+.tpl-isvicre .section-title::before {
+  content: '';
+  display: block;
+  position: absolute;
+  left: var(--pad-x);
+  right: var(--pad-x);
+  margin-top: calc(-1 * var(--rule-pad));
+  border-top: 0.25mm solid var(--rule);
+}
+
+.tpl-isvicre .col > .section-title:first-child {
+  margin-top: 0;
+}
+
+/* İlk kayıt etiketle aynı satırda başlar: üst boşluğu etiketinkiyle eşit */
+.tpl-isvicre .section-title + * {
+  margin-top: calc(var(--section-gap) - var(--block-gap) + var(--rule-pad));
+}
+
+.tpl-isvicre .col > .section-title:first-child + * {
+  margin-top: var(--rule-pad);
+}
+
+/* ---------- Kayıtlar ---------- */
+
+.tpl-isvicre .entry-title {
+  font-weight: 600;
+}
+
+.tpl-isvicre .entry-title strong {
+  font-weight: 600;
+}
+
+.tpl-isvicre .entry-date {
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.tpl-isvicre .entry-sub {
+  color: var(--muted);
+}
+
+.tpl-isvicre .entry-sub .sep {
+  color: color-mix(in srgb, var(--muted) 70%, var(--paper));
+}
+
+.tpl-isvicre .rich ul {
+  padding-left: 4mm;
+}
+
+.tpl-isvicre .rich li::marker {
+  color: var(--muted);
+}
+
+/* Beceri ve dil: "Etiket: değer" satırları */
+.tpl-isvicre .line-label {
+  font-weight: 600;
+}
+
+.tpl-isvicre .entry-languages .line-sep {
+  color: var(--muted);
+}

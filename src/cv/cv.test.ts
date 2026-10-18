@@ -11,8 +11,8 @@ function sampleCv(language: 'tr' | 'en' = 'tr') {
   return createCv({
     name: 'Örnek',
     language,
-    templateId: 'modern',
-    template: templateSettingsFor('modern', sections),
+    templateId: 'panel',
+    template: templateSettingsFor('panel', sections),
     personal: samplePersonal(language),
     sections,
   })
@@ -52,8 +52,8 @@ describe('CV oluşturma', () => {
     const blank = createCv({
       name: 'Genel TR',
       language: 'tr',
-      templateId: 'klasik',
-      template: templateSettingsFor('klasik', sections),
+      templateId: 'zarif',
+      template: templateSettingsFor('zarif', sections),
       sections,
     })
     expect(CvSchema.safeParse(blank).success).toBe(true)
@@ -119,6 +119,6 @@ describe('yedek', () => {
   })
 
   it('gelecek şema sürümünü reddeder', () => {
-    expect(() => migrateCv({ ...sampleCv(), schemaVersion: 2 })).toThrow('daha yeni')
+    expect(() => migrateCv({ ...sampleCv(), schemaVersion: 3 })).toThrow('daha yeni')
   })
 })

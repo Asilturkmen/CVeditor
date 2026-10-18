@@ -15,8 +15,8 @@ function sampleCv(name = 'Test'): Cv {
   return createCv({
     name,
     language: 'tr',
-    templateId: 'klasik',
-    template: templateSettingsFor('klasik', sections),
+    templateId: 'zarif',
+    template: templateSettingsFor('zarif', sections),
     personal: samplePersonal('tr'),
     sections,
   })

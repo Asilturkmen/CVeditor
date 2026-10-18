@@ -1,9 +1,9 @@
-import type { Draft } from 'immer'
+import { current, type Draft } from 'immer'
 import { createItem, createSection, newId } from '@/cv/factory'
 import { DEFAULT_SIDE_TYPES } from '@/cv/sample'
 import type { AnyItem, Cv, Personal, Section, SectionType, TemplateSettings } from '@/cv/schema'
 import { db } from '@/db/db'
-import { defaultSideSections, getTemplate, TEMPLATES, type TemplateId } from '@/render/templates'
+import { getTemplate, settingsForTemplate, TEMPLATES, type ColorSet, type TemplateId } from '@/render/templates'
 import { useEditor } from './store'
 import type { Suggestion } from './ui'
 
@@ -209,22 +209,24 @@ export function toggleSideSection(sectionId: string) {
   })
 }
 
+/** Hazır renk takımı: vurgu ve (varsa) zemin tek geri alma adımında değişir. */
+export function setColorSet(set: ColorSet) {
+  update((d) => {
+    d.template.accentColor = set.accent
+    d.template.baseColor = set.base ?? null
+  })
+}
+
 /**
- * Şablon değiştirmek içeriği kaybettirmez. Sütun düzeni yeni şablonun
- * varsayılanına geçer; renk ve yazı tipi kullanıcı değiştirmediyse
- * (eski şablonun varsayılanındaysa) yeni şablonunkine geçer.
+ * Şablon değiştirmek içeriği kaybettirmez. Görünüm ayarlarının nasıl geçtiği:
+ * settingsForTemplate (kullanıcının seçtiği kalır, şablonun varsayılanında duran
+ * yeni şablonunkine geçer; sütun desteklenen değere çekilir).
  */
 export function switchTemplate(templateId: TemplateId) {
   update((d) => {
     if (d.templateId === templateId) return
-    const previous = getTemplate(d.templateId).defaults
-    const next = TEMPLATES[templateId].defaults
-    if (d.template.accentColor === previous.accentColor) d.template.accentColor = next.accentColor
-    if (d.template.font === previous.font) d.template.font = next.font
-    d.template.columns = next.columns
-    if (next.columns === 2 && d.template.sideSections.length === 0) {
-      d.template.sideSections = defaultSideSections(d.sections as Section[])
-    }
+    const next = settingsForTemplate(getTemplate(d.templateId), TEMPLATES[templateId], current(d.template), current(d.sections))
+    Object.assign(d.template, next)
     d.templateId = templateId
   })
 }

@@ -1,0 +1,171 @@
+/*
+ * Panel (`panel`): docs/sablonlar/sartname.md §4.2. Sayfanın solunda baştan sona koyu sütun
+ * (--base), üstünde halkalı yuvarlak fotoğraf; ad sağda beyaz alanda. Yalnız iki sütun.
+ * Her kural `.tpl-panel` ile başlar; yalnız görünümü değiştirir (yapı base.css'te).
+ * Okunabilecek değişkenler, markup kancaları ve fotoğrafsız hâl: base.css başındaki sözleşme.
+ * Renk takımları, yazı tipleri ve desteklenen sütunlar: src/render/templateMeta.ts.
+ *
+ * Başlık, sütun çizgisine hizalı iki hücreli ızgaradır (sartname §3, teknik 2): fotoğraf koyu
+ * hücrede, kimlik her zaman 2. sütunda (fotoğraf yokken de; yoksa ad koyu zemine düşer).
+ */
+
+.tpl-panel {
+  --side-width: 34%;
+  /* Inter 8.8 pt (gövde 9.75 pt'nin 0.9'u) */
+  font-size: calc(var(--fs) * 0.9);
+}
+
+/* Tam boy koyu sütun: her sayfada tekrar eder (paginate her sayfaya .page açar). */
+.tpl-panel .page {
+  background: linear-gradient(90deg, var(--base) 0 var(--side-width), var(--paper) 0);
+}
+
+/* ---------- Başlık ---------- */
+
+.tpl-panel .cv-header {
+  display: grid;
+  grid-template-columns: var(--side-width) minmax(0, 1fr);
+  align-items: center;
+  gap: 0;
+  padding: 0;
+}
+
+/* Koyu hücredeki fotoğraf; yer tutucu kutu da koyu zemine göre boyanır. */
+.tpl-panel .cv-photo {
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: center;
+  width: 34mm;
+  height: 34mm;
+  margin: calc(var(--pad-y) * 0.86) 0 8mm;
+  border-radius: 50%;
+  outline: 1.2mm solid color-mix(in srgb, var(--on-base) 14%, transparent);
+  outline-offset: 1.2mm;
+  --sg-surface: var(--base);
+  --sg-ink: var(--on-base);
+}
+
+.tpl-panel .cv-identity {
+  grid-column: 2;
+  grid-row: 1;
+  padding: var(--pad-y) var(--pad-x) var(--section-gap) calc(var(--pad-x) * 0.6);
+}
+
+.tpl-panel .cv-name {
+  /* Boy sınırı (base.css .cv-name): sağ hücrede adın yeri geniş boşlukta ~109 mm */
+  --name-size: 2.6em;
+  --name-room: 109mm;
+  --name-char: 0.72;
+  font-weight: 700;
+  line-height: 1.04;
+  letter-spacing: -0.02em;
+}
+
+/* Uzun ad (> 24 karakter) biraz küçülür */
+.tpl-panel .cv-name.is-long {
+  --name-size: 2.25em;
+}
+
+.tpl-panel .cv-headline {
+  margin-top: 1.6mm;
+  font-size: 1.1em;
+  font-weight: 600;
+  color: var(--accent-ink);
+}
+
+/*
+ * İletişim iki sütun hâlinde; ayraçlar gizli (metin sırası aynı). Izgara yerine satır satır sarılan
+ * flex: her öğe yarım genişlikten başlar ve bölünmez (nowrap, base.css). Yarıma sığmayan uzun öğe
+ * (uzun e-posta, LinkedIn) kendi satırına iner ve tam genişliğe yayılır; adres ortasından kırılmaz.
+ */
+.tpl-panel .cv-contact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6mm 4mm;
+  margin-top: 3.6mm;
+  font-size: 0.92em;
+  color: var(--muted);
+}
+
+.tpl-panel .cv-contact li {
+  display: block;
+  /* Yarım genişlikten biraz az: alt piksel yuvarlaması ikinci öğeyi alt satıra itmesin (büyüme eşitler) */
+  flex: 1 0 calc(50% - 2.5mm);
+  max-width: 100%;
+}
+
+.tpl-panel .cv-contact .sep {
+  display: none;
+}
+
+.tpl-panel.align-center .cv-identity {
+  text-align: center;
+}
+
+/* ---------- Yan sütun (koyu) ---------- */
+
+.tpl-panel .col-side {
+  color: var(--on-base-dim);
+  --sg-surface: var(--base);
+  --sg-ink: var(--on-base);
+}
+
+.tpl-panel .col-side .section-title {
+  padding-bottom: 1.2mm;
+  border-bottom: 0.3mm solid color-mix(in srgb, var(--on-base) 18%, transparent);
+  font-size: 0.86em;
+  font-weight: 700;
+  color: var(--on-base);
+}
+
+.tpl-panel .col-side .entry-title,
+.tpl-panel .col-side .line-label {
+  color: var(--on-base);
+}
+
+.tpl-panel .col-side .line-label {
+  display: block;
+  font-weight: 600;
+}
+
+.tpl-panel .col-side .entry-sub,
+.tpl-panel .col-side .entry-date {
+  color: var(--on-base-muted);
+}
+
+.tpl-panel .col-side .entry-title strong {
+  font-weight: 600;
+}
+
+/* ---------- Ana sütun ---------- */
+
+.tpl-panel .col-main .section-title {
+  display: flex;
+  align-items: center;
+  gap: 2mm;
+  font-size: 0.9em;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* Başlığın solunda kısa vurgu çubuğu (metinsiz süs) */
+.tpl-panel .col-main .section-title::before {
+  content: '';
+  flex: none;
+  width: 5mm;
+  height: 0.9mm;
+  background: var(--accent);
+}
+
+.tpl-panel .col-main .entry-title strong {
+  font-weight: 600;
+}
+
+.tpl-panel .col-main .entry-sub {
+  font-weight: 500;
+  color: var(--accent-ink);
+}
+
+.tpl-panel .col-main .entry-sub .sep {
+  color: var(--muted);
+}

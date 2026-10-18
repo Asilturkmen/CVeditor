@@ -9,9 +9,9 @@ const cv = () => useEditor.getState().cv!
 
 beforeEach(() => {
   const sections = sampleSections('tr')
-  const template = { ...templateSettingsFor('klasik', sections), showPhoto: false }
+  const template = { ...templateSettingsFor('zarif', sections), showPhoto: false }
   useEditor.getState().load(
-    createCv({ name: 'Test', language: 'tr', templateId: 'klasik', template, personal: samplePersonal('tr'), sections }),
+    createCv({ name: 'Test', language: 'tr', templateId: 'zarif', template, personal: samplePersonal('tr'), sections }),
   )
 })
 

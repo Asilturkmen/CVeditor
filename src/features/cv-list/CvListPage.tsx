@@ -10,7 +10,7 @@ import { buttonClass } from '@/components/ui/buttonClass'
 import { Dialog } from '@/components/ui/Dialog'
 import { Input } from '@/components/ui/Field'
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from '@/components/ui/Menu'
-import { deleteWithUndo, duplicate, exportAllJson, exportCvJson, exportJsonResume, rename } from '@/features/cv-actions'
+import { deleteWithUndo, duplicate, exportAllJson, exportCvJson, rename } from '@/features/cv-actions'
 import { cn } from '@/lib/cn'
 import { useChanged } from '@/lib/useChanged'
 import { daysSince, formatDateTime, relativeTime } from '@/lib/time'
@@ -69,9 +69,6 @@ function CvCard({ cv, onRename, onDelete }: { cv: Cv; onRename: () => void; onDe
             </MenuItem>
             <MenuItem icon={<Download />} onSelect={() => exportCvJson(cv)}>
               {m.list_export_json()}
-            </MenuItem>
-            <MenuItem icon={<Download />} onSelect={() => exportJsonResume(cv)}>
-              {m.imp_json_export()}
             </MenuItem>
             <MenuSeparator />
             <MenuItem icon={<Trash2 />} danger onSelect={onDelete}>

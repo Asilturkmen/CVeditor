@@ -252,6 +252,8 @@ export const PreviewPane = forwardRef<
           interactive={!readOnly}
           placeholders
           emptyHint={m.preview_empty_hint()}
+          // Fotoğraf açık ama yüklenmemişse fotoğraf yerinde kesikli kutu (yalnız ekranda; PDF fotoğrafsız).
+          photoHint={readOnly ? undefined : m.preview_photo_hint()}
           suggestions={suggestionMap}
           // Vurgu yalnız İçerik sekmesinde ve odak paneldeyken (önizleme = PDF).
           focusedItemId={!readOnly && tab === 'content' ? focusedItemId : null}

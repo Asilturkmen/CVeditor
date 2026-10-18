@@ -25,8 +25,8 @@ function sampleCv(): Cv {
   return createCv({
     name: 'Test',
     language: 'tr',
-    templateId: 'klasik',
-    template: templateSettingsFor('klasik', sections),
+    templateId: 'zarif',
+    template: templateSettingsFor('zarif', sections),
     personal: samplePersonal('tr'),
     sections,
   })
@@ -118,17 +118,17 @@ describe('düzenleme', () => {
     useEditor.getState().update((d) => {
       d.template.accentColor = '#123456'
     })
-    switchTemplate('modern')
-    expect(cv().templateId).toBe('modern')
+    switchTemplate('panel')
+    expect(cv().templateId).toBe('panel')
     expect(cv().template.columns).toBe(2)
     expect(cv().template.accentColor).toBe('#123456')
     expect(cv().sections).toEqual(sectionsBefore)
   })
 
   it('şablon değişince dokunulmamış renk ve yazı tipi yeni şablonunkine geçer', () => {
-    switchTemplate('modern')
+    switchTemplate('panel')
     expect(cv().template.font).toBe('inter')
-    expect(cv().template.accentColor).toBe('#2f6f62')
+    expect(cv().template.accentColor).toBe('#2f8f7f')
   })
 
   it('otomatik kayıt veritabanına yazar', async () => {

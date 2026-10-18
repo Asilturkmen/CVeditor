@@ -2,6 +2,78 @@
  * Bütün şablonların ortak çizim tabanı. Önizleme (iframe) ve PDF (yazdır /
  * V2'de sunucu Chrome'u) aynı dosyayı kullanır. Şablon CSS'leri yalnız
  * görünümü değiştirir; yapı (sayfa, sütun, blok) burada sabittir.
+ *
+ * ŞABLON SÖZLEŞMESİ (styles/<id>.css bunlara dayanır)
+ *
+ * Kök: #cv-pages.tpl-<id>.cols-<1|2>.align-<left|center> > .page[data-page] > .page-inner(.has-header ilk sayfada)
+ *   > header.cv-header + .page-body > .col.col-side? + .col.col-main. Yan sütun DOM'da ana sütundan önce.
+ *   Her şablon kuralı `.tpl-<id>` ile başlar. Sayfa sayfa tekrar eden zemin (tam boy renkli sütun,
+ *   koyu sayfa, çerçeve) `.tpl-<id> .page { background: … }` ile yapılır; her sayfada tekrar eder.
+ *   Örnek: linear-gradient(90deg, var(--base) 0 var(--side-width), var(--paper) 0).
+ *   `--side-width` (varsayılan %34) `.tpl-<id>`'de değiştirilebilir; yan sütun genişliği de ondan gelir.
+ *   Gövde yazı boyu: `.tpl-<id> { font-size: calc(var(--fs) * 0.9) }` (em'ler buna göre ölçeklenir).
+ *   Boşluklar: --pad-x, --pad-y, --block-gap, --section-gap, --lh `.tpl-<id>`'de ezilebilir.
+ *
+ * Değişkenler (renderCv.ts cvVariables; renkler colors.ts, hepsi hex):
+ *   --paper --ink --muted --rule        kâğıt ve metin (şablonun kaydından; Gece/Çift Ton'da zeminden türer)
+ *   --accent                            kullanıcının vurgu rengi (dolgu, çizgi, nokta için)
+ *   --accent-ink                        vurgunun METİN hâli: --paper üstünde en az 4.5:1 (metinde bunu kullan)
+ *   --on-accent --on-accent-dim --on-accent-muted  vurgu zemininin üstündeki metin (beyaz ya da koyu; biraz ve
+ *                                       daha çok yumuşatılmış hâli; hepsi ≥ 4.5:1)
+ *   --accent-mark                       koyu metnin altına konan vurgu zemini (üstünde --ink ≥ 4.5:1)
+ *   --accent-soft --accent-light        kâğıt üstünde vurgunun açık tonları (%9 / %24; koyu kâğıtta %16 / %32).
+ *                                       --accent-soft metin zemini olabilir: üstünde --ink, --muted, --accent-ink ≥ 4.5:1
+ *   --accent-dark                       vurgunun koyu tonu
+ *   --base --on-base --on-base-dim --on-base-muted  zemin rengi (Panel yan sütunu, Gece sayfası, Çift Ton koyu
+ *                                       yarısı) ve üstündeki metin; zemin kullanmayan şablonda --base = --accent
+ *   Metin rengini CSS'te color-mix ile kendin karıştırma: kontrastı denetlenmez. Hazır token'ı kullan
+ *   (gerekirse colors.ts'e ekle); renk testleri (colors.test.ts) her şablonun metin/zemin çiftlerini denetler.
+ *   --base-soft --base-ink --base-ink-muted  zeminin açık tonu (Çift Ton'un açık yarısı) ve üstündeki metin
+ *   --accent-on-base                    vurgunun --base üstünde okunur (≥ 4.5:1) metin hâli
+ *   --font                              gövde (Görünüm'de seçilen)
+ *   --font-display                      şablonun ad/başlık ailesi (templateMeta fonts.display; seçilmez)
+ *   --font-mono                         eş aralıklı aile (İsviçre: IBM Plex Mono; yoksa gövde)
+ *   --fs --lh --pad-x --pad-y --block-gap --section-gap
+ *   Hazır renk takımı seçiliyken ColorSet.vars türetilen değerin yerine geçer (templateMeta.ts).
+ *   Yazı tiplerinde yalnız scripts/copy-fonts.mjs'teki yüzleri kullan (ara ağırlık yok).
+ *
+ * Markup kancaları (CvMarkup.tsx; DOM sırası okuma sırasıdır, hiçbiri sırayı değiştirmez):
+ *   header.cv-header.has-photo | .no-photo     fotoğraf yeri var mı (fotoğrafsız hâl: `.cv-header.no-photo`)
+ *   header.cv-header.photo-ph                  yalnız editörde: fotoğraf açık ama yüklenmemiş. Fotoğraf yerinde
+ *     div.cv-photo.ph.ph-photo                 kesikli "Fotoğraf ekle" kutusu; ekranda düzen fotoğraflıdır.
+ *                                              Baskıda kutu display:none olur: başlık "fotoğraflı düzen eksi kutu"
+ *                                              basılır. Sayfalama ekrana göre yapıldığından baskıda başlık
+ *                                              ekrandakinden UZUN olmamalı; kutunun yerini grid/flex kendiliğinden
+ *                                              kapatsın (yalnız fotoğrafa bağlı boşluğu .cv-photo'ya ver).
+ *   img.cv-photo                               gerçek fotoğraf, header'ın ilk çocuğu (sağa almak: grid-column)
+ *   .cv-identity > .cv-heading > h1.cv-name > span.cv-name-text   ad (iç span: satır satır vurgu/fosforlu kalem)
+ *                  .cv-heading > p.cv-headline                     unvan
+ *                  ul.cv-contact > li (+ span.sep " ·")            iletişim (her li bölünmez)
+ *   h1.cv-name.is-long (> 24 karakter) .has-long-word (12+ harfli kelime)   dev adı küçültmek için
+ *   h1.cv-name[style="--name-longest:N"]      en uzun kelimenin harf sayısı. Adın boyu base.css'te
+ *     min(--name-size, --name-room / (N × --name-char)): şablon font-size değil bu üç değişkeni verir
+ *     (--name-size: istenen boy, em; --name-room: adın en dar hâldeki genişliği — fotoğraflı, geniş
+ *     boşluk — mm; --name-char: yazı tipinin harf başına genişliği, em). Kelime asla bölünmez.
+ *   ul.cv-contact > li.is-long                 64+ karakterlik öğe: yalnız o, son çare satır sonunda bölünür
+ *   h2.section-title[data-section-type=<tür>] > span                  bölüm başlığı (summary, experience, skills…)
+ *   .entry.entry-<tür> > .entry-head(.entry-title > strong, .entry-date) + .entry-sub(.part, .sep) + .entry-body.rich
+ *   .entry-line > strong.line-label + span.line-value                  beceri/dil satırı
+ *   .line-value > span.kw + span.kw-sep(", ")                         virgüllü anahtar kelimeler (çip için);
+ *                                                                      ayırıcı metni gizleme (ATS okur)
+ *   .entry-languages .line-sep (" — ")                                 dil seviyesi ayırıcısı
+ *   .entry.is-split / .is-continued                                    bir sayfadan uzun kaydın parçaları
+ *
+ * Öneri vurguları (yapay zekâ): .sg-* renkleri metnin durduğu yüzeyden türer. Koyu bölgede
+ *   --sg-surface (zemin) ve --sg-ink (metin) ver; ör. `.tpl-panel .col-side { --sg-surface: var(--base);
+ *   --sg-ink: var(--on-base) }`. Varsayılan --paper / --ink (Gece ve Çift Ton'un koyu yarısında zaten koyu).
+ *
+ * ATS: order, *-reverse, metin taşıyan öğede herhangi bir position (relative dahil: konumlu öğe PDF'e
+ *   sayfanın geri kalanından sonra çizilir, içerik akışında sona düşer; yalnız .page konumlu), ::before/::after ile harf yasak;
+ *   metin taşıyan öğede opacity < 1, transform, filter, z-index, mix-blend-mode, isolation: isolate,
+ *   will-change (transform/opacity) da yasak: hepsi ayrı boyama katmanı açar, PDF'te metin kayar ya da
+ *   resim olarak basılıp kaybolur (metinsiz süs ve img serbest). Metin grid/flex ile yer değiştirmez; yalnız
+ *   fotoğraf başka hücreye yerleşebilir. harf aralığı ≤ 0.05em; iletişim başlıkta. font-synthesis: none
+ *   (aşağıda): sunulmayan kalınlık/italik isteme. Süs = içeriksiz sözde öğe, background ya da border.
  */
 @page {
   size: A4;
@@ -29,6 +101,11 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   font-kerning: normal;
+  /*
+   * Sahte kalın/italik yok: sunulmayan yüz (ör. DM Serif Display 700, Manrope italik) taklit
+   * edilirse Chromium onu PDF'e Type3 basar. Eksik yüzde en yakın gerçek ağırlık kullanılır.
+   */
+  font-synthesis: none;
   /* Kelime bölme yok: CV dilinde yanlış heceleme riskini almıyoruz */
   hyphens: manual;
   overflow-wrap: break-word;
@@ -130,6 +207,30 @@ body {
   flex: none;
 }
 
+/*
+ * Fotoğraf yer tutucusu (yalnız editör önizlemesi): şablonun .cv-photo boyut, biçim ve
+ * yerleşimini alır; kesikli kenar ve yazı buradan gelir (kimlik seçici şablonu ezer).
+ */
+#cv-pages .cv-photo.ph-photo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5mm;
+  text-align: center;
+  font-family: var(--font);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0;
+  text-transform: none;
+  color: color-mix(in srgb, var(--sg-ink, var(--ink)) 55%, var(--sg-surface, var(--paper)));
+  background: color-mix(in srgb, var(--sg-ink, var(--ink)) 4%, transparent);
+  border: 0.45mm dashed color-mix(in srgb, var(--sg-ink, var(--ink)) 40%, transparent);
+  box-shadow: none;
+  outline: none;
+  filter: none;
+}
+
 h1,
 h2,
 p,
@@ -137,11 +238,20 @@ ul {
   margin: 0;
 }
 
+/*
+ * Adın boyu: şablonun istediği boy (--name-size), ama en uzun kelime (--name-longest, harf
+ * sayısı; CvMarkup verir) adın en dar hâldeki genişliğine (--name-room, mm) sığacak kadar.
+ * --name-char: yazı tipinin harf başına ortalama genişliği (em; geniş harfli "Muhammed" ölçüsü).
+ * Ölçü mm cinsinden sabittir, kutunun genişliğine (cqi, %) bağlı değil: baskıda fotoğraf kutusu
+ * kalkınca ad büyümez, başlık ekrandakinden uzun olmaz. Kelime asla ortasından bölünmez.
+ */
 .cv-name {
-  font-size: 2.3em;
+  font-family: var(--font-display);
+  font-size: min(var(--name-size, 2.3em), calc(var(--name-room, 140mm) / (var(--name-longest, 1) * var(--name-char, 0.75))));
   line-height: 1.1;
   font-weight: 700;
   letter-spacing: -0.01em;
+  overflow-wrap: normal;
 }
 
 .cv-headline {
@@ -163,6 +273,12 @@ ul {
   white-space: nowrap;
 }
 
+/* Tam satıra bile sığmayabilecek kadar uzun öğe (CvMarkup: 64+ karakter): son çare satır sonunda bölünür */
+.cv-contact li.is-long {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .cv-contact .sep {
   padding-right: 1.2mm;
   color: color-mix(in srgb, var(--muted) 55%, #fff);
@@ -173,10 +289,19 @@ a {
   text-decoration: none;
 }
 
+/*
+ * Varsayılan bölüm başlığı (sade, büyük harf). Şablon görünümünü kendi CSS'inde ezer;
+ * büyük harf kullanmayan şablon text-transform: none der (e2e testleri buna hazır).
+ */
 .section-title {
   margin-top: var(--section-gap);
-  font-size: 1.05em;
+  font-size: 0.92em;
   line-height: 1.25;
+  font-weight: 700;
+  text-transform: uppercase;
+  /* 0.05em'ten geniş harf aralığını PDF ayrıştırıcıları kelime boşluğu sayar ("D E N E Y İ M") */
+  letter-spacing: 0.05em;
+  color: var(--accent-ink);
 }
 
 .col > .section-title:first-child {
@@ -263,7 +388,7 @@ a {
 
 /* Önizlemeye özgü: yer tutucu, etkileşim, öneri işaretleri. PDF'e basılmaz. */
 .ph {
-  color: #b9b9b9;
+  color: color-mix(in srgb, var(--sg-ink, var(--ink)) 32%, var(--sg-surface, var(--paper)));
 }
 
 .ph-hint {
@@ -295,43 +420,60 @@ body.interactive .is-focused {
   border-radius: 1mm;
 }
 
+/*
+ * Öneri renkleri metnin durduğu yüzeyden türer: açık kâğıtta açık zemin + koyu yazı,
+ * koyu zeminde koyu zemin + açık yazı. Değerler kullanıldıkları öğede hesaplanır; bu yüzden
+ * şablon koyu bir bölgede yalnız --sg-surface ve --sg-ink vererek hepsini çevirir.
+ */
+.sg,
+.sg-added,
+.sg-removed {
+  --sg-s: var(--sg-surface, var(--paper));
+  --sg-t: var(--sg-ink, var(--ink));
+  --sg-yellow: color-mix(in srgb, #f2c230 20%, var(--sg-s));
+  --sg-green-bg: color-mix(in srgb, #22a55a 20%, var(--sg-s));
+  --sg-green-text: color-mix(in srgb, #1f9d55 58%, var(--sg-t));
+  --sg-red-bg: color-mix(in srgb, #e5484d 16%, var(--sg-s));
+  --sg-red-text: color-mix(in srgb, #d92d20 58%, var(--sg-t));
+}
+
 .sg-block {
-  box-shadow: 0 0 0 1.2mm #fff7d6;
-  background: #fff7d6;
+  box-shadow: 0 0 0 1.2mm var(--sg-yellow);
+  background: var(--sg-yellow);
   animation: sg-in 320ms cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
 .sg-del {
-  color: #b42318;
+  color: var(--sg-red-text);
   text-decoration: line-through;
   text-decoration-thickness: 1px;
-  background: #fde8e7;
+  background: var(--sg-red-bg);
 }
 
 .sg-ins {
-  color: #0f6b3a;
+  color: var(--sg-green-text);
   text-decoration: none;
-  background: #dcf5e6;
+  background: var(--sg-green-bg);
 }
 
 .sg-old {
-  color: #8a2c22;
+  color: var(--sg-red-text);
   text-decoration: line-through;
   text-decoration-thickness: 1px;
-  opacity: 0.7;
+  opacity: 0.75;
   margin-bottom: 1.2mm;
 }
 
 .sg-new {
-  background: #dcf5e6;
-  box-shadow: 0 0 0 0.8mm #dcf5e6;
+  background: var(--sg-green-bg);
+  box-shadow: 0 0 0 0.8mm var(--sg-green-bg);
   border-radius: 0.5mm;
 }
 
 @keyframes sg-in {
   from {
-    background: #fff0b3;
-    box-shadow: 0 0 0 2.5mm #fff0b3;
+    background: color-mix(in srgb, #f2c230 34%, var(--sg-s));
+    box-shadow: 0 0 0 2.5mm color-mix(in srgb, #f2c230 34%, var(--sg-s));
   }
 }
 
@@ -339,9 +481,9 @@ body.interactive .is-focused {
 .sg-added,
 body.interactive .sg-added:hover,
 body.interactive .sg-added.is-focused {
-  background: #e6f7ec;
+  background: var(--sg-green-bg);
   box-shadow:
-    0 0 0 1.2mm #e6f7ec,
+    0 0 0 1.2mm var(--sg-green-bg),
     -1.2mm 0 0 0.4mm #3aa864;
   animation: sg-add-in 280ms cubic-bezier(0.2, 0.7, 0.2, 1);
 }
@@ -349,18 +491,18 @@ body.interactive .sg-added.is-focused {
 .sg-removed,
 body.interactive .sg-removed:hover,
 body.interactive .sg-removed.is-focused {
-  background: #fdeceb;
+  background: var(--sg-red-bg);
   box-shadow:
-    0 0 0 1.2mm #fdeceb,
+    0 0 0 1.2mm var(--sg-red-bg),
     -1.2mm 0 0 0.4mm #d4483b;
-  color: #8a2c22;
+  color: var(--sg-red-text);
 }
 
 .sg-removed *,
 .sg-removed {
   text-decoration: line-through;
   text-decoration-thickness: 1px;
-  text-decoration-color: color-mix(in srgb, #b42318 60%, transparent);
+  text-decoration-color: color-mix(in srgb, #d92d20 60%, transparent);
 }
 
 @keyframes sg-add-in {
@@ -377,8 +519,8 @@ body.interactive .sg-removed.is-focused {
 
 @keyframes sg-flash {
   from {
-    background: color-mix(in srgb, var(--accent) 16%, #fff);
-    box-shadow: 0 0 0 1.8mm color-mix(in srgb, var(--accent) 16%, #fff);
+    background: color-mix(in srgb, var(--accent) 16%, var(--sg-surface, var(--paper)));
+    box-shadow: 0 0 0 1.8mm color-mix(in srgb, var(--accent) 16%, var(--sg-surface, var(--paper)));
   }
 }
 
@@ -429,6 +571,12 @@ body.interactive .sg-removed.is-focused {
 
   .ph {
     visibility: hidden;
+  }
+
+  /* Fotoğraf yer tutucusu baskıda yer de kaplamaz: PDF fotoğrafsız basılır. Şablonlar kutuya
+     ekranda kendi `display`'ini verebildiği için (daha güçlü seçiciyle) burada !important şart. */
+  #cv-pages .cv-photo.ph-photo {
+    display: none !important;
   }
 
   body.interactive [data-item-id],

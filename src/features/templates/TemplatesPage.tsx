@@ -1,5 +1,4 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowRight } from 'lucide-react'
 import { useState } from 'react'
 import { db } from '@/db/db'
 import { cn } from '@/lib/cn'
@@ -17,12 +16,13 @@ function TemplateCard({ template, onChoose }: { template: TemplateDef; onChoose:
     <button
       type="button"
       onClick={onChoose}
-      className="group flex flex-col gap-4 text-left focus-visible:outline-none"
+      className="group flex min-w-0 flex-col gap-3 text-left focus-visible:outline-none"
       aria-label={m.templates_choose({ name: text.name() })}
+      data-template={template.id}
     >
       <div
         className={cn(
-          'relative w-full rounded-2xl border border-line bg-canvas p-5',
+          'w-full rounded-2xl border border-line bg-canvas p-3',
           'transition-[transform,box-shadow,border-color] duration-250 ease-[var(--ease-out-soft)]',
           'group-hover:-translate-y-1 group-hover:border-line-strong group-hover:shadow-lg',
           'group-focus-visible:ring-2 group-focus-visible:ring-accent group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-bg',
@@ -32,20 +32,16 @@ function TemplateCard({ template, onChoose }: { template: TemplateDef; onChoose:
           <CvFrame cv={sample} scale="fit" fitPadding={0} firstPageOnly title={text.name()} />
         </div>
       </div>
-      <div className="flex items-start justify-between gap-4 px-1">
-        <div>
-          <h2 className="flex items-center gap-2 text-[17px] font-semibold tracking-tight">
-            {text.name()}
-            <span className="rounded-full border border-line px-2 py-px text-[11px] font-medium text-muted">
-              {text.layout()}
+      <div className="flex flex-col gap-1.5 px-0.5">
+        <h2 className="text-[15px] font-semibold tracking-tight">{text.name()}</h2>
+        <span className="flex flex-wrap gap-1">
+          {text.tags().map((tag) => (
+            <span key={tag} className="rounded-full border border-line px-2 py-px text-[11px] font-medium text-muted">
+              {tag}
             </span>
-          </h2>
-          <p className="mt-1 max-w-sm text-sm text-muted">{text.description()}</p>
-        </div>
-        <span className="mt-0.5 inline-flex shrink-0 items-center gap-1 text-sm font-medium text-accent opacity-80 transition-[opacity,transform] duration-200 group-hover:translate-x-0.5 group-hover:opacity-100">
-          {m.templates_use()}
-          <ArrowRight className="size-4" />
+          ))}
         </span>
+        <p className="text-[13px] leading-snug text-muted">{text.description()}</p>
       </div>
     </button>
   )
@@ -65,7 +61,8 @@ export function TemplatesPage() {
         </h1>
         <p className="mt-1.5 text-muted">{firstVisit ? m.templates_welcome_body() : m.templates_subtitle()}</p>
       </div>
-      <div className="grid max-w-[920px] grid-cols-1 gap-x-10 gap-y-12 sm:grid-cols-2">
+      {/* 10 şablon kategorisiz tek ızgarada: geniş ekranda 5 sütun, iki satır. */}
+      <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 sm:gap-x-6 lg:grid-cols-4 xl:grid-cols-5">
         {TEMPLATE_LIST.map((template) => (
           <TemplateCard key={template.id} template={template} onChoose={() => setChosen(template.id)} />
         ))}

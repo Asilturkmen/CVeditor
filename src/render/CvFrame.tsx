@@ -2,12 +2,13 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffec
 import type { Cv } from '@/cv/schema'
 import { readingText, type ReadingText } from './atsText'
 import type { SuggestionMap } from './CvMarkup'
-import { FONTS } from './fonts'
+import { fontLoadQueries } from './fonts'
 import { paginate, type PaginateResult } from './paginate'
 import { whenPrintEnds } from './printEnd'
-import { buildPrintMirror, shadowCopyOfPages } from './printMirror'
+import { buildPrintMirror, shadowCopyOfPages, warmMirrorFonts } from './printMirror'
 import { createRenderGate } from './renderGate'
-import { cvStyles, documentShell, renderCvSource } from './renderCv'
+import { cvFonts, cvStyles, documentShell, renderCvSource } from './renderCv'
+import { getTemplate } from './templates'
 
 /** A4 genişliği CSS pikseli olarak (210mm @ 96dpi) */
 export const PAGE_WIDTH_PX = 793.7
@@ -41,6 +42,8 @@ interface Props {
   interactive?: boolean
   placeholders?: boolean
   emptyHint?: string
+  /** Fotoğraf açık ama yüklenmemişken önizlemedeki kutunun yazısı (placeholders ile; baskıda gizli) */
+  photoHint?: string
   focusedItemId?: string | null
   /** Kısa süre parlayacak kayıtlar (öneri kabulünden sonra); nonce her istekte artar */
   flash?: { ids: string[]; nonce: number } | null
@@ -72,6 +75,7 @@ export const CvFrame = forwardRef<CvFrameHandle, Props>(function CvFrame(
     interactive = false,
     placeholders = false,
     emptyHint,
+    photoHint,
     focusedItemId = null,
     flash = null,
     crossfadeKey,
@@ -163,15 +167,18 @@ export const CvFrame = forwardRef<CvFrameHandle, Props>(function CvFrame(
         // Kesikli "uzun kayıt" çerçevesi yalnız düzenlenebilir önizlemede (küçük resimde, telefonda değil).
         (interactive ? '' : '.overflow-warning{outline:none}')
 
-    // Yazı tipleri ölçümden önce yüklenmeli; yoksa satır kırılımı sonradan değişir.
-    const family = FONTS[cv.template.font].stack.split(',')[0]
+    // Yazı tipleri ölçümden önce yüklenmeli; yoksa satır kırılımı sonradan değişir. Gövde
+    // ailesinin yanında şablonun başlık ve eş aralıklı aileleri de (bütün yüzleriyle) yüklenir.
+    const fonts = Object.values(cvFonts(getTemplate(cv.templateId), cv.template))
     const sample = 'Aa ğüşıöçĞÜŞİÖÇ'
     await Promise.all(
-      ['400', '500', '600', '700', 'italic 400'].map((w) => doc.fonts.load(`${w} 12px ${family}`, sample).catch(() => [])),
+      [...new Set(fonts.flatMap(fontLoadQueries))].map((query) => doc.fonts.load(query, sample).catch(() => [])),
     )
     if (!gate.isCurrent(token)) return
+    // Menü baskısı aynası üst belgede çizilir; şablonun aileleri orada da hazır olsun.
+    if (!firstPageOnly) warmMirrorFonts(fonts)
 
-    doc.getElementById('cv-source')!.innerHTML = renderCvSource(cv, { suggestions, placeholders, emptyHint })
+    doc.getElementById('cv-source')!.innerHTML = renderCvSource(cv, { suggestions, placeholders, emptyHint, photoHint })
     const result = paginate(doc, { previousPageCount: pageCountRef.current })
     pageCountRef.current = result.pageCount
     // CV'deki bağlantılar klavye sırasına girmez (PDF al'dan sonra fazladan durak olmasın).
@@ -192,7 +199,7 @@ export const CvFrame = forwardRef<CvFrameHandle, Props>(function CvFrame(
     }
     callbacks.current.onResult?.(result)
     callbacks.current.onReadingText?.(readingText(doc))
-  }, [cv, suggestions, interactive, placeholders, emptyHint, firstPageOnly, crossfadeKey, gate])
+  }, [cv, suggestions, interactive, placeholders, emptyHint, photoHint, firstPageOnly, crossfadeKey, gate])
 
   const render = useCallback(() => gate.track(draw()), [draw, gate])
 

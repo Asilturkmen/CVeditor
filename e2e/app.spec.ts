@@ -57,7 +57,7 @@ test('Türkçe CV büyük harfte İ kullanır (lang=tr)', async ({ page }) => {
 test('şablon değiştirmek içeriği korur ve iki sütuna geçer', async ({ page }) => {
   await createCv(page, { start: 'sample' })
   await page.getByRole('radio', { name: 'Görünüm' }).click()
-  await page.getByRole('radio', { name: /Modern/ }).click()
+  await page.getByRole('radio', { name: /Panel/ }).click()
   const frame = preview(page)
   await expect(frame.locator('.col-side').first()).toBeVisible()
   await expect(frame.locator('.col-side').first()).toContainText('Beceriler')

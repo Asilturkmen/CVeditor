@@ -1,6 +1,6 @@
 # 10 şablon planı
 
-> **Durum: onay bekliyor (2026-10-17).** Asil planı gördü, uygulamayı sonraya bıraktı. Uygulamaya başlamadan önce aşağıdaki 5 kararı Asil'e bir kez daha onaylat. Onaylamadığı bir maddeyi uygulama.
+> **Durum: uygulandı (2026-10-18).** Asil 5 kararın hepsini onayladı; 3 aşama tamamlandı, bağımsız incelemenin bulguları düzeltildi. Commit Asil'in onayını bekliyor.
 
 ## Bu plan nereden geldi
 

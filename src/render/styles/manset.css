@@ -1,0 +1,128 @@
+/*
+ * Manşet (`manset`): iki satıra yayılan dev display serif ad, altında kalın siyah çizgi;
+ * özet büyük serif bir "giriş paragrafı". Vurgu rengi yalnız unvanda.
+ * Tarif: docs/sablonlar/sartname.md §4.4. Sözleşme (değişkenler, kancalar): base.css başı.
+ *
+ * - Fotoğraf (gri tonlu dikdörtgen) ızgaranın 2. sütununda; DOM sırası aynı. Sol aralık
+ *   fotoğrafın kendi kenar boşluğu: fotoğraf (ya da baskıda gizlenen kutu) yoksa yer kalmaz.
+ * - Dev ad `max-width` ile ad/soyad iki satıra düşer. Uzun adda (> 24 karakter: `.is-long`)
+ *   ve tek uzun kelimede (12+ harf: `.has-long-word`) küçülür. Ayrıca boy, en uzun kelime
+ *   adın yerine sığacak kadarla sınırlıdır (base.css .cv-name, --name-*): kelime asla bölünmez.
+ */
+
+.tpl-manset {
+  --side-width: 31%;
+  font-size: calc(var(--fs) * 0.885);
+}
+
+/* ---------- Başlık ---------- */
+
+.tpl-manset .cv-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0;
+  margin: 0 var(--pad-x) 6mm;
+  padding: calc(var(--pad-y) - 2mm) 0 5mm;
+  border-bottom: 0.7mm solid var(--ink);
+}
+
+.tpl-manset .cv-identity {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.tpl-manset .cv-name {
+  font-family: var(--font-display);
+  font-weight: 400;
+  --name-size: 8.4em;
+  --name-room: 112mm;
+  --name-char: 0.65;
+  line-height: 0.88;
+  letter-spacing: -0.02em;
+  max-width: 112mm;
+}
+
+/* Uzun ad-soyad: iki-üç satırda kalsın diye küçülür, satır genişliği serbest (fotoğraflı, geniş
+   boşlukta ~130 mm) */
+.tpl-manset .cv-name.is-long {
+  --name-size: 6.4em;
+  --name-room: 130mm;
+  max-width: none;
+}
+
+/* 12+ harfli kelime dev boyda satıra sığmaz: küçülür (daha uzun kelimede --name-* daha da küçültür) */
+.tpl-manset .cv-name.has-long-word {
+  --name-size: 4.2em;
+  --name-room: 130mm;
+  max-width: none;
+}
+
+.tpl-manset .cv-headline {
+  margin-top: 4mm;
+  font-weight: 700;
+  font-size: 0.95em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent-ink);
+}
+
+.tpl-manset .cv-contact {
+  margin-top: 2.2mm;
+  color: color-mix(in srgb, var(--ink) 82%, var(--paper));
+}
+
+.tpl-manset .cv-photo {
+  grid-column: 2;
+  grid-row: 1;
+  width: 36mm;
+  height: 46mm;
+  margin-left: 8mm;
+  filter: grayscale(1);
+}
+
+/* ---------- Bölüm başlıkları ---------- */
+
+.tpl-manset .section-title {
+  font-weight: 800;
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink);
+  border-top: 0.25mm solid var(--ink);
+  padding-top: 1.6mm;
+}
+
+/* ---------- Özet: büyük serif giriş paragrafı ---------- */
+
+.tpl-manset .entry-summary .entry-body {
+  font-family: var(--font-display);
+  font-size: 1.55em;
+  line-height: 1.22;
+  letter-spacing: -0.005em;
+}
+
+/* Dar yan sütunda dev giriş paragrafı sığmaz: gövde boyunun biraz üstü */
+.tpl-manset .col-side .entry-summary .entry-body {
+  font-size: 1.2em;
+}
+
+/* ---------- Kayıtlar ---------- */
+
+.tpl-manset .entry-title {
+  font-weight: 700;
+}
+
+.tpl-manset .entry-sub {
+  color: var(--muted);
+}
+
+.tpl-manset .entry-date {
+  color: var(--muted);
+}
+
+/* Yan sütunda "Etiket" ayrı satırda, değer altında */
+.tpl-manset .col-side .entry-skills .line-label {
+  display: block;
+  font-weight: 700;
+}

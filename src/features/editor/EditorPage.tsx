@@ -26,7 +26,7 @@ import { toast } from '@/components/ui/toast'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { useEditor } from '@/editor/store'
 import { useEditorUi } from '@/editor/ui'
-import { duplicate, exportCvJson, exportJsonResume, printTitle } from '@/features/cv-actions'
+import { duplicate, exportCvJson, printTitle } from '@/features/cv-actions'
 import { DeleteDialog } from '@/features/cv-list/CvListPage'
 import { ThemeToggle } from '@/features/shell/AppShell'
 import { TranslateCvDialog } from '@/features/translate/TranslateCvDialog'
@@ -522,9 +522,6 @@ export function EditorPage() {
               </MenuItem>
               <MenuItem icon={<Download />} onSelect={() => exportCvJson(cv)}>
                 {m.list_export_json()}
-              </MenuItem>
-              <MenuItem icon={<Download />} onSelect={() => exportJsonResume(cv)}>
-                {m.imp_json_export()}
               </MenuItem>
               <MenuItem icon={<Languages />} onSelect={() => setTranslating(true)}>
                 {m.editor_translate_cv()}

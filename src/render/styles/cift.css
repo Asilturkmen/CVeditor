@@ -1,0 +1,145 @@
+/*
+ * Çift Ton (`cift`): docs/sablonlar/sartname.md §4.8. Sayfada beyaz yok: solda açık ton
+ * (--base-soft), sağda koyu zemin (--base, aynı zamanda --paper); ad koyu tarafta beyaz,
+ * fotoğraf açık tarafta büyük daire. Yalnız iki sütun.
+ * Her kural `.tpl-cift` ile başlar; yalnız görünümü değiştirir (yapı base.css'te).
+ * Okunabilecek değişkenler, markup kancaları ve fotoğrafsız hâl: base.css başındaki sözleşme.
+ * Renk takımları, yazı tipleri ve desteklenen sütunlar: src/render/templateMeta.ts.
+ *
+ * --paper koyu zemindir (paper: 'base'); --ink/--muted/--accent-ink ona göre türer. Açık
+ * yarıdaki metin --base-ink / --base-ink-muted ile yazılır.
+ */
+
+.tpl-cift {
+  --side-width: 37%;
+  /* Space Grotesk 8.8 pt (gövde 9.75 pt'nin 0.9'u) */
+  font-size: calc(var(--fs) * 0.9);
+}
+
+/* İki tonlu sayfa: her sayfada tekrar eder. */
+.tpl-cift .page {
+  background: linear-gradient(90deg, var(--base-soft) 0 var(--side-width), var(--paper) 0);
+}
+
+/* ---------- Başlık ---------- */
+
+.tpl-cift .cv-header {
+  display: grid;
+  grid-template-columns: var(--side-width) minmax(0, 1fr);
+  align-items: end;
+  gap: 0;
+  padding: 0;
+}
+
+/* Açık hücredeki fotoğraf; yer tutucu kutu açık zemine göre boyanır. */
+.tpl-cift .cv-photo {
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: center;
+  width: 40mm;
+  height: 40mm;
+  margin: calc(var(--pad-y) * 0.93) 0 6mm;
+  border-radius: 50%;
+  border: 1.4mm solid #ffffff;
+  --sg-surface: var(--base-soft);
+  --sg-ink: var(--base-ink);
+}
+
+.tpl-cift .cv-identity {
+  grid-column: 2;
+  grid-row: 1;
+  padding: calc(var(--pad-y) * 0.93) var(--pad-x) 6mm calc(var(--pad-x) * 0.6);
+}
+
+.tpl-cift .cv-name {
+  /* Boy sınırı (base.css .cv-name): koyu hücrede adın yeri geniş boşlukta ~103 mm */
+  --name-size: 3em;
+  --name-room: 103mm;
+  --name-char: 0.7;
+  font-weight: 700;
+  line-height: 0.98;
+  letter-spacing: -0.02em;
+  color: var(--on-base);
+}
+
+/* Uzun ad (> 24 karakter) üç satıra yayılmasın */
+.tpl-cift .cv-name.is-long {
+  --name-size: 2.5em;
+}
+
+.tpl-cift .cv-headline {
+  margin-top: 2mm;
+  font-size: 1.1em;
+  font-weight: 500;
+  color: var(--accent-ink);
+}
+
+.tpl-cift .cv-contact {
+  margin-top: 2.6mm;
+  font-size: 0.95em;
+  color: var(--muted);
+}
+
+.tpl-cift .cv-contact .sep {
+  color: var(--muted);
+}
+
+.tpl-cift.align-center .cv-identity {
+  text-align: center;
+}
+
+/* ---------- Bölüm başlığı ---------- */
+
+.tpl-cift .section-title {
+  font-family: var(--font-display);
+  font-size: 1.15em;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: -0.01em;
+}
+
+.tpl-cift .col-side .section-title {
+  color: var(--base-ink);
+}
+
+.tpl-cift .col-main .section-title {
+  color: var(--accent-ink);
+}
+
+/* ---------- Açık yan sütun ---------- */
+
+.tpl-cift .col-side {
+  padding-top: 1mm;
+  color: var(--base-ink);
+  --sg-surface: var(--base-soft);
+  --sg-ink: var(--base-ink);
+}
+
+.tpl-cift .col-side .line-label {
+  display: block;
+  font-weight: 600;
+}
+
+.tpl-cift .col-side .entry-sub,
+.tpl-cift .col-side .entry-date {
+  color: var(--base-ink-muted);
+}
+
+.tpl-cift .entry-title strong {
+  font-weight: 600;
+}
+
+/* ---------- Koyu ana sütun ---------- */
+
+.tpl-cift .col-main {
+  padding-top: 1mm;
+}
+
+.tpl-cift .col-main .entry-title {
+  color: var(--on-base);
+}
+
+.tpl-cift .col-main .entry-sub,
+.tpl-cift .col-main .entry-date {
+  color: var(--muted);
+}

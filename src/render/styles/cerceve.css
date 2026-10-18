@@ -1,0 +1,128 @@
+/*
+ * Çerçeve (`cerceve`): docs/sablonlar/sartname.md §4.10. Sayfa kenarında 6,5 mm vurgu renginde
+ * çerçeve, 2,6 mm içeride ince ikinci çizgi, krem kâğıt, italik Fraunces başlıklar.
+ * Varsayılan iki sütun; tek sütun da desteklenir (templateMeta.ts).
+ *
+ * Sayfa kapasitesi: çerçeve .page'in kenarlığıdır (border-box, A4 sabit). .page-inner yüksekliği
+ * %100 = çerçevenin içi; sütunun alt sınırı da orası. paginate sütunun kendi kutusunu ölçtüğü için
+ * kenarlık her sayfada (2., 3. sayfa dahil) kullanılabilir yüksekliği doğru azaltır. İç çizgi
+ * outline'dır: yer kaplamaz, metin ondan iç boşluk kadar uzak durur.
+ */
+.tpl-cerceve {
+  font-size: calc(var(--fs) * 0.945);
+  /*
+   * Çerçeve içindeki boşluk: sayfa kenarından toplam uzaklık boşluk ölçeğine göre değişsin
+   * (normal: 6,5 + 13 mm yatay, 6,5 + 11 mm dikey). Değişken kendini okuyamadığı için ara
+   * değişkenle: .tpl-cerceve'de hesaplanır, .page'de --pad-x/--pad-y'nin yerine geçer.
+   */
+  --cerceve-frame: 6.5mm;
+  --cerceve-pad-x: calc(var(--pad-x) - 3mm);
+  --cerceve-pad-y: calc(var(--pad-y) - 3mm);
+}
+
+.tpl-cerceve .page {
+  --pad-x: var(--cerceve-pad-x);
+  --pad-y: var(--cerceve-pad-y);
+  border: var(--cerceve-frame) solid var(--accent);
+  background: var(--paper);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* İkinci ince çizgi (süs; yer kaplamaz) */
+.tpl-cerceve .page-inner {
+  outline: 0.3mm solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: -2.6mm;
+}
+
+/* Fraunces'in bağ harfleri (fi, fl) PDF metninde tek glif olmasın ("Certificates") */
+.tpl-cerceve .cv-name,
+.tpl-cerceve .cv-headline,
+.tpl-cerceve .section-title {
+  font-variant-ligatures: no-common-ligatures no-discretionary-ligatures;
+}
+
+/* ---------- Başlık ---------- */
+.tpl-cerceve .cv-header {
+  gap: 6mm;
+}
+
+.tpl-cerceve .cv-photo {
+  width: 28mm;
+  height: 32mm;
+  border-radius: 2mm;
+}
+
+.tpl-cerceve .cv-name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  /* Boy sınırı (base.css .cv-name): fotoğraflı, geniş boşlukta adın yeri ~133 mm */
+  --name-size: 2.9em;
+  --name-room: 133mm;
+  --name-char: 0.73;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.tpl-cerceve .cv-name.is-long,
+.tpl-cerceve .cv-name.has-long-word {
+  --name-size: 2.4em;
+}
+
+.tpl-cerceve .cv-headline {
+  margin-top: 1mm;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 600;
+  color: var(--accent-ink);
+}
+
+.tpl-cerceve .cv-contact {
+  margin-top: 2.4mm;
+  padding-top: 1.6mm;
+  border-top: 0.3mm solid var(--rule);
+  color: var(--muted);
+}
+
+/* ---------- Gövde ---------- */
+.tpl-cerceve.cols-2 .col-side {
+  border-right: 0.3mm solid var(--rule);
+}
+
+/* İtalik serif başlık: büyük harf yok, şablonun sesi bu */
+.tpl-cerceve .section-title {
+  margin-top: calc(var(--section-gap) - var(--block-gap) + 2mm);
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 600;
+  font-size: 1.32em;
+  line-height: 1.2;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--accent-ink);
+}
+
+.tpl-cerceve .col > .section-title:first-child {
+  margin-top: 0;
+}
+
+.tpl-cerceve .entry-title,
+.tpl-cerceve .entry-title strong {
+  font-weight: 700;
+}
+
+/* Projede rol adın yanında: sade */
+.tpl-cerceve .entry-title .part + .part {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* Yan sütunda beceri: "Etiket" blok, değer alt satırda */
+.tpl-cerceve .col-side .entry-skills .line-label {
+  display: block;
+}
+
+.tpl-cerceve .line-label {
+  font-weight: 700;
+}

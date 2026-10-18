@@ -1,0 +1,227 @@
+/*
+ * Bant (`bant`): kenardan kenara renkli başlık bandı, ad bandın içinde; sağda bandın alt
+ * kenarını kesen halkalı daire fotoğraf; altta açık tonlu yuvarlak köşeli yan kart.
+ * Tarif: docs/sablonlar/sartname.md §4.3. Sözleşme (değişkenler, kancalar): base.css başı.
+ *
+ * - Bant başlığın kendi zeminidir. Kimlik seçiciyle verilir: editördeki üzerine gelme/odak ve
+ *   baskıdaki sıfırlama kuralları başlığın `background`'ını ezemez. Başlık konumlandırılmaz
+ *   (position/isolation/z-index yok): konumlanan öğe PDF içerik akışına gövdeden SONRA basılır
+ *   ve ATS okuma sırası bozulur.
+ * - Fotoğraf ızgaranın 2. sütununda (yalnız görsel taşınır; DOM sırası aynı). Banttan taşması
+ *   negatif `margin-bottom` ile; taşma kadar yer başlığın `margin-bottom`'ında ayrılır. Sayfalama
+ *   gövdeyi başlığın gerçek kutusundan ölçtüğü için bu yer sayfa kapasitesine doğru yansır.
+ * - Yan kart sütunun zemini değil, bloklarının zemini: sütun sayfa boyu kalır (sayfalama sütunun
+ *   alt kenarını ölçer), kart her sayfada son bloğun altında biter.
+ */
+
+.tpl-bant {
+  --side-width: calc(31% + var(--pad-x));
+  --band-pad-top: calc(var(--pad-y) - 1mm);
+  --band-pad-bottom: 11mm;
+  /* Fotoğrafın bandın altından taşan kısmı ve ardından gövdeye kalan boşluk */
+  --photo-size: 38mm;
+  --photo-overhang: 12mm;
+  --card-pad: 5mm;
+  font-size: calc(var(--fs) * 0.985);
+}
+
+/* ---------- Başlık bandı ---------- */
+
+.tpl-bant .cv-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0;
+  padding: var(--band-pad-top) var(--pad-x) var(--band-pad-bottom);
+  margin-bottom: calc(var(--section-gap) + 3mm);
+  color: var(--on-accent);
+  /* Bant üstündeki öneri farkları koyu (renkli) zemine göre */
+  --sg-surface: var(--accent);
+  --sg-ink: var(--on-accent);
+}
+
+#cv-pages.tpl-bant .cv-header {
+  background: var(--accent);
+}
+
+.tpl-bant .cv-header.has-photo {
+  margin-bottom: calc(var(--photo-overhang) + 3mm);
+}
+
+.tpl-bant .cv-identity {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.tpl-bant .cv-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  /* Boy sınırı (base.css .cv-name): fotoğraflı bantta adın yeri geniş boşlukta ~128 mm */
+  --name-size: 2.7em;
+  --name-room: 128mm;
+  --name-char: 0.8;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+
+.tpl-bant .cv-headline {
+  margin-top: 1.2mm;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 1.05em;
+  color: var(--on-accent-dim);
+}
+
+.tpl-bant .cv-contact {
+  margin-top: 4mm;
+  color: var(--on-accent-muted);
+}
+
+.tpl-bant .cv-contact .sep {
+  color: var(--on-accent-muted);
+}
+
+.tpl-bant .cv-name .ph {
+  color: color-mix(in srgb, var(--on-accent) 45%, var(--accent));
+}
+
+/* Fotoğraf: bandın alt kenarını keser. Görsel boşluk (sol aralık) fotoğrafın kendisinde. */
+.tpl-bant .cv-photo {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: end;
+  width: var(--photo-size);
+  height: var(--photo-size);
+  margin-left: 8mm;
+  margin-bottom: calc(-1 * (var(--photo-overhang) + var(--band-pad-bottom)));
+  border-radius: 50%;
+  border: 1.6mm solid var(--paper);
+}
+
+/* Editördeki "Fotoğraf ekle" kutusu yarısı bantta, yarısı kâğıtta durur: düz kâğıt zemini alır. */
+#cv-pages.tpl-bant .cv-photo.ph-photo {
+  --sg-surface: var(--paper);
+  --sg-ink: var(--ink);
+  background: var(--paper);
+  border: 0.45mm dashed color-mix(in srgb, var(--ink) 40%, var(--paper));
+  box-shadow: 0 0 0 1.6mm var(--paper);
+}
+
+/*
+ * Baskıda kutu yok: fotoğrafa ayrılan taşma yeri de kalkar (başlık ekrandakinden kısa olur,
+ * uzun değil). PDF fotoğrafsız hâlin aynısı basılır.
+ */
+@media print {
+  .tpl-bant .cv-header.photo-ph {
+    margin-bottom: calc(var(--section-gap) + 3mm);
+  }
+}
+
+/* ---------- Bölüm başlıkları ve kayıtlar ---------- */
+
+.tpl-bant .section-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.12em;
+  line-height: 1.3;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--accent-ink);
+  padding-bottom: 1.4mm;
+  background: linear-gradient(var(--accent), var(--accent)) no-repeat left bottom / 8mm 0.9mm;
+}
+
+.tpl-bant .entry-title {
+  font-weight: 700;
+}
+
+.tpl-bant .entry-sub {
+  color: var(--accent-ink);
+}
+
+.tpl-bant .entry-date {
+  color: var(--muted);
+}
+
+.tpl-bant .line-label {
+  font-weight: 700;
+}
+
+/* ---------- Yan kart (iki sütun) ---------- */
+
+.tpl-bant.cols-2 .col-side {
+  gap: 0;
+  padding-right: 0;
+}
+
+.tpl-bant.cols-2 .col-main {
+  padding-left: 7mm;
+}
+
+.tpl-bant .col-side > * {
+  margin-top: 0;
+  padding: var(--block-gap) var(--card-pad) 0;
+  background-color: var(--accent-soft);
+}
+
+.tpl-bant .col-side > .section-title {
+  padding-top: var(--section-gap);
+  padding-bottom: 1.4mm;
+  background:
+    linear-gradient(var(--accent), var(--accent)) no-repeat left var(--card-pad) bottom 0 / 8mm 0.9mm,
+    var(--accent-soft);
+}
+
+/* Ölçekli önizlemede bloklar arasındaki alt piksel çizgisini kartın tonuyla örter */
+.tpl-bant .col-side > :not(:last-child) {
+  box-shadow: 0 0.3mm 0 var(--accent-soft);
+}
+
+/* Editördeki tıklanabilir kayıtların köşe yuvarlaması kartı kertiklemesin */
+.tpl-bant .col-side > [data-item-id] {
+  border-radius: 0;
+}
+
+.tpl-bant .col-side > :first-child {
+  padding-top: var(--card-pad);
+  border-top-left-radius: 2mm;
+  border-top-right-radius: 2mm;
+}
+
+.tpl-bant .col-side > :last-child {
+  padding-bottom: var(--card-pad);
+  border-bottom-left-radius: 2mm;
+  border-bottom-right-radius: 2mm;
+}
+
+/* Bölüm başlığının altındaki çubukla ilk kayıt arasında başlığın kendi boşluğu */
+.tpl-bant .col-side > .section-title + * {
+  padding-top: 2.4mm;
+}
+
+/* Editörde üzerine gelme/odak zemini kartı delmesin: kartın tonunun üstüne biner */
+.tpl-bant .col-side > [data-item-id]:hover,
+.tpl-bant .col-side > [data-item-id].is-focused {
+  background-color: color-mix(in srgb, var(--accent) 12%, var(--accent-soft));
+  box-shadow: none;
+}
+
+/* Öneri işaretli kayıt (eklenecek / kaldırılacak) kartın tonunu değil öneri rengini alır */
+.tpl-bant .col-side > .sg-added,
+.tpl-bant .col-side > .sg-added:hover,
+.tpl-bant .col-side > .sg-added.is-focused {
+  background-color: var(--sg-green-bg);
+}
+
+.tpl-bant .col-side > .sg-removed,
+.tpl-bant .col-side > .sg-removed:hover,
+.tpl-bant .col-side > .sg-removed.is-focused {
+  background-color: var(--sg-red-bg);
+}
+
+@media print {
+  .tpl-bant .col-side > [data-item-id]:hover,
+  .tpl-bant .col-side > [data-item-id].is-focused {
+    background-color: var(--accent-soft);
+  }
+}
