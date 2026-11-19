@@ -1,147 +1,99 @@
 import { DndContext, type DragEndEvent, type UniqueIdentifier } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { Check, Printer } from 'lucide-react'
-import { useDeferredValue, useMemo, type ReactNode } from 'react'
+import { Printer } from 'lucide-react'
+import { memo, useDeferredValue, useEffect, useId, useMemo, useRef, type ReactNode } from 'react'
 import { sectionTitle } from '@/cv/locale'
 import type { Cv, CvLanguage, Section, TemplateSettings } from '@/cv/schema'
+import { Badge } from '@/components/ui/Badge'
+import { Button } from '@/components/ui/Button'
+import { DragHandle } from '@/components/ui/DragHandle'
+import { Group } from '@/components/ui/Group'
 import { Segmented } from '@/components/ui/Segmented'
-import { Switch } from '@/components/ui/Switch'
-import { moveSection, setColorSet, setTemplateSetting, switchTemplate, toggleSideSection } from '@/editor/actions'
+import { SelectMenu, type SelectMenuGroup } from '@/components/ui/SelectMenu'
+import { Swatches } from '@/components/ui/Swatches'
+import { moveSection, setColorSet, setTemplateSetting, toggleSideSection } from '@/editor/actions'
+import { useEditorUi } from '@/editor/ui'
 import { cn } from '@/lib/cn'
 import { m } from '@/paraglide/messages'
 import { CvFrame } from '@/render/CvFrame'
 import { BODY_FONT_ORDER, FONTS } from '@/render/fonts'
-import {
-  activeColorSet,
-  getTemplate,
-  resolvedBaseColor,
-  settingsForTemplate,
-  supportedColumns,
-  TEMPLATE_LIST,
-  TEMPLATES,
-  type TemplateDef,
-  type TemplateId,
-} from '@/render/templates'
-import { visibleSections } from '@/render/visibleSections'
+
+type FontId = keyof typeof FONTS
+import { activeColorSet, getTemplate, resolvedBaseColor, supportedColumns, type TemplateDef } from '@/render/templates'
 import { colorSetName, TEMPLATE_TEXT } from '@/features/templates/templateText'
 import { dndScreenReaderInstructions, useDndAnnouncements } from '../content/dndA11y'
-import { useSortDnd } from '../content/keyboardSort'
-import { DragHandle } from '../content/sortable'
-import { useSortableStyle, verticalOnly } from '../content/sortableStyle'
+import { useSortDnd, useStableIds } from '../content/keyboardSort'
+import { PhotoRow } from '../content/photo'
+import { useSortableStyle, VERTICAL_ONLY } from '../content/sortableStyle'
 
-function Group({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
+/** Ayar satırı: etiket solda, kontrol sağda (44px); altında isteğe bağlı açıklama (sarar). */
+function SettingRow({
+  label,
+  htmlFor,
+  children,
+  note,
+  labelId,
+}: {
+  label: ReactNode
+  htmlFor?: string
+  labelId?: string
+  children: ReactNode
+  note?: ReactNode
+}) {
   return (
-    <section className="flex flex-col gap-2.5 border-b border-line py-5 first:pt-1 last:border-b-0">
-      <div>
-        <h3 className="text-[13px] font-semibold">{title}</h3>
-        {hint && <p className="mt-0.5 text-xs text-muted">{hint}</p>}
-      </div>
-      {children}
-    </section>
-  )
-}
-
-function TemplateChoice({ cv, id }: { cv: Cv; id: TemplateId }) {
-  // Bilinmeyen kimlik çizimde varsayılan şablona düşer; seçili görünen de o olsun.
-  const active = getTemplate(cv.templateId).id === id
-  const preview = useMemo<Cv>(() => {
-    if (active) return cv
-    // switchTemplate ile aynı kural (settingsForTemplate): küçük resim, seçince olacak olanı gösterir.
-    return { ...cv, templateId: id, template: settingsForTemplate(getTemplate(cv.templateId), TEMPLATES[id], cv.template, cv.sections) }
-  }, [cv, id, active])
-  const template = TEMPLATES[id]
-  return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={active}
-      onClick={() => switchTemplate(id)}
-      className="group flex min-w-0 flex-col gap-1.5 text-left"
-    >
-      <div
-        className={cn(
-          'relative aspect-[210/297] overflow-hidden rounded-lg border bg-canvas transition-[border-color,box-shadow,transform] duration-200',
-          active ? 'border-accent shadow-[0_0_0_2px_var(--accent)]' : 'border-line group-hover:-translate-y-0.5 group-hover:border-line-strong',
-        )}
-      >
-        <CvFrame cv={preview} scale="fit" fitPadding={0} firstPageOnly title={TEMPLATE_TEXT[template.id].name()} />
-        {active && (
-          <span className="absolute top-2 right-2 flex size-5 items-center justify-center rounded-full bg-accent text-accent-fg shadow-sm animate-[pop-in_200ms_var(--ease-spring)]">
-            <Check className="size-3" strokeWidth={3} />
+    <div className="px-[var(--row-px)] py-2">
+      <div className="flex min-h-7 flex-wrap items-start justify-between gap-x-3 gap-y-2">
+        {htmlFor ? (
+          <label id={labelId} htmlFor={htmlFor} className="flex min-h-7 items-center text-body text-fg">
+            {label}
+          </label>
+        ) : (
+          <span id={labelId} className="flex min-h-7 items-center text-body text-fg">
+            {label}
           </span>
         )}
+        <div className="ml-auto flex min-h-7 min-w-0 items-center justify-end gap-2">{children}</div>
       </div>
-      <div>
-        <p className="text-[13px] font-semibold">{TEMPLATE_TEXT[template.id].name()}</p>
-        <p className="text-xs text-muted">{TEMPLATE_TEXT[id].layout()}</p>
-      </div>
-    </button>
+      {note && <div className="mt-1.5 flex flex-col gap-1 text-callout text-fg-2">{note}</div>}
+    </div>
   )
 }
 
-/** Renk yuvarlağı: takımın zemini ve vurgusu (zeminsiz takımda yalnız vurgu). */
-function swatchBackground(accent: string, base?: string) {
-  return base ? `linear-gradient(135deg, ${base} 0 50%, ${accent} 50% 100%)` : accent
-}
+let colorSessions = 0
 
-function ColorChoices({ cv, template }: { cv: Cv; template: TemplateDef }) {
-  const t = cv.template
-  const active = activeColorSet(template, t)
-  const usesBase = template.colorSets.some((set) => set.base)
-  const base = resolvedBaseColor(template, t)
+/**
+ * Renk seçicisi açıkken her sürükleme adımı bir `input` olayıdır. Seçicinin bir açılışı (ilk
+ * değişiklikten `change`/odak kaybına kadar) tek oturumdur: arada ne kadar duraklanırsa duraklansın
+ * tek geri alma adımı olur.
+ */
+function ColorInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string, session: string) => void }) {
+  const session = useRef<string | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    const input = inputRef.current
+    if (!input) return
+    // Yerel `change` seçici kapanınca gelir (React'in onChange'i her `input`ta çalışır).
+    const end = () => {
+      session.current = null
+    }
+    input.addEventListener('change', end)
+    return () => input.removeEventListener('change', end)
+  }, [])
   return (
-    <>
-      <div className="flex flex-wrap items-center gap-2" role="radiogroup" aria-label={m.ap_color_sets()}>
-        {template.colorSets.map((set) => {
-          const selected = active?.id === set.id
-          const name = colorSetName(set.id)
-          return (
-            <button
-              key={set.id}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              aria-label={name}
-              title={name}
-              onClick={() => setColorSet(set)}
-              className={cn(
-                'flex size-8 items-center justify-center rounded-full ring-offset-2 ring-offset-surface transition-[transform,box-shadow] duration-150 hover:scale-105',
-                selected ? 'ring-2 ring-text' : 'ring-1 ring-black/10 ring-inset dark:ring-white/25',
-              )}
-              style={{ background: swatchBackground(set.accent, set.base) }}
-            >
-              {selected && (
-                <span className="flex size-4 items-center justify-center rounded-full bg-black/45">
-                  <Check className="size-3 text-white" strokeWidth={3} />
-                </span>
-              )}
-            </button>
-          )
-        })}
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <ColorInput label={m.ap_custom_color()} value={t.accentColor} onChange={(v) => setTemplateSetting('accentColor', v)} />
-        {usesBase && <ColorInput label={m.ap_custom_base()} value={base} onChange={(v) => setTemplateSetting('baseColor', v)} />}
-      </div>
-      {template.inkHeavy && (
-        <p className="flex items-start gap-1.5 text-xs text-muted">
-          <Printer className="mt-px size-3.5 shrink-0" />
-          {m.ap_ink_note()}
-        </p>
-      )}
-    </>
-  )
-}
-
-function ColorInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return (
-    <label className="relative flex h-8 cursor-pointer items-center gap-2 rounded-full border border-line pr-3 pl-1 text-xs text-muted hover:border-line-strong">
-      <span className="size-6 rounded-full border border-line" style={{ background: value }} />
+    <label className="press relative inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-full bg-fill-3 pr-2.5 pl-1 text-callout font-medium text-fg hover:bg-fill-2 has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-1 has-[:focus-visible]:outline-focus-ring">
+      <span aria-hidden className="size-5 rounded-full shadow-[inset_0_0_0_1px_rgb(0_0_0/0.12)]" style={{ background: value }} />
       {label}
       <input
+        ref={inputRef}
         type="color"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          session.current ??= `color-${++colorSessions}`
+          onChange(e.target.value, session.current)
+        }}
+        onBlur={() => {
+          session.current = null
+        }}
         className="absolute inset-0 cursor-pointer opacity-0"
         aria-label={label}
       />
@@ -149,7 +101,112 @@ function ColorInput({ label, value, onChange }: { label: string; value: string; 
   )
 }
 
-function SectionOrderRow({ section, language }: { section: Section; language: CvLanguage }) {
+function ColorRow({ cv, template }: { cv: Cv; template: TemplateDef }) {
+  const t = cv.template
+  const active = activeColorSet(template, t)
+  const usesBase = template.colorSets.some((set) => set.base)
+  const base = resolvedBaseColor(template, t)
+  const options = template.colorSets.map((set) => ({
+    value: set.id,
+    color: set.base ?? set.accent,
+    second: set.base ? set.accent : undefined,
+    label: colorSetName(set.id),
+  }))
+  return (
+    <SettingRow
+      label={m.ap_accent()}
+      note={
+        <>
+          <span>{m.ap_colors_hint()}</span>
+          {template.inkHeavy && (
+            <span className="flex items-start gap-1.5">
+              <Printer aria-hidden className="mt-px size-3.5 shrink-0" />
+              {m.ap_ink_note()}
+            </span>
+          )}
+        </>
+      }
+    >
+      <div className="flex flex-col items-end gap-2">
+        <div className="flex items-center gap-2.5">
+          <span className="text-callout text-fg-2" aria-live="polite">
+            {active ? colorSetName(active.id) : m.ap_custom_color()}
+          </span>
+          <Swatches
+            value={active?.id ?? ''}
+            onChange={(id) => {
+              const set = template.colorSets.find((s) => s.id === id)
+              if (set) setColorSet(set)
+            }}
+            options={options}
+            aria-label={m.ap_color_sets()}
+          />
+        </div>
+        <div className="flex flex-wrap justify-end gap-2">
+          <ColorInput label={m.ap_custom_color()} value={t.accentColor} onChange={(v, session) => setTemplateSetting('accentColor', v, session)} />
+          {usesBase && <ColorInput label={m.ap_custom_base()} value={base} onChange={(v, session) => setTemplateSetting('baseColor', v, session)} />}
+        </div>
+      </div>
+    </SettingRow>
+  )
+}
+
+const FONT_SAMPLE = 'Ağ Şı İç Ğü'
+
+function fontGroups(): SelectMenuGroup[] {
+  const option = (id: FontId) => ({
+    value: id,
+    short: FONTS[id].label,
+    style: { fontFamily: FONTS[id].stack },
+    label: (
+      <span className="flex items-baseline gap-2">
+        <span className="text-body-user">{FONTS[id].label}</span>
+        <span className="text-fg-2">{FONT_SAMPLE}</span>
+      </span>
+    ),
+  })
+  return [
+    { label: m.ap_sans(), options: BODY_FONT_ORDER.filter((id) => FONTS[id].kind !== 'serif').map(option) },
+    { label: m.ap_serif(), options: BODY_FONT_ORDER.filter((id) => FONTS[id].kind === 'serif').map(option) },
+  ]
+}
+
+/** Şablon satırı: geçerli şablonun küçük resmi + adı + düzeni; "Değiştir…" tuvalin solundaki şablon rayını açar. */
+const TemplateRow = memo(function TemplateRow({ cv }: { cv: Cv }) {
+  const template = getTemplate(cv.templateId)
+  const text = TEMPLATE_TEXT[template.id]
+  const rail = useEditorUi((s) => s.rail)
+  const setRail = useEditorUi((s) => s.setRail)
+  return (
+    <div className="flex min-h-18 items-center gap-3 px-[var(--row-px)] py-2">
+      <div aria-hidden className="h-14 w-10 shrink-0 overflow-hidden rounded-xs bg-paper shadow-thumb">
+        <CvFrame cv={cv} scale="fit" fitPadding={0} firstPageOnly title={text.name()} />
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="text-headline break-words text-fg">{text.name()}</span>
+        <span className="text-callout break-words text-fg-2">{text.features()}</span>
+      </div>
+      <Button
+        aria-expanded={rail === 'templates'}
+        onClick={() => setRail(rail === 'templates' ? null : 'templates')}
+      >
+        {m.ap_template_change()}
+      </Button>
+    </div>
+  )
+})
+
+function SectionRow({
+  section,
+  language,
+  twoColumns,
+  side,
+}: {
+  section: Section
+  language: CvLanguage
+  twoColumns: boolean
+  side: boolean
+}) {
   const { attributes, listeners, setNodeRef, style, isDragging } = useSortableStyle(section.id)
   const title = sectionTitle(language, section.type, section.title)
   return (
@@ -157,29 +214,43 @@ function SectionOrderRow({ section, language }: { section: Section; language: Cv
       ref={setNodeRef}
       style={style}
       className={cn(
-        'flex items-center gap-1.5 bg-surface py-1.5 pr-3 pl-1.5 transition-[box-shadow,border-radius] duration-200',
-        isDragging && 'rounded-lg shadow-lg ring-1 ring-accent-line',
+        'flex min-h-10 items-center gap-1 bg-content py-1 pr-[var(--row-px)] pl-1 transition-[box-shadow,border-radius,scale] duration-200',
+        isDragging && 'z-20 scale-[1.02] rounded-lg bg-elevated shadow-3',
       )}
     >
-      <DragHandle label={m.ap_order_drag({ name: title })} {...attributes} {...listeners} />
-      <span className={cn('min-w-0 flex-1 truncate text-[13px]', section.hidden && 'text-muted')}>{title}</span>
-      {section.hidden && (
-        <span className="rounded-full bg-surface-2 px-1.5 py-px text-[11px] font-medium text-muted">{m.common_hidden()}</span>
+      <DragHandle label={m.ap_order_drag({ name: title })} {...attributes} {...listeners} className="h-8 self-center" />
+      <span className={cn('min-w-0 flex-1 px-1 text-body break-words', section.hidden ? 'text-fg-3' : 'text-fg')}>{title}</span>
+      {section.hidden && <Badge>{m.common_hidden()}</Badge>}
+      {twoColumns && (
+        <Segmented
+          size="sm"
+          value={side ? 'side' : 'main'}
+          onChange={(v) => (v === 'side') !== side && toggleSideSection(section.id)}
+          aria-label={m.ap_column_for({ name: title })}
+          options={[
+            { value: 'side', label: m.ap_side_column() },
+            { value: 'main', label: m.ap_main_column() },
+          ]}
+        />
       )}
     </li>
   )
 }
 
 /**
- * Bölüm sırası: İçerik sekmesindeki sürükle-bırak ile aynı eylem (moveSection), her
- * bırakış tek geri alma adımı. Klavye: tutamakta Boşluk, oklar, Boşluk (Escape vazgeçer).
+ * Bölümler: tek liste — sıra (sürükle ya da tutamakta Boşluk + oklar; İçerik'teki sürükleme ile aynı
+ * eylem, her bırakış tek geri alma adımı) ve iki sütunlu düzende her bölümün sütunu (Yan/Ana).
  */
-function SectionOrder({ sections, language }: { sections: Section[]; language: CvLanguage }) {
+function SectionsList({ cv, twoColumns }: { cv: Cv; twoColumns: boolean }) {
+  const sections = cv.sections
   const dnd = useSortDnd()
-  const announcements = useDndAnnouncements((id: UniqueIdentifier) => {
+  const ids = useStableIds(sections.map((s) => s.id))
+  const nameOf = (id: UniqueIdentifier) => {
     const s = sections.find((x) => x.id === id)
-    return s ? sectionTitle(language, s.type, s.title) : ''
-  })
+    return s ? sectionTitle(cv.language, s.type, s.title) : ''
+  }
+  const announcements = useDndAnnouncements(nameOf)
+  const accessibility = useMemo(() => ({ announcements, screenReaderInstructions: dndScreenReaderInstructions }), [announcements])
   const onDragEnd = ({ active, over }: DragEndEvent) => {
     dnd.reset()
     if (!over || active.id === over.id) return
@@ -191,16 +262,22 @@ function SectionOrder({ sections, language }: { sections: Section[]; language: C
     <DndContext
       sensors={dnd.sensors}
       collisionDetection={dnd.collisionDetection}
-      modifiers={[verticalOnly]}
-      accessibility={{ announcements, screenReaderInstructions: dndScreenReaderInstructions }}
+      modifiers={VERTICAL_ONLY}
+      accessibility={accessibility}
       onDragStart={dnd.reset}
       onDragCancel={dnd.reset}
       onDragEnd={onDragEnd}
     >
-      <SortableContext items={sections.map((s) => s.id)} strategy={verticalListSortingStrategy}>
-        <ul aria-label={m.ap_order()} className="flex flex-col divide-y divide-line rounded-lg border border-line" data-section-order>
+      <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+        <ul aria-label={m.ap_order()} className="group-rows" data-section-order>
           {sections.map((section) => (
-            <SectionOrderRow key={section.id} section={section} language={language} />
+            <SectionRow
+              key={section.id}
+              section={section}
+              language={cv.language}
+              twoColumns={twoColumns}
+              side={cv.template.sideSections.includes(section.id)}
+            />
           ))}
         </ul>
       </SortableContext>
@@ -208,65 +285,36 @@ function SectionOrder({ sections, language }: { sections: Section[]; language: C
   )
 }
 
+/**
+ * Görünüm sekmesi (Pages'in Biçim paneli): tek ekranlık ayar satırları, etiket solda kontrol sağda.
+ * Şablon ızgarası tuvalin solundaki raya taşındı; burada geçerli şablon + "Değiştir…".
+ */
 export function AppearanceTab({ cv }: { cv: Cv }) {
   const t = cv.template
   const set = <K extends keyof TemplateSettings>(key: K) => (value: TemplateSettings[K]) => setTemplateSetting(key, value)
-  const sections = visibleSections(cv)
   const template = getTemplate(cv.templateId)
-  // 10 küçük resim her değişiklikte yeniden çizilir; yazarken öncelik panelde kalsın.
+  // Küçük resim her değişiklikte yeniden çizilir; yazarken öncelik panelde kalsın.
   const thumbnailCv = useDeferredValue(cv)
   // Çizimle aynı kural: desteklenmeyen sütun sayısı (eski/bozuk kayıt) desteklenene düşer.
   const columns = supportedColumns(template, t.columns)
   const twoColumns = columns === 2
   const columnChoice = template.columns.length > 1
+  const fontId = useId()
+  const groups = useMemo(() => fontGroups(), [])
 
   return (
-    <div className="flex flex-col">
-      <Group title={m.ap_template()} hint={m.ap_template_hint()}>
-        <div role="radiogroup" aria-label={m.ap_template()} className="grid grid-cols-3 gap-x-3 gap-y-4">
-          {TEMPLATE_LIST.map((tpl) => (
-            <TemplateChoice key={tpl.id} cv={thumbnailCv} id={tpl.id} />
-          ))}
-        </div>
+    <div className="flex flex-col gap-6">
+      <Group title={m.ap_template()} footer={m.ap_template_hint()}>
+        <TemplateRow cv={thumbnailCv} />
       </Group>
 
-      <Group title={m.ap_accent()} hint={m.ap_colors_hint()}>
-        <ColorChoices cv={cv} template={template} />
-      </Group>
-
-      <Group title={m.ap_font()} hint={m.ap_font_hint()}>
-        <div className="grid grid-cols-1 gap-1.5" role="radiogroup" aria-label={m.ap_font()}>
-          {BODY_FONT_ORDER.map((id) => {
-            const font = FONTS[id]
-            const active = t.font === id
-            return (
-              <button
-                key={id}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                onClick={() => set('font')(id)}
-                className={cn(
-                  'flex items-center justify-between rounded-lg border px-3 py-2 text-left transition-colors',
-                  active ? 'border-accent bg-accent-soft' : 'border-line hover:border-line-strong',
-                )}
-              >
-                <span style={{ fontFamily: font.stack }} className="text-[15px]">
-                  {font.label}
-                  <span className="ml-2 text-muted">Ağ Şı İç Ğü</span>
-                </span>
-                <span className="text-xs text-muted">{font.kind === 'serif' ? m.ap_serif() : m.ap_sans()}</span>
-              </button>
-            )
-          })}
-        </div>
-      </Group>
-
-      <Group title={m.ap_size_spacing()}>
-        <div className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2.5">
-          <span className="text-[13px] text-muted">{m.ap_font_size()}</span>
+      <Group title={m.ap_format()}>
+        <ColorRow cv={cv} template={template} />
+        <SettingRow label={m.ap_font()} htmlFor={fontId} note={m.ap_font_hint()}>
+          <SelectMenu id={fontId} value={t.font} onValueChange={(v) => set('font')(v as FontId)} groups={groups} aria-label={m.ap_font()} className="min-w-40" />
+        </SettingRow>
+        <SettingRow label={m.ap_font_size()}>
           <Segmented
-            stretch
             value={t.fontSize}
             onChange={set('fontSize')}
             aria-label={m.ap_font_size()}
@@ -276,9 +324,9 @@ export function AppearanceTab({ cv }: { cv: Cv }) {
               { value: 'lg', label: m.ap_large() },
             ]}
           />
-          <span className="text-[13px] text-muted">{m.ap_spacing()}</span>
+        </SettingRow>
+        <SettingRow label={m.ap_spacing()}>
           <Segmented
-            stretch
             value={t.spacing}
             onChange={set('spacing')}
             aria-label={m.ap_spacing()}
@@ -288,9 +336,9 @@ export function AppearanceTab({ cv }: { cv: Cv }) {
               { value: 'relaxed', label: m.ap_relaxed() },
             ]}
           />
-          <span className="text-[13px] text-muted">{m.ap_header_align()}</span>
+        </SettingRow>
+        <SettingRow label={m.ap_header_align()}>
           <Segmented
-            stretch
             value={t.headerAlign}
             onChange={set('headerAlign')}
             aria-label={m.ap_header_align()}
@@ -299,15 +347,11 @@ export function AppearanceTab({ cv }: { cv: Cv }) {
               { value: 'center', label: m.ap_center() },
             ]}
           />
-        </div>
-      </Group>
-
-      {/* Tek düzenli şablonda sütun seçeneği yok; yalnız iki sütunlu şablonda yan sütun listesi kalır. */}
-      {(columnChoice || twoColumns) && (
-        <Group title={m.ap_columns()} hint={columnChoice ? (twoColumns ? m.ap_columns_hint() : undefined) : m.ap_columns_only_two()}>
-          {columnChoice && (
+        </SettingRow>
+        {/* Tek düzenli şablonda sütun seçeneği yok (yalnız iki sütunluysa Bölümler'de Yan/Ana kalır). */}
+        {columnChoice && (
+          <SettingRow label={m.ap_columns()}>
             <Segmented
-              stretch
               value={String(columns) as '1' | '2'}
               onChange={(v) => set('columns')(v === '2' ? 2 : 1)}
               aria-label={m.ap_columns()}
@@ -316,45 +360,24 @@ export function AppearanceTab({ cv }: { cv: Cv }) {
                 { value: '2', label: m.layout_two_columns() },
               ]}
             />
-          )}
-          {twoColumns && (
-            <ul className="mt-1 flex flex-col divide-y divide-line rounded-lg border border-line">
-              {sections.map((section) => {
-                const side = t.sideSections.includes(section.id)
-                return (
-                  <li key={section.id} className="flex items-center justify-between gap-3 px-3 py-2">
-                    <span className="text-[13px]">{sectionTitle(cv.language, section.type, section.title)}</span>
-                    <Segmented
-                      size="sm"
-                      value={side ? 'side' : 'main'}
-                      onChange={(v) => (v === 'side') !== side && toggleSideSection(section.id)}
-                      aria-label={m.ap_column_for({ name: sectionTitle(cv.language, section.type, section.title) })}
-                      options={[
-                        { value: 'side', label: m.ap_side_column() },
-                        { value: 'main', label: m.ap_main_column() },
-                      ]}
-                    />
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </Group>
-      )}
-
-      <Group title={m.ap_photo()} hint={cv.personal.photo ? undefined : m.ap_photo_none()}>
-        <label className="flex items-center justify-between gap-3">
-          <span className="text-[13px]">{m.ap_photo_show()}</span>
-          <Switch
-            checked={t.showPhoto}
-            onCheckedChange={set('showPhoto')}
-            aria-label={m.ap_photo_show()}
-          />
-        </label>
+          </SettingRow>
+        )}
       </Group>
 
-      <Group title={m.ap_order()} hint={m.ap_order_hint()}>
-        <SectionOrder sections={cv.sections} language={cv.language} />
+      <Group title={m.ap_photo()}>
+        <PhotoRow />
+      </Group>
+
+      <Group
+        title={m.ap_sections()}
+        footer={
+          <span className="flex flex-col gap-1">
+            <span>{m.ap_order_hint()}</span>
+            {twoColumns && <span>{columnChoice ? m.ap_columns_hint() : m.ap_columns_only_two()}</span>}
+          </span>
+        }
+      >
+        <SectionsList cv={cv} twoColumns={twoColumns} />
       </Group>
     </div>
   )

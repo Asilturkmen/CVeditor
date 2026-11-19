@@ -60,6 +60,8 @@ test('Türkçe CV İngilizceye çevrilir: önce gösterilir, düzeltilir, yeni C
   await expect(dialog.getByLabel('Derece çevirisi')).toHaveValue("Bachelor's degree")
   // Şirket adı çevrilecekler listesinde yok
   await expect(dialog.getByLabel('Şirket çevirisi')).toHaveCount(0)
+  // Kişinin şehriyle aynı konum maskeli gittiği için çevrilmedi: işaretli, uyarısız geçmez
+  await expect(dialog.getByTestId('translate-location-kept').first()).toHaveText('Konum çevrilmedi, kontrol et')
 
   // Bir alanı satır içinde düzelt, birini olduğu gibi bırak
   await dialog.getByLabel('Rol çevirisi').first().fill('Creator')

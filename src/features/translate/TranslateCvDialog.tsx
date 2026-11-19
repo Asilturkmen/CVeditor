@@ -1,5 +1,4 @@
 import { useNavigate } from '@tanstack/react-router'
-import { Loader2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getAiProvider } from '@/ai/provider'
 import {
@@ -17,7 +16,10 @@ import type { Cv } from '@/cv/schema'
 import { saveCv } from '@/db/repo'
 import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
+import { controlOnContentClass } from '@/components/ui/controlClass'
 import { Field, Input } from '@/components/ui/Field'
+import { InlineNotice } from '@/components/ui/Notice'
+import { Spinner } from '@/components/ui/Spinner'
 import { toast } from '@/components/ui/toast'
 import { useEditor } from '@/editor/store'
 import { m } from '@/paraglide/messages'
@@ -28,6 +30,9 @@ import { changedCount, initialReview, reviewValues, type ReviewState } from './r
 import { DemoTranslateNote, TranslationReview } from './TranslationReview'
 
 type Step = 'setup' | 'running' | 'review' | 'error'
+
+/** Kontrol adımının penceresi: masaüstünde kenarlardan 24px, en çok 1200px genişlik; telefonda alt sayfa. */
+const REVIEW_SHEET = 'bg-window sm:inset-x-6 sm:inset-y-6 sm:mx-auto sm:w-auto sm:max-w-[1200px] sm:max-h-none sm:translate-x-0 sm:translate-y-0'
 
 /**
  * "Diğer dile çevir": CV'nin öbür dilde kopyasını oluşturur. Kaynak CV
@@ -129,24 +134,24 @@ export function TranslateCvDialog({ cv, open, onClose }: { cv: Cv; open: boolean
 
   const footer =
     step === 'running' ? (
-      <Button variant="ghost" onClick={stop}>
+      <Button size="lg" onClick={stop}>
         {m.tr8_translate_stop()}
       </Button>
     ) : reviewing ? (
       <>
-        <Button variant="ghost" onClick={() => setStep('setup')}>
+        <Button size="lg" onClick={() => setStep('setup')}>
           {m.common_back()}
         </Button>
-        <Button variant="primary" disabled={saving} onClick={() => void save()}>
+        <Button size="lg" variant="primary" loading={saving} onClick={() => void save()}>
           {m.tr8_translate_save()}
         </Button>
       </>
     ) : (
       <>
-        <Button variant="ghost" onClick={onClose}>
+        <Button size="lg" onClick={onClose}>
           {m.common_cancel()}
         </Button>
-        <Button variant="primary" disabled={!name.trim()} onClick={() => void start()}>
+        <Button size="lg" variant="primary" disabled={!name.trim()} onClick={() => void start()}>
           {step === 'error' ? m.tr8_translate_retry() : m.tr8_translate_start()}
         </Button>
       </>
@@ -164,7 +169,8 @@ export function TranslateCvDialog({ cv, open, onClose }: { cv: Cv; open: boolean
             ? m.tr8_translate_intro_en()
             : m.tr8_translate_intro_tr()
       }
-      className={reviewing ? 'w-[min(94vw,720px)]' : undefined}
+      // Kontrol adımı neredeyse tam ekran: pencere zemini + beyaz gruplar, en çok 1200px, ortada.
+      className={reviewing ? REVIEW_SHEET : undefined}
       footer={footer}
     >
       <div key={reviewing ? 'review' : 'setup'} className="flex flex-col gap-4 animate-rise-in">
@@ -172,7 +178,7 @@ export function TranslateCvDialog({ cv, open, onClose }: { cv: Cv; open: boolean
 
         {reviewing ? (
           entries.length === 0 ? (
-            <p className="text-sm text-muted">{m.tr8_translate_empty()}</p>
+            <p className="text-body text-fg">{m.tr8_translate_empty()}</p>
           ) : (
             <TranslationReview
               entries={entries}
@@ -189,6 +195,7 @@ export function TranslateCvDialog({ cv, open, onClose }: { cv: Cv; open: boolean
               {(id) => (
                 <Input
                   id={id}
+                  className={controlOnContentClass}
                   value={name}
                   disabled={step === 'running'}
                   onChange={(e) => setName(e.target.value)}
@@ -198,17 +205,17 @@ export function TranslateCvDialog({ cv, open, onClose }: { cv: Cv; open: boolean
                 />
               )}
             </Field>
-            <p className="text-[13px] text-muted">{m.tr8_translate_rules()}</p>
+            <p className="text-callout text-fg-2">{m.tr8_translate_rules()}</p>
             {step === 'running' && (
-              <p role="status" className="flex items-center gap-2 text-sm text-muted animate-fade-in">
-                <Loader2 className="size-4 animate-spin text-accent" />
+              <p role="status" className="flex animate-fade-in items-center gap-2 text-body text-fg">
+                <Spinner />
                 {m.tr8_translate_running()}
               </p>
             )}
             {step === 'error' && (
-              <p role="alert" className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">
-                {errorText || m.tr8_translate_error()}
-              </p>
+              <div role="alert">
+                <InlineNotice tone="danger">{errorText || m.tr8_translate_error()}</InlineNotice>
+              </div>
             )}
           </>
         )}

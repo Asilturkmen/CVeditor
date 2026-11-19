@@ -1,18 +1,23 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Check, Download, HardDrive, Info, Upload } from 'lucide-react'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { parseBackup, type ParsedBackup } from '@/cv/migrate'
+import { CircleCheck, TriangleAlert } from 'lucide-react'
+import { Fragment, useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { CvReadError, parseBackup, type ParsedBackup } from '@/cv/migrate'
 import type { Cv } from '@/cv/schema'
 import { db } from '@/db/db'
 import { clearAll, getMeta, importCvs, META_LAST_BACKUP } from '@/db/repo'
+import { Badge, Kbd } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
+import { Checkbox } from '@/components/ui/Checkbox'
 import { Dialog } from '@/components/ui/Dialog'
+import { Group, GroupRow } from '@/components/ui/Group'
+import { InlineNotice } from '@/components/ui/Notice'
 import { Segmented } from '@/components/ui/Segmented'
+import { Swatches } from '@/components/ui/Swatches'
 import { Switch } from '@/components/ui/Switch'
 import { toast } from '@/components/ui/toast'
 import { exportAllJson } from '@/features/cv-actions'
-import { cn } from '@/lib/cn'
 import { isChromium, isPersisted, isSafari, requestPersistence } from '@/lib/persistence'
+import { formatShortcut } from '@/lib/platform'
 import { ACCENTS, usePrefs, type AccentId } from '@/lib/prefs'
 import { formatDateTime } from '@/lib/time'
 import { useChanged } from '@/lib/useChanged'
@@ -33,44 +38,74 @@ const LOCALE_OPTIONS: { value: Locale; label: ReactNode }[] = [
   { value: 'en', label: <span lang="en">English</span> },
 ]
 
-function Card({ title, description, children, tone }: { title: string; description?: ReactNode; children: ReactNode; tone?: 'danger' }) {
+const SHORTCUTS: { keys: string[]; label: () => string }[] = [
+  { keys: ['Ctrl+Z'], label: () => m.common_undo() },
+  { keys: ['Ctrl+Shift+Z'], label: () => m.common_redo() },
+  { keys: ['Ctrl+P'], label: () => m.pdf_button() },
+  { keys: ['Ctrl+S'], label: () => m.shortcut_save() },
+  { keys: ['/'], label: () => m.shortcut_search() },
+  { keys: ['Ctrl+B', 'Ctrl+I'], label: () => m.shortcut_format() },
+  { keys: ['Ctrl+\\'], label: () => m.shortcut_rail() },
+  { keys: ['Ctrl+0'], label: () => m.shortcut_fit() },
+]
+
+/** Ayar grupları arası 32px; başlık title-2, satırlar 16px iç boşluklu (macOS Sistem Ayarları). */
+function SettingsGroup({ title, footer, children }: { title: string; footer?: ReactNode; children: ReactNode }) {
   return (
-    <section
-      className={cn(
-        'grid grid-cols-1 gap-x-10 gap-y-4 border-b border-line py-8 first:pt-0 last:border-b-0 md:grid-cols-[260px_1fr]',
-      )}
-    >
-      <div>
-        <h2 className={cn('text-[15px] font-semibold tracking-tight', tone === 'danger' && 'text-danger')}>{title}</h2>
-        {description && <p className="mt-1 text-sm text-muted">{description}</p>}
-      </div>
-      <div className="flex min-w-0 flex-col gap-4">{children}</div>
-    </section>
+    <Group title={title} size="settings" inset="lg" footer={footer}>
+      {children}
+    </Group>
   )
 }
 
-function Row({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
+/**
+ * Kontrolü geniş satır (vurgu rengi): dar ekranda kontrol başlığın altına iner; başlık
+ * sıkışıp harf harf sarmaz.
+ */
+function WrapRow({ title, description, children }: { title: ReactNode; description?: ReactNode; children: ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-6 rounded-xl border border-line bg-surface px-4 py-3">
-      <div className="min-w-0">
-        <p className="text-sm font-medium">{label}</p>
-        {hint && <p className="mt-0.5 text-[13px] text-muted">{hint}</p>}
+    <div className="flex min-h-11 flex-wrap items-center justify-between gap-x-3 gap-y-2 px-[var(--row-px)] py-2.5">
+      <div className="flex min-w-48 flex-1 flex-col gap-0.5">
+        <span className="text-body text-fg">{title}</span>
+        {description && <span className="text-callout text-fg-2">{description}</span>}
       </div>
-      <div className="shrink-0">{children}</div>
+      <div className="flex items-center gap-3">{children}</div>
     </div>
   )
 }
 
+/** Beyaz dialog yüzeyinde liste: gri dolgulu tek blok, satırlar arası ayırıcı (kutu içinde kutu değil). */
+const dialogListStyle = { '--row-px': '12px' } as CSSProperties
+
 function RestoreDialog({ parsed, onClose }: { parsed: ParsedBackup | null; onClose: () => void }) {
   const existing = useLiveQuery(() => db.cvs.toCollection().primaryKeys(), [], [] as string[])
   const [mode, setMode] = useState<'keepBoth' | 'replace'>('keepBoth')
+  const [busy, setBusy] = useState(false)
+  // Çift tıklama aynı yedeği iki kez eklemesin: durum güncellenmeden gelen ikinci tıklamayı da keser.
+  const running = useRef(false)
+  // Her açılışta baştan başlanır: önceki dosyada seçilen "Yedektekiyle değiştir" yeni dosyaya taşınmaz.
+  if (useChanged(parsed, null) && parsed) {
+    setMode('keepBoth')
+    setBusy(false)
+  }
   const conflicts = parsed ? parsed.cvs.filter((cv) => existing.includes(cv.id)).length : 0
 
   const run = async () => {
-    if (!parsed) return
-    const { added, replaced } = await importCvs(parsed.cvs, mode)
-    toast({ message: m.restore_done({ added, replaced }) })
-    onClose()
+    if (!parsed || running.current) return
+    running.current = true
+    setBusy(true)
+    try {
+      const { added, replaced } = await importCvs(parsed.cvs, mode)
+      toast({ message: m.restore_done({ added, replaced }) })
+      onClose()
+    } catch (error) {
+      // İşlem bütünüyle geri alınır (tek veritabanı işlemi); pencere açık kalır, yeniden denenebilir.
+      console.error(error)
+      toast({ message: m.err_restore(), tone: 'error' })
+    } finally {
+      running.current = false
+      setBusy(false)
+    }
   }
 
   return (
@@ -81,10 +116,16 @@ function RestoreDialog({ parsed, onClose }: { parsed: ParsedBackup | null; onClo
       description={parsed ? m.restore_found({ count: parsed.cvs.length }) : undefined}
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>
+          <Button size="lg" onClick={onClose}>
             {m.common_cancel()}
           </Button>
-          <Button variant="primary" disabled={!parsed || parsed.cvs.length === 0} onClick={() => void run()}>
+          <Button
+            size="lg"
+            variant="primary"
+            loading={busy}
+            disabled={!parsed || parsed.cvs.length === 0}
+            onClick={() => void run()}
+          >
             {m.restore_submit()}
           </Button>
         </>
@@ -92,19 +133,21 @@ function RestoreDialog({ parsed, onClose }: { parsed: ParsedBackup | null; onClo
     >
       {parsed && (
         <div className="flex flex-col gap-4">
-          <ul className="flex flex-col divide-y divide-line rounded-xl border border-line">
-            {parsed.cvs.map((cv: Cv) => (
-              <li key={cv.id} className="flex items-center gap-2.5 px-3 py-2 text-sm">
-                <span className="rounded bg-surface-2 px-1.5 py-px text-[11px] font-semibold uppercase">{cv.language}</span>
-                <span className="flex-1 font-medium">{cv.name}</span>
-                {existing.includes(cv.id) && <span className="text-xs text-warn">{m.restore_exists()}</span>}
-              </li>
-            ))}
-          </ul>
+          {parsed.cvs.length > 0 && (
+            <ul className="group-rows overflow-hidden rounded-xl bg-fill-4" style={dialogListStyle}>
+              {parsed.cvs.map((cv: Cv) => (
+                <li key={cv.id} className="flex min-h-10 items-center gap-2 px-3 py-2 text-body">
+                  <Badge className="uppercase">{cv.language}</Badge>
+                  <span className="min-w-0 flex-1 break-words text-fg">{cv.name}</span>
+                  {existing.includes(cv.id) && <span className="text-callout text-fg-2">{m.restore_exists()}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
           {parsed.failures.length > 0 && (
-            <div className="rounded-xl bg-danger-soft px-3 py-2.5 text-[13px] text-danger">
-              <p className="font-medium">{m.restore_failures({ count: parsed.failures.length })}</p>
-              <ul className="mt-1 list-disc pl-5">
+            <div>
+              <InlineNotice tone="danger">{m.restore_failures({ count: parsed.failures.length })}</InlineNotice>
+              <ul className="mt-1 list-disc pl-11 text-callout text-fg-2">
                 {parsed.failures.map((f) => (
                   <li key={f.index}>
                     {f.name}: {f.reason}
@@ -115,10 +158,11 @@ function RestoreDialog({ parsed, onClose }: { parsed: ParsedBackup | null; onClo
           )}
           {conflicts > 0 && (
             <div className="flex flex-col gap-2">
-              <p className="text-sm">{m.restore_conflicts({ count: conflicts })}</p>
+              <p className="text-body text-fg">{m.restore_conflicts({ count: conflicts })}</p>
               <Segmented
                 value={mode}
                 onChange={setMode}
+                stretch
                 aria-label={m.restore_conflicts({ count: conflicts })}
                 options={[
                   { value: 'keepBoth', label: m.restore_keep_both() },
@@ -144,14 +188,22 @@ function ClearAllDialog({ open, onClose }: { open: boolean; onClose: () => void 
       description={m.clear_desc()}
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>
+          {/* Yıkıcı onayda Enter Vazgeç'e gider. */}
+          <Button size="lg" autoFocus onClick={onClose}>
             {m.common_cancel()}
           </Button>
           <Button
-            variant="danger"
+            size="lg"
+            variant="destructive"
             disabled={!agreed}
             onClick={() => {
-              void clearAll().then(() => toast({ message: m.clear_done() }))
+              void clearAll().then(
+                () => toast({ message: m.clear_done() }),
+                (error) => {
+                  console.error(error)
+                  toast({ message: m.err_clear(), tone: 'error' })
+                },
+              )
               onClose()
             }}
           >
@@ -160,16 +212,21 @@ function ClearAllDialog({ open, onClose }: { open: boolean; onClose: () => void 
         </>
       }
     >
-      <label className="flex cursor-pointer items-start gap-2.5 text-sm">
-        <input
-          type="checkbox"
-          checked={agreed}
-          onChange={(e) => setAgreed(e.target.checked)}
-          className="mt-0.5 size-4 accent-[var(--danger)]"
-        />
-        <span>{m.clear_check()}</span>
-      </label>
+      <Checkbox checked={agreed} onCheckedChange={setAgreed} label={m.clear_check()} />
     </Dialog>
+  )
+}
+
+function ShortcutKeys({ keys }: { keys: string[] }) {
+  return (
+    <span className="flex items-center gap-1.5">
+      {keys.map((key, i) => (
+        <Fragment key={key}>
+          {i > 0 && <span className="text-callout text-fg-3">/</span>}
+          <Kbd className="text-callout">{formatShortcut(key)}</Kbd>
+        </Fragment>
+      ))}
+    </span>
   )
 }
 
@@ -184,6 +241,7 @@ export function SettingsPage() {
   const [parsed, setParsed] = useState<ParsedBackup | null>(null)
   const [clearing, setClearing] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const darkId = useId()
   const chromium = isChromium()
   const safari = isSafari()
 
@@ -196,160 +254,138 @@ export function SettingsPage() {
     try {
       setParsed(parseBackup(await file.text()))
     } catch (error) {
-      toast({ message: error instanceof Error ? error.message : String(error), tone: 'error' })
+      // Bilinen nedenler arayüz dilinde gelir; beklenmeyen hata ham hâliyle gösterilmez.
+      if (!(error instanceof CvReadError)) console.error(error)
+      toast({ message: error instanceof CvReadError ? error.message : m.err_backup_read(), tone: 'error' })
     }
   }
 
   return (
-    <div className="animate-fade-in">
-      <h1 className="mb-8 text-2xl font-semibold tracking-tight">{m.settings_title()}</h1>
+    <div className="mx-auto flex max-w-[720px] animate-fade-in flex-col gap-8 pb-12">
+      <h1 className="text-title-lg text-fg">{m.settings_title()}</h1>
 
-      <Card title={m.settings_appearance()} description={m.settings_appearance_desc()}>
-        <Row label={m.settings_language()} hint={m.settings_language_hint()}>
-          {/* setLocale tercihi localStorage'a yazar ve sayfayı yeniden yükler. */}
-          <Segmented value={getLocale()} onChange={(locale) => void setLocale(locale)} aria-label={m.settings_language()} options={LOCALE_OPTIONS} />
-        </Row>
-        <Row label={m.settings_dark()} hint={m.settings_dark_hint()}>
-          <Switch checked={theme === 'dark'} onCheckedChange={(on) => setTheme(on ? 'dark' : 'light')} aria-label={m.settings_dark()} />
-        </Row>
-        <div className="rounded-xl border border-line bg-surface px-4 py-3">
-          <p className="text-sm font-medium">{m.settings_accent()}</p>
-          <p className="mt-0.5 text-[13px] text-muted">{m.settings_accent_hint()}</p>
-          <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label={m.settings_accent()}>
-            {ACCENTS.map((a) => (
-              <button
-                key={a.id}
-                type="button"
-                role="radio"
-                aria-checked={accent === a.id}
-                onClick={() => setAccent(a.id)}
-                className={cn(
-                  'flex h-9 items-center gap-2 rounded-full border pr-3.5 pl-1.5 text-sm transition-colors',
-                  accent === a.id ? 'border-text' : 'border-line hover:border-line-strong',
-                )}
-              >
-                <span
-                  className="flex size-6 items-center justify-center rounded-full ring-1 ring-black/10 ring-inset dark:ring-white/25"
-                  style={{ background: a.color }}
-                >
-                  {accent === a.id && <Check className="size-3.5 text-white" strokeWidth={3} />}
-                </span>
-                {ACCENT_NAMES[a.id]()}
-              </button>
-            ))}
-          </div>
-        </div>
-      </Card>
-
-      <Card title={m.settings_data()} description={m.settings_data_desc()}>
-        <Row
-          label={m.settings_backup()}
-          hint={lastBackup ? m.settings_last_backup({ date: formatDateTime(lastBackup) }) : m.backup_reminder_never()}
-        >
-          <Button onClick={() => void exportAllJson(cvs)} disabled={cvs.length === 0}>
-            <Download />
-            {cvs.length > 0 ? m.settings_backup_button({ count: cvs.length }) : m.ux_settings_backup_empty()}
-          </Button>
-        </Row>
-        <Row label={m.settings_restore()} hint={m.settings_restore_hint()}>
-          <Button onClick={() => fileRef.current?.click()}>
-            <Upload />
-            {m.settings_restore_button()}
-          </Button>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="application/json,.json"
-            hidden
-            onChange={(e) => {
-              void onFile(e.target.files?.[0])
-              e.target.value = ''
-            }}
-          />
-        </Row>
-        <Row
-          label={m.settings_persist()}
-          hint={
-            persisted === null
-              ? m.settings_persist_unknown()
-              : persisted
-                ? m.settings_persist_on()
-                : m.settings_persist_off()
+      <SettingsGroup title={m.settings_appearance()} footer={m.settings_appearance_desc()}>
+        <GroupRow
+          title={m.settings_language()}
+          description={m.settings_language_hint()}
+          trailing={
+            // setLocale tercihi localStorage'a yazar ve sayfayı yeniden yükler.
+            <Segmented value={getLocale()} onChange={(locale) => void setLocale(locale)} aria-label={m.settings_language()} options={LOCALE_OPTIONS} />
           }
-        >
-          {persisted ? (
-            <span className="inline-flex items-center gap-1.5 text-sm text-ok">
-              <HardDrive className="size-4" />
-              {m.settings_persist_ok()}
-            </span>
-          ) : (
-            <Button
-              onClick={() =>
-                void requestPersistence().then((ok) => {
-                  setPersisted(ok)
-                  if (!ok) toast({ message: m.settings_persist_denied() })
-                })
-              }
-            >
-              {m.settings_persist_request()}
-            </Button>
-          )}
-        </Row>
-        <div className="flex gap-3 rounded-xl bg-surface-2 px-4 py-3 text-[13px] text-muted">
-          <Info className="mt-0.5 size-4 shrink-0" />
-          <p>{m.settings_brave_note()}</p>
-        </div>
-      </Card>
+        />
+        <GroupRow
+          title={m.settings_dark()}
+          description={m.settings_dark_hint()}
+          htmlFor={darkId}
+          trailing={<Switch id={darkId} checked={theme === 'dark'} onCheckedChange={(on) => setTheme(on ? 'dark' : 'light')} />}
+        />
+        <WrapRow title={m.settings_accent()} description={m.settings_accent_hint()}>
+          <span className="text-body text-fg-2" aria-hidden>
+            {ACCENT_NAMES[accent]()}
+          </span>
+          <Swatches
+            value={accent}
+            onChange={(id) => setAccent(id as AccentId)}
+            aria-label={m.settings_accent()}
+            // Daire, vurgunun bu temadaki hâlini gösterir (koyuda açık ton).
+            options={ACCENTS.map((a) => ({ value: a.id, color: theme === 'dark' ? a.dark : a.color, label: ACCENT_NAMES[a.id]() }))}
+          />
+        </WrapRow>
+      </SettingsGroup>
 
-      <Card title={m.settings_browser()} description={m.settings_browser_desc()}>
-        <div
-          className={cn(
-            'flex gap-3 rounded-xl border px-4 py-3 text-sm',
-            chromium ? 'border-line bg-surface' : 'border-warn/30 bg-warn-soft',
-          )}
-        >
-          {chromium ? <Check className="mt-0.5 size-4 shrink-0 text-ok" /> : <Info className="mt-0.5 size-4 shrink-0 text-warn" />}
-          <p>{chromium ? m.settings_browser_ok() : m.settings_browser_warn()}</p>
-        </div>
-        {safari && (
-          <div className="flex gap-3 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3 text-sm">
-            <Info className="mt-0.5 size-4 shrink-0 text-warn" />
-            <p>{m.settings_browser_safari()}</p>
+      <SettingsGroup
+        title={m.settings_data()}
+        footer={
+          <div className="flex flex-col gap-2">
+            <p>{m.settings_data_desc()}</p>
+            <p>{m.settings_brave_note()}</p>
           </div>
-        )}
-      </Card>
+        }
+      >
+        <GroupRow
+          title={m.settings_backup()}
+          description={lastBackup ? m.settings_last_backup({ date: formatDateTime(lastBackup) }) : m.backup_reminder_never()}
+          trailing={
+            <Button onClick={() => void exportAllJson(cvs)} disabled={cvs.length === 0}>
+              {cvs.length > 0 ? m.settings_backup_button({ count: cvs.length }) : m.ux_settings_backup_empty()}
+            </Button>
+          }
+        />
+        <GroupRow
+          title={m.settings_restore()}
+          description={m.settings_restore_hint()}
+          trailing={
+            <>
+              <Button onClick={() => fileRef.current?.click()}>{m.settings_restore_button()}</Button>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="application/json,.json"
+                hidden
+                onChange={(e) => {
+                  void onFile(e.target.files?.[0])
+                  e.target.value = ''
+                }}
+              />
+            </>
+          }
+        />
+        <GroupRow
+          title={m.settings_persist()}
+          description={
+            persisted === null ? m.settings_persist_unknown() : persisted ? m.settings_persist_on() : m.settings_persist_off()
+          }
+          trailing={
+            persisted ? (
+              <span className="inline-flex items-center gap-1.5 text-body text-fg-2">
+                <CircleCheck aria-hidden className="size-4 text-ok" />
+                {m.settings_persist_ok()}
+              </span>
+            ) : (
+              <Button
+                onClick={() =>
+                  void requestPersistence().then((ok) => {
+                    setPersisted(ok)
+                    if (!ok) toast({ message: m.settings_persist_denied() })
+                  })
+                }
+              >
+                {m.settings_persist_request()}
+              </Button>
+            )
+          }
+        />
+      </SettingsGroup>
 
-      <Card title={m.settings_shortcuts()}>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 rounded-xl border border-line bg-surface px-4 py-3 text-sm">
-          {[
-            ['Ctrl+Z', m.common_undo()],
-            ['Ctrl+Shift+Z', m.common_redo()],
-            ['Ctrl+P', m.pdf_button()],
-            ['Ctrl+S', m.shortcut_save()],
-            ['/', m.shortcut_search()],
-            ['Ctrl+B / Ctrl+I', m.shortcut_format()],
-          ].map(([key, label]) => (
-            <div key={key} className="contents">
-              <dt>
-                <kbd className="rounded border border-line bg-surface-2 px-1.5 py-0.5 text-xs">{key}</kbd>
-              </dt>
-              <dd className="text-muted">{label}</dd>
-            </div>
-          ))}
-        </dl>
-      </Card>
+      <SettingsGroup title={m.settings_browser()} footer={m.settings_browser_desc()}>
+        <GroupRow
+          leading={chromium ? <CircleCheck className="text-ok" /> : <TriangleAlert className="text-warn" />}
+          title={chromium ? m.settings_browser_ok() : m.settings_browser_warn()}
+        />
+        {safari && <GroupRow leading={<TriangleAlert className="text-warn" />} title={m.settings_browser_safari()} />}
+      </SettingsGroup>
 
-      <Card title={m.settings_danger()} tone="danger" description={m.settings_danger_desc()}>
-        <Row label={m.clear_title()} hint={m.clear_row_hint()}>
-          <Button variant="secondary" className="text-danger" onClick={() => setClearing(true)}>
-            {m.clear_submit()}
-          </Button>
-        </Row>
-      </Card>
+      <SettingsGroup title={m.settings_shortcuts()}>
+        {SHORTCUTS.map((s) => (
+          <GroupRow key={s.keys.join()} title={s.label()} trailing={<ShortcutKeys keys={s.keys} />} />
+        ))}
+      </SettingsGroup>
 
-      <Card title={m.settings_about()}>
-        <p className="text-sm text-muted">{m.settings_about_body({ version: __APP_VERSION__ })}</p>
-      </Card>
+      <SettingsGroup title={m.settings_danger()} footer={m.settings_danger_desc()}>
+        <GroupRow
+          title={m.clear_title()}
+          description={m.clear_row_hint()}
+          trailing={
+            <Button variant="destructive" onClick={() => setClearing(true)}>
+              {m.settings_clear_button()}
+            </Button>
+          }
+        />
+      </SettingsGroup>
+
+      <SettingsGroup title={m.settings_about()}>
+        <GroupRow title={m.settings_about_body({ version: __APP_VERSION__ })} />
+      </SettingsGroup>
 
       <RestoreDialog parsed={parsed} onClose={() => setParsed(null)} />
       <ClearAllDialog open={clearing} onClose={() => setClearing(false)} />

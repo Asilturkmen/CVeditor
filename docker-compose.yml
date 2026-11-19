@@ -1,0 +1,34 @@
+# CVeditör — VDS'te: `docker compose up -d --build` (ayrıntı: docs/YAYIN.md)
+#
+# Sunucu yalnız makinenin kendisine (127.0.0.1:8787) açılır; dışarıya ters vekil (Caddy, deploy/Caddyfile)
+# TLS ile yayınlar. Ayarlar .env dosyasından (adlar ve açıklamalar .env.example'da).
+services:
+  cveditor:
+    build:
+      context: .
+      args:
+        # .env'deki değer derlemeye geçer: "http" → gerçek yapay zekâ uçları
+        VITE_AI_PROVIDER: ${VITE_AI_PROVIDER:-}
+    image: cveditor:latest
+    restart: unless-stopped
+    # Chromium'un alt süreçleri için init (yetim süreç birikmesin, SIGTERM düzgün iletilsin)
+    init: true
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PORT: "8787"
+      # Önünde Caddy var: istemci adresi X-Forwarded-For'dan okunur (hız sınırı IP başına)
+      TRUST_PROXY: "1"
+    ports:
+      - "127.0.0.1:8787:8787"
+    # Chromium ~1 GB ister; sınır aşılırsa kapsayıcı yeniden başlar
+    mem_limit: 1536m
+    shm_size: 256m
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"

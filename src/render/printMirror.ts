@@ -34,6 +34,24 @@ export function warmMirrorFonts(fonts: FontId | FontDef[]) {
 }
 
 /**
+ * Gölge kökün başlangıç stili. Kopya, CV iframe'indeki `html > body` ile aynı ortamda çizilmeli;
+ * ama gölge kök kalıtılan özellikleri barındıran belgeden alır (uygulamanın gövdesi: Instrument Sans
+ * için `font-feature-settings: 'ss01'`, harf aralığı, satır yüksekliği, renk, koyu temada
+ * `color-scheme`…). `all: initial` kalıtılan her şeyi başlangıç değerine çeker (iframe'in kökü de
+ * oradan başlar); ardından base.css'in `body` kuralı yinelenir. Tek tek sıfırlamak yerine `all`:
+ * uygulama yarın yeni bir kalıtılan özellik (font-variant, word-spacing, text-transform…) eklese de
+ * aynaya sızmaz. `all` özel değişkenlere (--ink, --font…) ve `direction`'a dokunmaz. Barındıranın
+ * kendi kuralları (app.css `#cv-print-mirror { display }`, geçiş kopyasının satır içi stili)
+ * `:host`'tan önce gelir, etkilenmez. base.css'teki `body` kuralı değişirse burası da değişmeli
+ * (printMirror.test.ts denetler).
+ */
+export const HOST_RESET =
+  ':host{all:initial;display:block;color:var(--ink);font-family:var(--font);font-size:var(--fs);line-height:var(--lh);' +
+  'font-feature-settings:normal;font-variant:normal;letter-spacing:normal;color-scheme:light;' +
+  '-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-kerning:normal;font-synthesis:none;' +
+  'hyphens:manual;overflow-wrap:break-word;print-color-adjust:exact;-webkit-print-color-adjust:exact}'
+
+/**
  * CV belgesinin stilleriyle sayfaların gölge kökte kopyası. Şablon geçişindeki
  * solma kopyası da bunu kullanır. :root değişkenleri ve body yazı ayarları
  * gölge kökte :host üzerinden okunur.
@@ -45,9 +63,15 @@ export function shadowCopyOfPages(doc: Document, host: HTMLElement, extraCss = '
   const root = host.shadowRoot ?? host.attachShadow({ mode: 'open' })
   const style = doc.createElement('style')
   style.textContent = `${css.replace(/:root/g, ':host')}
-:host{display:block;color:var(--ink);font-family:var(--font);font-size:var(--fs);line-height:var(--lh);-webkit-font-smoothing:antialiased;font-kerning:normal;font-synthesis:none;overflow-wrap:break-word;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+${HOST_RESET}
 .page-enter{animation:none}${extraCss}`
-  root.replaceChildren(style, pages.cloneNode(true))
+  const copy = pages.cloneNode(true) as HTMLElement
+  // Dil kopyanın kendisinde de: `:host{all:initial}` barındıranın `lang`'ından gelen yerel ayarı da
+  // sıfırlar (Chromium'da `-webkit-locale`); büyük harf dönüşümü CV dilini kopyanın kökünden okur
+  // (Türkçe CV'de "DENEYİM", "DENEYIM" değil).
+  const lang = doc.documentElement.lang
+  if (lang) copy.lang = lang
+  root.replaceChildren(style, copy)
   return true
 }
 

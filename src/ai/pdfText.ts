@@ -29,6 +29,13 @@ export interface PdfText {
   text: string
   /** Sayfa genişliği (pt), ilk sayfadan */
   pageWidth: number
+  /**
+   * PDF içerik akışının ham sırası (yeniden sıralama, sütun ayırma yok): her
+   * bölüt ayrı satır. Basit bir ATS metni bu sırayla okur; CV İnceleme sütun
+   * karışmasını ve "ATS'nin gördüğü metin"i buradan hesaplar. Ekranda aynı
+   * satırdaki ardışık bölütler `flowRows` ile birleştirilir.
+   */
+  flow?: PdfTextLine[]
 }
 
 export type PdfTextErrorCode = 'not_pdf' | 'encrypted' | 'no_text' | 'unreadable' | 'too_long'
@@ -194,6 +201,23 @@ export function buildPageLines(items: RawTextItem[], page: number, width: number
   return lines
 }
 
+/** Bir sayfanın parçaları, içerik akışının ham sırasıyla (her bölüt ayrı satır; bkz. `PdfText.flow`). */
+export function buildFlowLines(items: RawTextItem[], page: number): PdfTextLine[] {
+  return segmentsOf(items).map((s) => ({ text: s.text, page, x: s.x, y: s.y, size: s.size }))
+}
+
+/** Akışta aynı satırda ardışık duran bölütleri birleştirir ("unvan   tarih"); sıra değişmez. */
+export function flowRows(flow: PdfTextLine[]): PdfTextLine[] {
+  const out: PdfTextLine[] = []
+  for (const l of flow) {
+    const prev = out[out.length - 1]
+    const size = Math.max(prev?.size ?? 10, l.size ?? 10)
+    if (prev && prev.page === l.page && Math.abs(prev.y - l.y) < size * 0.5) out[out.length - 1] = { ...prev, text: `${prev.text}   ${l.text}`, size }
+    else out.push(l)
+  }
+  return out
+}
+
 /** İlk sayfadaki en büyük yazılı satır (genellikle ad) */
 export function largestLine(lines: PdfTextLine[]): string | null {
   const first = lines.filter((l) => l.page === 1 && l.size)
@@ -219,11 +243,25 @@ export interface ExtractOptions {
   maxPages?: number
 }
 
+const SIGNATURE = [0x25, 0x50, 0x44, 0x46, 0x2d] // "%PDF-"
+
+/**
+ * PDF imzası var mı? Spesifikasyon imzanın ilk 1024 bayt içinde olmasına izin
+ * verir (önünde BOM, boşluk ya da başka bir yazılımın bıraktığı baytlar olabilir).
+ */
+export function hasPdfSignature(bytes: Uint8Array): boolean {
+  const last = Math.min(1023, bytes.length - SIGNATURE.length)
+  for (let at = 0; at <= last; at++) {
+    if (SIGNATURE.every((b, i) => bytes[at + i] === b)) return true
+  }
+  return false
+}
+
 export async function extractPdfText(data: ArrayBuffer, options: ExtractOptions = {}): Promise<PdfText> {
   const { signal, maxPages = MAX_PDF_PAGES } = options
   signal?.throwIfAborted()
   const bytes = new Uint8Array(data)
-  if (!(bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46)) {
+  if (!hasPdfSignature(bytes)) {
     throw new PdfTextError('Bu dosya bir PDF değil.', 'not_pdf')
   }
   const pdfjs = await loadPdfjs()
@@ -248,6 +286,7 @@ export async function extractPdfText(data: ArrayBuffer, options: ExtractOptions 
   }
 
   const lines: PdfTextLine[] = []
+  const flow: PdfTextLine[] = []
   let pageWidth = 595
   try {
     for (let p = 1; p <= doc.numPages; p++) {
@@ -269,6 +308,7 @@ export async function extractPdfText(data: ArrayBuffer, options: ExtractOptions 
         })
       }
       lines.push(...buildPageLines(items, p, viewport.width))
+      flow.push(...buildFlowLines(items, p))
     }
   } catch {
     // İptal, okuma hatası sayılmaz: çağıran iptal nedenini alır.
@@ -287,5 +327,5 @@ export async function extractPdfText(data: ArrayBuffer, options: ExtractOptions 
       'no_text',
     )
   }
-  return { pageCount, lines, text, pageWidth }
+  return { pageCount, lines, text, pageWidth, flow }
 }

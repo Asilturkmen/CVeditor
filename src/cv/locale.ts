@@ -50,3 +50,8 @@ export function sectionTitle(language: CvLanguage, type: SectionType, custom: st
   const trimmed = custom?.trim()
   return trimmed ? trimmed : SECTION_TITLES[language][type]
 }
+
+/** Yeni CV'nin varsayılan dili: arayüz dili bir CV diliyse o, değilse Türkçe. */
+export function initialCvLanguage(uiLocale: string): CvLanguage {
+  return uiLocale === 'en' ? 'en' : 'tr'
+}

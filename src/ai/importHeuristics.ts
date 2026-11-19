@@ -1,4 +1,5 @@
 import type { CvLanguage } from '@/cv/schema'
+import { HEADING_GROUPS, type HeadingKind } from '@/review/headings'
 import { detectLanguage, EMAIL_RE, extractContacts, fold, joinWrappedUrls, looksLikeLocation, phonesIn } from './importText'
 import type { ImportRequest, ImportResult } from './types'
 
@@ -19,105 +20,16 @@ type ImportItem = ImportSection['items'][number]
 
 // ---------------------------------------------------------------- Başlıklar
 
-type HeadingKind = SectionType | 'contact'
 interface Heading {
   kind: HeadingKind
   /** Bölüm başlığı korunacaksa (özel bölüm, staj) asıl başlık */
   keepTitle: boolean
 }
 
-const HEADING_TABLE: [HeadingKind, boolean, string[]][] = [
-  [
-    'summary',
-    false,
-    [
-      'ozet', 'hakkimda', 'profil', 'profile', 'summary', 'professional summary', 'profesyonel ozet', 'kariyer hedefi',
-      'career objective', 'objective', 'about me', 'about', 'kisa ozet', 'genel bakis', 'overview', 'kariyer ozeti',
-      'career summary', 'profesyonel profil', 'professional profile', 'ozgecmis ozeti', 'kisisel ozet', 'personal statement',
-    ],
-  ],
-  [
-    'experience',
-    false,
-    [
-      'deneyim', 'deneyimler', 'is deneyimi', 'is deneyimleri', 'is tecrubesi', 'tecrube', 'tecrubeler',
-      'profesyonel deneyim', 'mesleki deneyim', 'calisma deneyimi', 'is gecmisi', 'kariyer', 'experience',
-      'work experience', 'professional experience', 'employment', 'employment history', 'work history',
-      'career history', 'relevant experience', 'experiences',
-    ],
-  ],
-  ['experience', true, ['staj', 'stajlar', 'staj deneyimi', 'staj deneyimleri', 'internship', 'internships', 'internship experience']],
-  [
-    'education',
-    false,
-    ['egitim', 'egitim bilgileri', 'egitim gecmisi', 'ogrenim', 'ogrenim bilgileri', 'education', 'academic background', 'akademik gecmis', 'education & training'],
-  ],
-  [
-    'skills',
-    false,
-    [
-      'beceriler', 'yetenekler', 'yetkinlikler', 'teknik beceriler', 'teknik yetenekler', 'teknik yetkinlikler',
-      'bilgisayar becerileri', 'bilgisayar bilgisi', 'skills', 'technical skills', 'core skills', 'key skills',
-      'core competencies', 'competencies', 'skills & tools', 'tools & technologies', 'technologies', 'teknolojiler',
-      'araclar & teknolojiler', 'beceriler & yetkinlikler', 'skills & abilities', 'hard skills', 'soft skills',
-      'kisisel beceriler', 'skills & expertise', 'uzmanlik alanlari', 'expertise',
-    ],
-  ],
-  [
-    'projects',
-    false,
-    ['projeler', 'proje', 'projects', 'personal projects', 'selected projects', 'side projects', 'kisisel projeler', 'academic projects', 'akademik projeler', 'secili projeler'],
-  ],
-  [
-    'languages',
-    false,
-    ['diller', 'yabanci diller', 'yabanci dil', 'dil bilgisi', 'dil becerileri', 'languages', 'language skills', 'language'],
-  ],
-  [
-    'certificates',
-    false,
-    [
-      'sertifikalar', 'sertifika', 'sertifikalar & kurslar', 'kurslar & sertifikalar', 'kurslar',
-      'egitimler & sertifikalar', 'sertifika & kurslar', 'certificates', 'certifications', 'certificates & courses',
-      'certifications & courses', 'courses', 'licenses & certifications', 'certifications & licenses',
-      'lisanslar & sertifikalar',
-    ],
-  ],
-  [
-    'awards',
-    false,
-    ['oduller', 'basarilar', 'oduller & basarilar', 'basarilar & oduller', 'awards', 'honors', 'honors & awards', 'awards & honors', 'achievements', 'awards & achievements'],
-  ],
-  [
-    'volunteer',
-    false,
-    [
-      'gonulluluk', 'gonullu calismalar', 'gonullu deneyim', 'gonulluluk deneyimi', 'gonullu faaliyetler',
-      'sosyal sorumluluk', 'toplumsal calismalar', 'volunteer', 'volunteering', 'volunteer experience',
-      'volunteer work', 'community involvement',
-    ],
-  ],
-  ['references', false, ['referanslar', 'referans', 'references']],
-  [
-    'contact',
-    true,
-    ['iletisim', 'iletisim bilgileri', 'kisisel bilgiler', 'contact', 'contact information', 'contact info', 'personal information', 'personal details', 'kisisel detaylar'],
-  ],
-  [
-    'custom',
-    true,
-    [
-      'hobiler', 'ilgi alanlari', 'hobiler & ilgi alanlari', 'interests', 'hobbies', 'hobbies & interests',
-      'yayinlar', 'publications', 'uyelikler', 'memberships', 'konferanslar', 'conferences', 'etkinlikler',
-      'activities', 'extracurricular activities', 'ders disi etkinlikler', 'kulupler', 'clubs', 'leadership',
-      'liderlik', 'patentler', 'patents', 'research', 'arastirma', 'arastirmalar', 'tez', 'thesis',
-    ],
-  ],
-]
-
+// Başlık listesi CV İnceleme ile ortaktır (src/review/headings.ts).
 const HEADINGS = new Map<string, Heading>()
-for (const [kind, keepTitle, keys] of HEADING_TABLE) {
-  for (const key of keys) {
+for (const { kind, keepTitle, titles } of HEADING_GROUPS) {
+  for (const key of titles) {
     HEADINGS.set(key, { kind, keepTitle })
     // Harf aralıklı ya da bitişik yazılmış başlıklar için boşluksuz biçim
     HEADINGS.set(key.replace(/[ &]/g, ''), { kind, keepTitle })
@@ -248,7 +160,8 @@ const NAME_PLACEHOLDER = /^⟦NAME(?:_\d+)?⟧$/
 
 function isContactLine(text: string): boolean {
   return (
-    /⟦(?!LOCATION|NAME)[A-Z]+(?:_\d+)?⟧/.test(text) ||
+    // Ad, konum, referans adı ve kaçışlanmış metin dışındaki yer tutucular iletişim / kimlik bilgisidir.
+    /⟦(?!LOCATION|NAME|REFNAME|RAW)[A-Z]+(?:_\d+)?⟧/.test(text) ||
     new RegExp(EMAIL_RE.source, 'iu').test(text) ||
     /(?:linkedin|github)\.com|https?:\/\/|www\./i.test(text) ||
     phonesIn(text).length > 0
@@ -264,13 +177,56 @@ function isTitleish(text: string): boolean {
   return text.length <= 90 && words <= 12 && !endsSentence(text) && !isContactLine(text)
 }
 
-/** "Deniz Aksoy", "DENİZ AKSOY", "Ayşe Nur Kaya-Demir" */
+/**
+ * Belge başlığı sözcükleri (katlanmış): "CURRICULUM VITAE", "ÖZGEÇMİŞ",
+ * "RESUME", "CV". PDF'in en büyük yazılı satırı çoğu zaman addır ama bazen
+ * bu başlıktır; ad sanılırsa gerçek ad maskesiz kalır.
+ */
+const DOC_TITLE_WORDS = new Set([
+  'curriculum', 'vitae', 'cv', 'resume', 'ozgecmis', 'ozgecmisi', 'ozgecmisim', 'lebenslauf', 'europass', 'biodata',
+  'portfolio', 'portfolyo',
+])
+const DOC_TITLE_CONNECTORS = new Set(['of', 'for', 'by', 'ait', 'in', 'nin', 'nun'])
+const docTokens = (text: string) =>
+  text
+    .split(/[\s\-–—|:·,/()]+/)
+    .map((raw) => ({ raw, key: fold(raw).replace(/[.'’]/g, '') }))
+    .filter((t) => t.key)
+
+/** Satır yalnız belge başlığı mı ("Curriculum Vitae", "ÖZ GEÇMİŞ", "CV / Resume")? */
+export function isDocumentTitle(text: string): boolean {
+  const tokens = docTokens(text)
+  return tokens.length > 0 && stripDocumentTitle(text) === ''
+}
+
+/** Belge başlığı sözcüklerini atar: "Ayşe Yılmaz CV" → "Ayşe Yılmaz", "ÖZGEÇMİŞ - AYŞE YILMAZ" → "AYŞE YILMAZ". */
+export function stripDocumentTitle(text: string): string {
+  const tokens = docTokens(text)
+  const kept: string[] = []
+  let removed = false
+  for (let i = 0; i < tokens.length; i++) {
+    const { raw, key } = tokens[i]
+    // "Öz Geçmiş" iki sözcük yazılabilir ("Öz" tek başına soyadı olabilir, atılmaz)
+    if (key === 'oz' && /^gecmis/.test(tokens[i + 1]?.key ?? '')) {
+      i++
+      removed = true
+    } else if (DOC_TITLE_WORDS.has(key)) removed = true
+    else kept.push(raw)
+  }
+  if (!removed) return text.trim()
+  // "Resume of Jane Doe" → "Jane Doe"
+  while (kept.length && DOC_TITLE_CONNECTORS.has(fold(kept[0]))) kept.shift()
+  return kept.join(' ').trim()
+}
+
+/** "Deniz Aksoy", "DENİZ AKSOY", "Ayşe Nur Kaya-Demir". Bölüm ve belge başlıkları ad değildir. */
 export function looksLikeName(text: string): boolean {
   const t = text.trim()
   if (t.length < 4 || t.length > 40 || /[\d@:|/⟦,]/.test(t)) return false
   const words = t.split(/\s+/)
   if (words.length < 2 || words.length > 4) return false
-  if (headingOf(t)) return false
+  if (headingOf(t) || isDocumentTitle(t)) return false
+  if (words.some((w) => DOC_TITLE_WORDS.has(fold(w).replace(/[.'’]/g, '')))) return false
   return words.every((w) => /^\p{Lu}[\p{L}'’.-]*$/u.test(w) && w.length >= 2) && !KNOWN_LANGUAGES.has(fold(words[0]))
 }
 
@@ -286,6 +242,23 @@ const NOT_NAME_WORDS = new Set(
   ).split(' '),
 )
 const NAME_TITLE = /^(?:prof|doç|doc|dr|av|müh|muh|mr|mrs|ms|bay|bayan|sn)\.?\s+/iu
+
+/** Baştaki unvanı atar: "Dr. Mehmet Demir" → "Mehmet Demir" */
+export function stripNameTitle(text: string): string {
+  let out = text.trim()
+  while (NAME_TITLE.test(out)) out = out.replace(NAME_TITLE, '')
+  return out
+}
+
+/** Ad gibi yazılmış ama unvan, kurum, okul ya da yer belirten satır mı ("Proje Müdürü", "Örnek Teknoloji", "Ege Üniversitesi")? */
+export function hasNonNameWord(text: string): boolean {
+  const words = fold(text).replace(/\./g, '').split(/\s+/)
+  return (
+    words.some((w) => NOT_NAME_WORDS.has(w)) ||
+    wordScore(text, POSITION_WORDS) + wordScore(text, COMPANY_WORDS) + wordScore(text, SCHOOL_WORDS) > 0 ||
+    looksLikeLocation(text)
+  )
+}
 
 /**
  * Yüklenen PDF'in referans bölümündeki kişi adları (en iyi çaba; inceleme
@@ -743,22 +716,29 @@ function languages(lines: Line[]): ImportItem[] {
   return items
 }
 
+const REF_PLACEHOLDER = /^⟦REFNAME(?:_\d+)?⟧$/
+
 function references(lines: Line[]): ImportItem[] {
   if (lines.length <= 2 && lines.every((l) => /talep|istek|request|verilecektir|available/i.test(l.text))) return []
   const items: ImportItem[] = []
   let cur: Record<string, string> | null = null
-  for (const { text } of lines) {
-    if (looksLikeName(text) && (!cur || cur.position || cur.email || cur.phone)) {
-      cur = { name: text }
+  for (const line of lines) {
+    let text = line.text
+    // Referans adı yerelde maskelenmiş olabilir (⟦REFNAME⟧): satırın başındaki yer tutucu addır.
+    const lead = /^(⟦REFNAME(?:_\d+)?⟧)\s*(?:[,|(;]|[-–—])?\s*(.*)$/.exec(text)
+    const isName = looksLikeName(text) || REF_PLACEHOLDER.test(text.trim())
+    if ((isName || lead) && (!cur || cur.position || cur.email || cur.phone || lead)) {
+      cur = { name: lead ? lead[1] : text }
       items.push({ fields: cur })
-      continue
+      if (!lead || !lead[2].trim()) continue
+      text = lead[2].replace(/\)\s*$/, '').trim()
     }
     if (!cur) {
       cur = { name: '' }
       items.push({ fields: cur })
     }
-    const email = /⟦EMAIL(?:_\d+)?⟧/.exec(text)?.[0] ?? text.match(new RegExp(EMAIL_RE.source, 'iu'))?.[0]
-    const phone = /⟦PHONE(?:_\d+)?⟧/.exec(text)?.[0]
+    const email = /⟦(?:REF)?EMAIL(?:_\d+)?⟧/.exec(text)?.[0] ?? text.match(new RegExp(EMAIL_RE.source, 'iu'))?.[0]
+    const phone = /⟦(?:REF)?PHONE(?:_\d+)?⟧/.exec(text)?.[0]
     if (email || phone) {
       if (email) cur.email = email
       if (phone) cur.phone = phone

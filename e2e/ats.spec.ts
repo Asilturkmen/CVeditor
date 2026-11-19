@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'
-import { TEMPLATE_META } from '../src/render/templateMeta.ts'
+import { TEMPLATE_META, type TemplateMeta } from '../src/render/templateMeta.ts'
 import { createCv, patchCv, preview } from './helpers.ts'
 import {
   flowText,
@@ -31,6 +31,10 @@ interface Layout {
   columns: number
   /** Fotoğraf yüklü mü. Değilse editörde fotoğraf yerinde "Fotoğraf ekle" kutusu durur (PDF'e girmez). */
   photo: boolean
+  /** K1: kayıtta tarih DOM'da başlıktan önce (Çizelge) */
+  dateFirst: boolean
+  /** K2: yan sütun sağda, DOM'da ana sütundan sonra (İkili) */
+  sideEnd: boolean
 }
 
 /*
@@ -45,7 +49,7 @@ const TR_MESSAGES = JSON.parse(source('messages/tr.json')) as Record<string, str
 const COLUMN_LABEL: Record<number, string> = { 1: 'tek sütun', 2: 'iki sütun' }
 const PHOTO_HINT = TR_MESSAGES.preview_photo_hint
 
-const LAYOUTS: Layout[] = TEMPLATE_META.flatMap((meta) => {
+const LAYOUTS: Layout[] = TEMPLATE_META.flatMap((meta: TemplateMeta) => {
   const template = TR_MESSAGES[`template_${meta.id}_name`]
   if (!template) throw new Error(`messages/tr.json içinde template_${meta.id}_name yok`)
   return meta.columns.flatMap((columns) =>
@@ -55,6 +59,8 @@ const LAYOUTS: Layout[] = TEMPLATE_META.flatMap((meta) => {
       template,
       columns,
       photo,
+      dateFirst: meta.datePosition === 'start',
+      sideEnd: meta.sidePosition === 'end',
     })),
   )
 })
@@ -109,13 +115,42 @@ const SIDE_SECTIONS = [
   'Örnek Akademi',
 ]
 
+/** Tarihli kayıt başlıkları ve tarihleri: tarih sütunlu şablonda (K1) tarih başlıktan önce okunur. */
+const DATED: Record<string, string> = Object.fromEntries([
+  ...POSITIONS.map(([title, date]) => [title, date]),
+  ['Ege Üniversitesi', 'Eyl 2020 – Haz 2024'],
+  ['Web Erişilebilirliği Temelleri', 'Kas 2023'],
+])
+
+function datesFirst(list: string[]): string[] {
+  const out = [...list]
+  for (let i = 0; i < out.length - 1; i++) {
+    if (DATED[out[i]] === out[i + 1]) {
+      ;[out[i], out[i + 1]] = [out[i + 1], out[i]]
+      i++
+    }
+  }
+  return out
+}
+
+/** Yan sütunda beceri etiketi blok, iki noktası (K5) gizli: "Diller:" yerine "Diller". */
+const labelFor = (layout: Layout, label: string) => (layout.columns === 2 ? label.replace(/:$/, '') : label)
+
+/**
+ * Karşılaştırma biçimi: boşluksuz, büyük harf (şablon tarihi büyük harf yazabilir: Blok), "·" yok
+ * (Teknik'in dört köşeli alt satırı ayırıcıyı gizler; kurum ve yer aralıkla ayrılır).
+ */
+const norm = (text: string) => squash(text).toLocaleUpperCase('tr').replace(/·/g, '')
+
 /**
  * DOM (= mantıksal okuma) sırası. Başlık (ad, unvan, iletişim) her düzende tam
- * genişlikte en üsttedir; tek sütunda yan bölümler ana akışın sonundadır.
+ * genişlikte en üsttedir; tek sütunda yan bölümler ana akışın sonundadır. İki sütunda yan sütun
+ * ana sütundan önce, side-end şablonunda (K2) sonra. Tarih sütunlu şablonda (K1) tarih başlıktan önce.
  */
 function expectedOrder(layout: Layout, T: Titles, header: string[]) {
-  const main = MAIN.map(T)
-  const side = SIDE_SECTIONS.map(T)
+  const order = (list: string[]) => (layout.dateFirst ? datesFirst(list) : list)
+  const main = order(MAIN).map(T)
+  const side = order(SIDE_SECTIONS).map((s) => labelFor(layout, T(s)))
   if (layout.columns === 1) return { header: [...header, ...CONTACT], side: [], main: [...main, ...side] }
   return { header: [...header, ...CONTACT], side, main }
 }
@@ -198,12 +233,19 @@ async function printed(page: Page) {
   return { pdf, pages, previewPages }
 }
 
-/** Ana sütunun sol kenarı, sayfa genişliğine oranla (yan sütun genişliği şablona göre değişir). */
-async function mainColumnStart(page: Page): Promise<number> {
+/** Ana ve yan sütunun sol kenarı, sayfa genişliğine oranla (yan sütun genişliği ve yeri şablona göre değişir). */
+async function columnStarts(page: Page): Promise<{ main: number; side: number }> {
   return preview(page)
     .locator('#cv-pages > .page')
     .first()
-    .evaluate((p) => (p.querySelector('.col-main')!.getBoundingClientRect().left - p.getBoundingClientRect().left) / p.getBoundingClientRect().width)
+    .evaluate((p) => {
+      const box = p.getBoundingClientRect()
+      const left = (sel: string) => {
+        const el = p.querySelector(sel)
+        return el ? (el.getBoundingClientRect().left - box.left) / box.width : 0
+      }
+      return { main: left('.col-main'), side: left('.col-side') }
+    })
 }
 
 /**
@@ -427,7 +469,7 @@ for (const layout of LAYOUTS) {
     test('örnek CV: metin, Türkçe karakter, bağlantı, iletişim başlıkta, okuma sırası, sayfa sayısı, gömülü yazı tipleri', async ({ page }) => {
       test.slow()
       await openSample(page, layout)
-      const mainStart = await mainColumnStart(page)
+      const starts = await columnStarts(page)
       const T = await renderedTitles(page)
       const shownHeader = await renderedHeader(page)
       const { pages, pdf, previewPages } = await printed(page)
@@ -456,10 +498,10 @@ for (const layout of LAYOUTS) {
         'Ege Üniversitesi',
         'Kampüs Etkinlik Takvimi',
         'Örnek Akademi',
-        'Çatılar:',
+        labelFor(layout, 'Çatılar:'),
         'İleri (C1)',
       ]) {
-        expect(text, `PDF metninde "${needle}" yok`).toContain(needle)
+        expect(norm(text), `PDF metninde "${needle}" yok`).toContain(norm(needle))
       }
       // Bölüm başlıkları önizlemede göründüğü gibi; CSS ile büyük harfse Türkçe büyük İ (noktalı) çıkmalı.
       const titles = ['ÖZET', 'DENEYİM', 'EĞİTİM', 'PROJELER', 'BECERİLER', 'DİLLER', 'SERTİFİKALAR'].map(T)
@@ -492,26 +534,35 @@ for (const layout of LAYOUTS) {
 
       // İçerik akışı: başlık en önde; iki sütunda yan sütunun tamamı ana sütundan önce (DOM sırası).
       const { header, side, main } = expectedOrder(layout, T, shownHeader)
-      expect(orderProblem(squash(text), [...header, ...side, ...main].map(squash))).toBeNull()
+      const flow = layout.sideEnd ? [...header, ...main, ...side] : [...header, ...side, ...main]
+      expect(orderProblem(norm(text), flow.map(norm))).toBeNull()
 
       // y'ye göre sıralı okuma her sütunda doğru.
       if (layout.columns === 1) {
-        expect(orderProblem(squash(ySortedText(pages, () => true)), [...header, ...main].map(squash))).toBeNull()
+        // Başlık ayrı okunur: ad ve unvan yukarıdan aşağı sırada, iletişim başlığın içinde. İletişimi adın
+        // sağında tutan şablonda (Teknik) iletişimin ilk satırı adın taban çizgisinden yukarıda kalabilir;
+        // içerik akışı sırası (yukarıda) bunu zaten denetler.
+        const inHeader = (item: PdfItem, p: PdfPage) => p === pages[0] && item.y > bottom
+        const headerText = norm(ySortedText(pages, inHeader))
+        expect(orderProblem(headerText, shownHeader.map(norm))).toBeNull()
+        for (const c of CONTACT) expect(headerText, `"${c}" başlıkta değil`).toContain(norm(c))
+        expect(orderProblem(norm(ySortedText(pages, (i, p) => !inHeader(i, p))), main.map(norm))).toBeNull()
       } else {
         // Tam genişlik başlık (ilk sayfanın üstü) ayrı okunur; altında iki sütun.
         const inHeader = (item: PdfItem, p: PdfPage) => p === pages[0] && item.y > bottom
-        const inSide = (item: PdfItem, p: PdfPage) => item.x < p.width * mainStart
-        const headerText = squash(ySortedText(pages, inHeader))
-        const sideText = squash(ySortedText(pages, (i, p) => !inHeader(i, p) && inSide(i, p)))
-        const mainText = squash(ySortedText(pages, (i, p) => !inHeader(i, p) && !inSide(i, p)))
-        expect(orderProblem(headerText, header.map(squash))).toBeNull()
-        expect(orderProblem(sideText, side.map(squash))).toBeNull()
-        expect(orderProblem(mainText, main.map(squash))).toBeNull()
+        // Yan sütun solda (çoğu) ya da sağda (K2, side-end): ayrım sağdaki sütunun sol kenarı.
+        const inSide = (item: PdfItem, p: PdfPage) => (layout.sideEnd ? item.x >= p.width * starts.side - 1 : item.x < p.width * starts.main)
+        const headerText = norm(ySortedText(pages, inHeader))
+        const sideText = norm(ySortedText(pages, (i, p) => !inHeader(i, p) && inSide(i, p)))
+        const mainText = norm(ySortedText(pages, (i, p) => !inHeader(i, p) && !inSide(i, p)))
+        expect(orderProblem(headerText, header.map(norm))).toBeNull()
+        expect(orderProblem(sideText, side.map(norm))).toBeNull()
+        expect(orderProblem(mainText, main.map(norm))).toBeNull()
         // Sütunlar birbirine karışmıyor: ana sütun metni yan sütunda yok (ve tersi).
-        for (const needle of [squash(T('DENEYİM')), 'YazılımStajyeri', 'EgeÜniversitesi']) expect(sideText).not.toContain(needle)
-        for (const needle of [squash(T('BECERİLER')), 'ÖrnekAkademi']) expect(mainText).not.toContain(needle)
+        for (const needle of [T('DENEYİM'), 'Yazılım Stajyeri', 'Ege Üniversitesi']) expect(sideText).not.toContain(norm(needle))
+        for (const needle of [T('BECERİLER'), 'Örnek Akademi']) expect(mainText).not.toContain(norm(needle))
         // İletişim yalnız başlıkta; sütunlara düşmüyor.
-        for (const needle of ['deniz.aksoy@example.com', 'linkedin.com']) {
+        for (const needle of ['deniz.aksoy@example.com', 'linkedin.com'].map(norm)) {
           expect(sideText).not.toContain(needle)
           expect(mainText).not.toContain(needle)
         }

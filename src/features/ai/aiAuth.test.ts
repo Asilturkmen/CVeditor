@@ -9,12 +9,28 @@ const tick = () => new Promise((r) => setTimeout(r, 0))
 
 describe('hata iletileri', () => {
   it('her hata kodunun kendi iletisi var; durdurma ayrı tutulur', () => {
-    const codes: AiErrorCode[] = ['invalid_response', 'network', 'rate_limited', 'unauthorized', 'unavailable', 'unknown']
+    const codes: AiErrorCode[] = [
+      'invalid_response',
+      'network',
+      'timeout',
+      'rate_limited',
+      'unauthorized',
+      'unavailable',
+      'too_large',
+      'bad_request',
+      'unprocessable',
+      'unknown',
+    ]
     const messages = codes.map((code) => aiErrorMessage(new AiError('x', code)))
     expect(new Set(messages).size).toBe(codes.length)
     expect(isAiAbort(new AiError('x', 'aborted'))).toBe(true)
     expect(isAiAbort(Object.assign(new Error('x'), { name: 'AbortError' }))).toBe(true)
     expect(aiErrorCode(new TypeError('x'))).toBe('unknown')
+  })
+
+  it('429 bekleme süresi ve parola sonrası yine 401 ayrı ileti alır', () => {
+    expect(aiErrorMessage(new AiError('x', 'rate_limited', { retryAfter: 30 }))).toContain('30')
+    expect(aiErrorMessage(new AiError('x', 'unauthorized', { afterAuth: true }))).not.toBe(aiErrorMessage(new AiError('x', 'unauthorized')))
   })
 
   it('yapay zekâ dışı hatada bağlama özgü metin gösterilir', () => {
@@ -65,6 +81,56 @@ describe('parola akışı', () => {
     expect(a).toBe(b)
     useAiAuth.getState().settle!(true)
     await expect(Promise.all([a, b])).resolves.toEqual([true, true])
+  })
+
+  it("parola doğrulanmadan önce gönderilen isteğin geç gelen 401'i pencereyi yeniden açmaz; istek yenilenir", async () => {
+    localStorage.setItem(MOCK_FLAGS_KEY, JSON.stringify({ password: 'deneme' }))
+    let rejectLate!: (e: unknown) => void
+    const late = vi
+      .fn()
+      .mockImplementationOnce(() => new Promise((_, reject) => (rejectLate = reject)))
+      .mockResolvedValueOnce('geç tamam')
+    const first = vi.fn().mockRejectedValueOnce(unauthorized()).mockResolvedValueOnce('ilk tamam')
+    const pendingLate = withAiAuth(late, new AbortController().signal)
+    const pendingFirst = withAiAuth(first, new AbortController().signal)
+    await tick()
+    expect(useAiAuth.getState().open).toBe(true)
+    useAiAuth.getState().settle!(true)
+    await expect(pendingFirst).resolves.toBe('ilk tamam')
+    // Eski istek şimdi 401 döner: pencere açılmaz, yeni oturumla bir kez yenilenir.
+    rejectLate(unauthorized())
+    await tick()
+    expect(useAiAuth.getState().open).toBe(false)
+    await expect(pendingLate).resolves.toBe('geç tamam')
+  })
+
+  it('bekleyen bileşen kalkınca (iptal) pencere kapanır; başka bekleyen varsa açık kalır', async () => {
+    localStorage.setItem(MOCK_FLAGS_KEY, JSON.stringify({ password: 'deneme' }))
+    const a = new AbortController()
+    const b = new AbortController()
+    const pa = withAiAuth(vi.fn().mockRejectedValue(unauthorized()), a.signal)
+    const pb = withAiAuth(vi.fn().mockRejectedValue(unauthorized()), b.signal)
+    await tick()
+    expect(useAiAuth.getState().open).toBe(true)
+    a.abort()
+    await expect(pa).rejects.toMatchObject({ code: 'aborted' })
+    expect(useAiAuth.getState().open).toBe(true)
+    b.abort()
+    await expect(pb).rejects.toMatchObject({ code: 'aborted' })
+    expect(useAiAuth.getState().open).toBe(false)
+  })
+
+  it('parola doğrulandığı hâlde yenilenen istek yine 401 alırsa döngü yok; çerez iletisi', async () => {
+    localStorage.setItem(MOCK_FLAGS_KEY, JSON.stringify({ password: 'deneme' }))
+    const call = vi.fn().mockRejectedValue(unauthorized())
+    const pending = withAiAuth(call, new AbortController().signal)
+    await tick()
+    useAiAuth.getState().settle!(true)
+    const error = await pending.catch((e: unknown) => e)
+    expect(error).toMatchObject({ code: 'unauthorized', afterAuth: true })
+    expect(call).toHaveBeenCalledTimes(2)
+    expect(useAiAuth.getState().open).toBe(false)
+    expect(aiErrorMessage(error)).toBe(aiErrorMessage(new AiError('x', 'unauthorized', { afterAuth: true })))
   })
 
   it('diğer hatalar parola sormaz', async () => {

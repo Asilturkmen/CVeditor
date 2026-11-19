@@ -1,10 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import type { PdfText, PdfTextLine } from '@/ai/pdfText'
+import { buildFlowLines, buildPageLines, type PdfText, type PdfTextLine, type RawTextItem } from '@/ai/pdfText'
 import { createCv, createItem, createSection } from '@/cv/factory'
 import { samplePersonal, sampleSections } from '@/cv/sample'
 import type { Cv, CvLanguage, SectionOf, SectionType } from '@/cv/schema'
 import { templateSettingsFor } from '@/render/templates'
-import { columnInterleaving, detectDateStyles, pdfErrorFinding, reviewCv, reviewPdfText, type Finding } from './rules'
+import {
+  columnInterleaving,
+  detectDateStyles,
+  isValidUrl,
+  pdfErrorFinding,
+  reviewCv,
+  reviewPdfText,
+  withoutBirthDates,
+  type Finding,
+} from './rules'
 
 const NOW = new Date('2026-10-16')
 
@@ -232,7 +241,7 @@ describe('reviewCv: içerik', () => {
   })
 
   it('sayılı madde sayımı: skor değil, sayı', () => {
-    expect(byId(review(sampleCv()), 'numbers')?.title).toBe('6 maddenin 3 tanesinde sayı var')
+    expect(byId(review(sampleCv()), 'numbers')?.title).toBe('8 maddenin 3 tanesinde sayı var')
     const cv = sampleCv()
     section(cv, 'experience').items.forEach((i) => (i.description = '<ul><li>Arayüz geliştirdim.</li><li>Test yazdım.</li></ul>'))
     expect(byId(review(cv), 'numbers')?.severity).toBe('info')
@@ -610,5 +619,138 @@ describe('reviewPdfText', () => {
 
   it('PDF okuma hatası tek sorun bulgusu olur', () => {
     expect(pdfErrorFinding('no_text')).toMatchObject({ severity: 'problem', category: 'okunabilirlik', title: 'Seçilebilir metin yok' })
+  })
+})
+
+describe('isValidUrl', () => {
+  it('Unicode alan adı ve portlu tam alan adı geçerli', () => {
+    for (const ok of ['çiçek.com', 'çiçek.com.tr/yol', 'https://çiçek.com.tr/yol?x=1', 'site.com:8080/yol', 'https://site.com:8443', 'example.com', 'xn--iek-qqa.com']) {
+      expect(isValidUrl(ok), ok).toBe(true)
+    }
+  })
+
+  it('alan adsız, boşluklu, protokolü bozuk ya da portu geçersiz adres geçersiz', () => {
+    for (const bad of ['localhost:3000', 'localhost', 'benim sitem', 'site .com', 'javascript:alert(1)', 'mailto:deniz@example.com', 'http:/site.com', 'site', '-site.com', 'site-.com', 'site.com:99999', 'site.c']) {
+      expect(isValidUrl(bad), bad).toBe(false)
+    }
+  })
+})
+
+// ---------------------------------------------------------------- PDF: telefon, başlık, doğum tarihi, sütun akışı
+
+/** Sağlaması tutan uydurma TC kimlik numarası (9 haneli tabandan hesaplanır) */
+function fakeTcNumber(base = '123456789'): string {
+  const d = base.split('').map(Number)
+  const odd = d[0] + d[2] + d[4] + d[6] + d[8]
+  const even = d[1] + d[3] + d[5] + d[7]
+  const d10 = (((odd * 7 - even) % 10) + 10) % 10
+  const d11 = (d.reduce((a, b) => a + b, 0) + d10) % 10
+  return `${base}${d10}${d11}`
+}
+
+const FILLER = Array<string>(20).fill('Erişilebilir arayüzler geliştiren bir frontend geliştirici olarak çalışıyorum.')
+
+describe('reviewPdfText: telefon', () => {
+  it('TC kimlik numarası telefon sayılmaz', () => {
+    const tc = fakeTcNumber()
+    expect(tc).toMatch(/^[1-9]\d{10}$/)
+    const f = reviewPdfText(pdf(['Deniz Aksoy', `T.C. Kimlik No: ${tc}`, `Kimlik ${tc}`, ...FILLER]))
+    expect(byId(f, 'pdf-phone')?.severity).toBe('warn')
+  })
+
+  it('farklı biçimlerdeki telefonlar bulunur', () => {
+    for (const phone of ['020 7946 0958', '+44 20 7946 0958', '0(532) 123 45 67', '212 123 45 67', '415-555-0132', '+90 555 000 00 00', '(0532) 123-45-67']) {
+      const f = byId(reviewPdfText(pdf(['Deniz Aksoy', `Telefon: ${phone}`, ...FILLER])), 'pdf-phone')
+      expect(f?.severity, phone).toBe('ok')
+      expect(f?.title, phone).toContain(phone)
+    }
+  })
+
+  it('tarih aralıkları telefon sayılmaz', () => {
+    const lines = ['Deniz Aksoy', 'Lacivert Yazılım 2019 - 2023', 'Martı Teknoloji 03.2020 – 05.2022', 'Ege Üniversitesi 2015 2019 2020', 'Kurs 01.02.2020 03.04.2021', ...FILLER]
+    expect(byId(reviewPdfText(pdf(lines)), 'pdf-phone')?.severity).toBe('warn')
+  })
+})
+
+describe('reviewPdfText: büyük harfli Türkçe başlıklar', () => {
+  it('ÇALIŞMA DENEYİMİ, TEKNİK YETENEKLER, EĞİTİM BİLGİLERİ tanınır', () => {
+    const f = reviewPdfText(pdf(['Deniz Aksoy', 'ÇALIŞMA DENEYİMİ', ...FILLER.slice(0, 5), 'EĞİTİM BİLGİLERİ:', 'Ege Üniversitesi', 'TEKNİK YETENEKLER', 'React, TypeScript']))
+    expect(byId(f, 'pdf-h-experience')).toBeUndefined()
+    expect(byId(f, 'pdf-h-education')).toBeUndefined()
+    expect(byId(f, 'pdf-h-skills')).toBeUndefined()
+    expect(byId(f, 'pdf-headings')?.detail).toContain('ÇALIŞMA DENEYİMİ, EĞİTİM BİLGİLERİ, TEKNİK YETENEKLER')
+  })
+
+  it('İŞ DENEYİMİ: ayrıştırılmış (NFD) yazım ve harf aralıklı yazım da tanınır', () => {
+    const f = reviewPdfText(pdf(['Deniz Aksoy', 'İŞ DENEYİMİ'.normalize('NFD'), ...FILLER.slice(0, 5), 'E Ğ İ T İ M', 'Ege Üniversitesi']))
+    expect(byId(f, 'pdf-h-experience')).toBeUndefined()
+    expect(byId(f, 'pdf-h-education')).toBeUndefined()
+  })
+})
+
+describe('reviewPdfText: doğum tarihi', () => {
+  it('doğum tarihi tarih biçimi karşılaştırmasına girmez', () => {
+    for (const birth of ['Doğum Tarihi: 12.03.1995', 'DOĞUM TARİHİ 12.03.1995', 'Date of birth: 12/03/1995', 'DOB: 12/03/1995', 'D.O.B. 12/03/1995', 'Doğum Yeri ve Tarihi: İzmir, 12.03.1995']) {
+      const f = reviewPdfText(pdf([GOOD_TR[0], birth, ...GOOD_TR.slice(1)]))
+      expect(byId(f, 'pdf-dates')?.severity, birth).toBe('ok')
+    }
+  })
+
+  it('deneyim tarihleri yerinde kalır', () => {
+    const text = 'Doğum Tarihi: 12.03.1995\nLacivert Yazılım 03.2020 – 05.2022'
+    const stripped = withoutBirthDates(text)
+    expect(stripped).not.toContain('12.03.1995')
+    expect(stripped).toContain('03.2020 – 05.2022')
+    expect(stripped.length).toBe(text.length)
+  })
+})
+
+describe('sütun karışması içerik akışından hesaplanır', () => {
+  /** Gutter'lı iki sütun; içerik akışı satır satır sol-sağ gidip gelir. Sağ sütun yarım satır aşağıda (satırlar hizalı değil). */
+  function interleavedItems(): RawTextItem[] {
+    const items: RawTextItem[] = []
+    for (let i = 0; i < 10; i++) {
+      items.push({ str: `Sol sütundaki uzun bir satır ${i}`, x: 40, y: 100 + i * 14, width: 200, size: 10, hasEOL: true })
+      items.push({ str: `Sağ sütundaki uzun bir satır ${i}`, x: 330, y: 107 + i * 14, width: 220, size: 10, hasEOL: true })
+    }
+    return items
+  }
+
+  it('flow ham sırada karışık, lines sütunlara ayrık; uyarı akıştan gelir', () => {
+    const items = interleavedItems()
+    const lines = buildPageLines(items, 1, 595)
+    const flow = buildFlowLines(items, 1)
+    // Okuma satırları sütun sütun (içe aktarma bunu kullanır)
+    expect(lines.slice(0, 10).every((l) => l.text.startsWith('Sol'))).toBe(true)
+    expect(lines.slice(10).every((l) => l.text.startsWith('Sağ'))).toBe(true)
+    // Ham akış satır satır karışık
+    expect(flow.map((l) => l.text.slice(0, 3)).slice(0, 4)).toEqual(['Sol', 'Sağ', 'Sol', 'Sağ'])
+    const doc: PdfText = { pageCount: 1, lines, flow, text: lines.map((l) => l.text).join('\n'), pageWidth: 595 }
+    const result = columnInterleaving(doc)
+    expect(result.twoColumn).toBe(true)
+    expect(result.switches).toBeGreaterThan(6)
+    expect(byId(reviewPdfText(doc), 'pdf-columns')?.severity).toBe('warn')
+    // Akış bilinmeseydi (yalnız yeniden sıralanmış satırlar) karışma görünmezdi
+    expect(byId(reviewPdfText({ ...doc, flow: undefined }), 'pdf-columns')?.severity).toBe('info')
+  })
+
+  it('sütun sütun yazılmış akışta uyarı yok', () => {
+    const items = interleavedItems()
+    const ordered = [...items.filter((_, i) => i % 2 === 0), ...items.filter((_, i) => i % 2 === 1)]
+    const lines = buildPageLines(ordered, 1, 595)
+    const doc: PdfText = { pageCount: 1, lines, flow: buildFlowLines(ordered, 1), text: lines.map((l) => l.text).join('\n'), pageWidth: 595 }
+    expect(columnInterleaving(doc)).toEqual({ twoColumn: true, switches: 1 })
+    expect(byId(reviewPdfText(doc), 'pdf-columns')?.severity).toBe('info')
+  })
+
+  it('tek sütunda unvan ve sağa yaslı tarih akışta ayrı bölüt olsa da iki sütun sayılmaz', () => {
+    const items: RawTextItem[] = []
+    for (let i = 0; i < 12; i++) {
+      items.push({ str: `Tek sütunda uzun bir deneyim satırı ${i}`, x: 40, y: 100 + i * 14, width: 220, size: 10 })
+      items.push({ str: 'Oca 2020 – Ara 2022', x: 460, y: 100 + i * 14, width: 95, size: 10, hasEOL: true })
+    }
+    const lines = buildPageLines(items, 1, 595)
+    const doc: PdfText = { pageCount: 1, lines, flow: buildFlowLines(items, 1), text: lines.map((l) => l.text).join('\n'), pageWidth: 595 }
+    expect(columnInterleaving(doc).twoColumn).toBe(false)
   })
 })

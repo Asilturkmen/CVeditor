@@ -1,18 +1,16 @@
 /*
- * Panel (`panel`): docs/sablonlar/sartname.md §4.2. Sayfanın solunda baştan sona koyu sütun
- * (--base), üstünde halkalı yuvarlak fotoğraf; ad sağda beyaz alanda. Yalnız iki sütun.
- * Her kural `.tpl-panel` ile başlar; yalnız görünümü değiştirir (yapı base.css'te).
- * Okunabilecek değişkenler, markup kancaları ve fotoğrafsız hâl: base.css başındaki sözleşme.
- * Renk takımları, yazı tipleri ve desteklenen sütunlar: src/render/templateMeta.ts.
- *
- * Başlık, sütun çizgisine hizalı iki hücreli ızgaradır (sartname §3, teknik 2): fotoğraf koyu
- * hücrede, kimlik her zaman 2. sütunda (fotoğraf yokken de; yoksa ad koyu zemine düşer).
+ * Panel (`panel`): docs/sablonlar/SET-14.md Şablon 4. Solda sayfa boyu koyu sütun (--base), tepesinde
+ * yuvarlak fotoğraf (halkasız); ad beyaz alanda tırnaklı (Source Serif 4), gövde Source Sans 3.
+ * "Sis" takımı açık gri sütundur; üstündeki metin --on-base ile kendiliğinden koyu olur. Yalnız iki sütun.
+ * Her kural `.tpl-panel` ile başlar. Sözleşme ve ortak varsayılanlar: base.css başı. Gövde boyu,
+ * satır aralığı ve boşluklar templateMeta.ts `scale` ile gelir (CSS'te yeniden çarpma).
+ * Başlık, sütun çizgisine hizalı iki hücreli ızgaradır: fotoğraf koyu hücrede, kimlik her zaman
+ * 2. sütunda (fotoğraf yokken de; yoksa ad koyu zemine düşer).
+ * İLK SÜRÜM (T0): iskelet ve ölçüler şartnameden; şablon ekibi cilalayacak.
  */
 
 .tpl-panel {
-  --side-width: 34%;
-  /* Inter 8.8 pt (gövde 9.75 pt'nin 0.9'u) */
-  font-size: calc(var(--fs) * 0.9);
+  --side-width: 32%;
 }
 
 /* Tam boy koyu sütun: her sayfada tekrar eder (paginate her sayfaya .page açar). */
@@ -25,7 +23,8 @@
 .tpl-panel .cv-header {
   display: grid;
   grid-template-columns: var(--side-width) minmax(0, 1fr);
-  align-items: center;
+  /* Fotoğrafın üst kenarı ile adın satır kutusu aynı --pad-y hizasında */
+  align-items: start;
   gap: 0;
   padding: 0;
 }
@@ -35,12 +34,10 @@
   grid-column: 1;
   grid-row: 1;
   justify-self: center;
-  width: 34mm;
-  height: 34mm;
-  margin: calc(var(--pad-y) * 0.86) 0 8mm;
+  width: 32mm;
+  height: 32mm;
+  margin: var(--pad-y) 0 6mm;
   border-radius: 50%;
-  outline: 1.2mm solid color-mix(in srgb, var(--on-base) 14%, transparent);
-  outline-offset: 1.2mm;
   --sg-surface: var(--base);
   --sg-ink: var(--on-base);
 }
@@ -48,27 +45,21 @@
 .tpl-panel .cv-identity {
   grid-column: 2;
   grid-row: 1;
-  padding: var(--pad-y) var(--pad-x) var(--section-gap) calc(var(--pad-x) * 0.6);
+  padding: var(--pad-y) var(--pad-x) 6mm calc(var(--pad-x) * 0.6);
 }
 
 .tpl-panel .cv-name {
-  /* Boy sınırı (base.css .cv-name): sağ hücrede adın yeri geniş boşlukta ~109 mm */
-  --name-size: 2.6em;
-  --name-room: 109mm;
-  --name-char: 0.72;
-  font-weight: 700;
-  line-height: 1.04;
-  letter-spacing: -0.02em;
-}
-
-/* Uzun ad (> 24 karakter) biraz küçülür */
-.tpl-panel .cv-name.is-long {
-  --name-size: 2.25em;
+  --name-size: 2.45em;
+  --name-room: 112mm;
+  --name-char: 0.66;
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -0.01em;
 }
 
 .tpl-panel .cv-headline {
-  margin-top: 1.6mm;
-  font-size: 1.1em;
+  margin-top: 1.2mm;
+  font-size: 1.12em;
   font-weight: 600;
   color: var(--accent-ink);
 }
@@ -76,14 +67,13 @@
 /*
  * İletişim iki sütun hâlinde; ayraçlar gizli (metin sırası aynı). Izgara yerine satır satır sarılan
  * flex: her öğe yarım genişlikten başlar ve bölünmez (nowrap, base.css). Yarıma sığmayan uzun öğe
- * (uzun e-posta, LinkedIn) kendi satırına iner ve tam genişliğe yayılır; adres ortasından kırılmaz.
+ * kendi satırına iner ve tam genişliğe yayılır; adres ortasından kırılmaz.
  */
 .tpl-panel .cv-contact {
   display: flex;
   flex-wrap: wrap;
   gap: 0.6mm 4mm;
-  margin-top: 3.6mm;
-  font-size: 0.92em;
+  margin-top: 3mm;
   color: var(--muted);
 }
 
@@ -102,6 +92,59 @@
   text-align: center;
 }
 
+/*
+ * Fotoğrafsız (fotoğraf kapalı): koyu sütun sayfanın üst kenarından başlar, sol üstte boş koyu blok
+ * kalmaz. İlk sayfanın iç kutusu iki sütunlu ızgara olur; .page-body kutusuz (display: contents),
+ * böylece yan sütun iki satırı kaplar, başlık ve ana sütun sağ sütunda alt alta durur. DOM ve
+ * okuma sırası değişmez (başlık → yan → ana); yalnız kutuların yerleşimi. Sütunlar kendi
+ * kutularıyla ölçüldüğü için paginate yan sütunun uzayan yerini kendiliğinden kullanır.
+ * Editördeki yer tutucu kutulu hâl (photo-ph) fotoğraflı düzende kalır.
+ */
+.tpl-panel.cols-2 .page-inner.has-header:has(> .cv-header.no-photo) {
+  display: grid;
+  grid-template-columns: var(--side-width) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.tpl-panel.cols-2 .page-inner.has-header:has(> .cv-header.no-photo) > .page-body {
+  display: contents;
+}
+
+.tpl-panel.cols-2 .page-inner.has-header > .cv-header.no-photo {
+  grid-column: 2;
+  grid-row: 1;
+  display: block;
+}
+
+.tpl-panel.cols-2 .page-inner.has-header:has(> .cv-header.no-photo) .col-side {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  width: auto;
+  min-height: 0;
+  padding-top: var(--pad-y);
+}
+
+.tpl-panel.cols-2 .page-inner.has-header:has(> .cv-header.no-photo) .col-main {
+  grid-column: 2;
+  grid-row: 2;
+  min-height: 0;
+}
+
+.tpl-panel.align-center .cv-contact {
+  justify-content: center;
+}
+
+/* ---------- Ana sütun ---------- */
+
+.tpl-panel .col-main .section-title {
+  padding-bottom: 1mm;
+  border-bottom: 0.25mm solid var(--rule);
+  font-size: 0.95em;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--accent-ink);
+}
+
 /* ---------- Yan sütun (koyu) ---------- */
 
 .tpl-panel .col-side {
@@ -111,61 +154,26 @@
 }
 
 .tpl-panel .col-side .section-title {
-  padding-bottom: 1.2mm;
-  border-bottom: 0.3mm solid color-mix(in srgb, var(--on-base) 18%, transparent);
-  font-size: 0.86em;
+  padding-bottom: 1mm;
+  /* Yalnız çizgi karışık; metin rengi token */
+  border-bottom: 0.25mm solid color-mix(in srgb, var(--on-base) 22%, transparent);
+  font-size: 0.9em;
   font-weight: 700;
+  letter-spacing: 0.05em;
   color: var(--on-base);
 }
 
-.tpl-panel .col-side .entry-title,
+.tpl-panel .col-side .entry-title strong,
 .tpl-panel .col-side .line-label {
   color: var(--on-base);
-}
-
-.tpl-panel .col-side .line-label {
-  display: block;
-  font-weight: 600;
 }
 
 .tpl-panel .col-side .entry-sub,
+.tpl-panel .col-side .entry-sub .part:first-child,
 .tpl-panel .col-side .entry-date {
   color: var(--on-base-muted);
 }
 
-.tpl-panel .col-side .entry-title strong {
-  font-weight: 600;
-}
-
-/* ---------- Ana sütun ---------- */
-
-.tpl-panel .col-main .section-title {
-  display: flex;
-  align-items: center;
-  gap: 2mm;
-  font-size: 0.9em;
-  font-weight: 700;
-  color: var(--ink);
-}
-
-/* Başlığın solunda kısa vurgu çubuğu (metinsiz süs) */
-.tpl-panel .col-main .section-title::before {
-  content: '';
-  flex: none;
-  width: 5mm;
-  height: 0.9mm;
-  background: var(--accent);
-}
-
-.tpl-panel .col-main .entry-title strong {
-  font-weight: 600;
-}
-
-.tpl-panel .col-main .entry-sub {
-  font-weight: 500;
-  color: var(--accent-ink);
-}
-
-.tpl-panel .col-main .entry-sub .sep {
-  color: var(--muted);
+.tpl-panel .col-side .entry-sub .part:first-child {
+  font-weight: 400;
 }

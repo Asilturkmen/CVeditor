@@ -15,12 +15,17 @@ export function aiErrorCode(error: unknown): AiErrorCode {
 
 export const isAiAbort = (error: unknown) => aiErrorCode(error) === 'aborted'
 
-const MESSAGES: Record<Exclude<AiErrorCode, 'aborted' | 'unknown'>, () => string> = {
+const MESSAGES: Record<Exclude<AiErrorCode, 'aborted' | 'unknown'>, (error: AiError) => string> = {
   invalid_response: () => m.ai2_error_invalid(),
   network: () => m.ai2_error_network(),
-  rate_limited: () => m.ai2_error_rate(),
-  unauthorized: () => m.ai2_error_unauthorized(),
+  timeout: () => m.ai2_error_timeout(),
+  rate_limited: (e) => (e.retryAfter ? m.ai2_error_rate_wait({ seconds: e.retryAfter }) : m.ai2_error_rate()),
+  // Parola az önce doğrulandığı hâlde yenilenen istek yine reddedildiyse sorun çerezdedir.
+  unauthorized: (e) => (e.afterAuth ? m.ai2_error_unauthorized_retry() : m.ai2_error_unauthorized()),
   unavailable: () => m.ai2_error_unavailable(),
+  too_large: () => m.ai2_error_too_large(),
+  bad_request: () => m.ai2_error_bad_request(),
+  unprocessable: () => m.ai2_error_unprocessable(),
 }
 
 /**
@@ -29,6 +34,6 @@ const MESSAGES: Record<Exclude<AiErrorCode, 'aborted' | 'unknown'>, () => string
  */
 export function aiErrorMessage(error: unknown, fallback?: string): string {
   const code = aiErrorCode(error)
-  if (code === 'aborted' || code === 'unknown') return fallback ?? m.ai2_error_unknown()
-  return MESSAGES[code]()
+  if (code === 'aborted' || code === 'unknown' || !(error instanceof AiError)) return fallback ?? m.ai2_error_unknown()
+  return MESSAGES[code](error)
 }

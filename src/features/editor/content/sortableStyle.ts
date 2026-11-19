@@ -7,6 +7,9 @@ import { dndText } from './dndA11y'
 
 export const verticalOnly: Modifier = ({ transform }) => ({ ...transform, x: 0 })
 
+/** DndContext `modifiers` için kararlı dizi (her çizimde yeni dizi bağlamı tazeler). */
+export const VERTICAL_ONLY = [verticalOnly]
+
 export function useSortableStyle(id: string) {
   const sortable = useSortable({ id, attributes: { roleDescription: dndText.roleDescription } })
   const style = {

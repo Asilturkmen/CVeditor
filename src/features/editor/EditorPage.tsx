@@ -1,14 +1,19 @@
-import { Link, useNavigate, useParams } from '@tanstack/react-router'
+import { Link, useBlocker, useNavigate, useParams } from '@tanstack/react-router'
 import {
-  ArrowLeft,
   Check,
+  ChevronDown,
+  ChevronLeft,
   Copy,
   Download,
   FileDown,
+  FileQuestion,
+  FileWarning,
   Languages,
+  LayoutTemplate,
   ListChecks,
   Loader2,
   MoreHorizontal,
+  Pencil,
   Redo2,
   Trash2,
   TriangleAlert,
@@ -17,44 +22,52 @@ import {
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { migrateCv } from '@/cv/migrate'
 import type { Cv } from '@/cv/schema'
-import { getCv } from '@/db/repo'
+import { getCv, versionOf } from '@/db/repo'
+import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
+import { buttonClass } from '@/components/ui/buttonClass'
+import { Checkbox } from '@/components/ui/Checkbox'
 import { Dialog } from '@/components/ui/Dialog'
-import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from '@/components/ui/Menu'
-import { Segmented } from '@/components/ui/Segmented'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { IconButton } from '@/components/ui/IconButton'
+import { Menu, MenuCheckboxItem, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from '@/components/ui/Menu'
+import { FloatingNotice, InlineNotice } from '@/components/ui/Notice'
+import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
 import { toast } from '@/components/ui/toast'
+import { Toolbar, ToolbarGroup, ToolbarSection } from '@/components/ui/Toolbar'
 import { Tooltip } from '@/components/ui/Tooltip'
-import { useEditor } from '@/editor/store'
+import { CV_FORM_ATTR, editorShortcut } from '@/editor/shortcuts'
+import { useEditor, type SaveConflict } from '@/editor/store'
 import { useEditorUi } from '@/editor/ui'
-import { duplicate, exportCvJson, printTitle } from '@/features/cv-actions'
+import { duplicate, exportCvJson, exportRawJson, printTitle } from '@/features/cv-actions'
 import { DeleteDialog } from '@/features/cv-list/CvListPage'
-import { ThemeToggle } from '@/features/shell/AppShell'
 import { TranslateCvDialog } from '@/features/translate/TranslateCvDialog'
 import { Wordmark } from '@/features/shell/Wordmark'
 import { cn } from '@/lib/cn'
+import { usePrefs } from '@/lib/prefs'
 import { useChanged } from '@/lib/useChanged'
 import { useMediaQuery } from '@/lib/useMediaQuery'
+import { exportPdf } from '@/lib/pdfExport'
+import type { OversizedBlock } from '@/render/paginate'
 import { m } from '@/paraglide/messages'
 import { OWN_PRINT_ATTR, type CvFrameHandle } from '@/render/CvFrame'
 import { whenPrintEnds } from '@/render/printEnd'
 import { buildPrintNotice, PRINT_MIRROR_ID, warmMirrorFonts } from '@/render/printMirror'
-import { AppearanceTab } from './appearance/AppearanceTab'
-import { PromptBox } from './ai/PromptBox'
-import { PersonalForm } from './content/PersonalForm'
-import { SectionList } from './content/SectionList'
+import { Inspector } from './Inspector'
 import { oversizedLabels } from './oversizedLabels'
 import { PreviewPane } from './PreviewPane'
+import { Rail } from './rail/Rail'
 
 const PANEL_KEY = 'cveditor:panelWidth'
-const PANEL_MIN = 380
-const PANEL_MAX_DEFAULT = 560
+/** Inspector genişliği (DESIGN.md): varsayılan 440, en az 360, en çok 560 ya da pencerenin %45'i. */
+const PANEL_MIN = 360
+const PANEL_DEFAULT = 440
+const PANEL_MAX = 560
 
-/** Varsayılan panel genişliği pencereyle orantılı: clamp(380px, 38vw, 560px). */
-const panelDefault = (viewport: number) => Math.round(Math.min(PANEL_MAX_DEFAULT, Math.max(PANEL_MIN, viewport * 0.38)))
-/** Panel pencerenin yarısını geçmez; CV her zaman en az yarıyı alır. */
-const panelMax = (viewport: number) => Math.max(PANEL_MIN, Math.round(viewport * 0.5))
+/** Panel pencerenin %45'ini geçmez; CV her zaman alanın çoğunu alır. */
+const panelMax = (viewport: number) => Math.max(PANEL_MIN, Math.min(PANEL_MAX, Math.round(viewport * 0.45)))
 
-/** Kullanıcının sürükleyerek seçtiği genişlik; hiç sürüklemediyse null (varsayılan orantılı). */
+/** Kullanıcının sürükleyerek seçtiği genişlik; hiç sürüklemediyse null (varsayılan). */
 function readSavedPanelWidth() {
   try {
     const value = Number(localStorage.getItem(PANEL_KEY))
@@ -74,118 +87,342 @@ function useViewportWidth() {
   return width
 }
 
+/** CV formunu işaretler: içindeki alanlarda Ctrl+Z CV'nin ortak geçmişini geri alır (bkz. editor/shortcuts.ts). */
+const cvForm = { [CV_FORM_ATTR]: '' }
+
+/** Kaydetme göstergesi: CV adının yanında, malzeme üstünde birincil renk; kaydedilince 12px ✓. */
 function SaveIndicator() {
   const state = useEditor((s) => s.saveState)
+  const problem = state === 'error' || state === 'conflict'
   const label =
-    state === 'error' ? m.save_error() : state === 'saved' ? m.save_saved() : m.save_saving()
+    state === 'error'
+      ? m.save_error()
+      : state === 'conflict'
+        ? m.save_conflict()
+        : state === 'saved'
+          ? m.save_saved()
+          : m.save_saving()
   return (
-    <span
-      role="status"
-      className={cn(
-        'inline-flex items-center gap-1.5 text-xs transition-colors',
-        state === 'error' ? 'text-danger' : 'text-faint',
+    <span className="inline-flex shrink-0 items-center gap-1.5">
+      <span
+        role="status"
+        data-save-state={state}
+        className={cn('inline-flex items-center gap-1 text-callout whitespace-nowrap', problem ? 'text-danger' : 'text-fg')}
+      >
+        {state === 'saved' ? (
+          <Check key="ok" aria-hidden className="size-3 text-ok animate-save-tick" strokeWidth={2.5} />
+        ) : problem ? (
+          <TriangleAlert aria-hidden className="size-3.5" />
+        ) : (
+          <Loader2 aria-hidden className="size-3 animate-spin" />
+        )}
+        {label}
+      </span>
+      {state === 'error' && (
+        <Button size="sm" variant="plain" data-save-retry onClick={() => void useEditor.getState().flush()}>
+          {m.common_retry()}
+        </Button>
       )}
-    >
-      {state === 'saved' ? (
-        <Check key="ok" className="size-3.5 text-ok animate-[save-tick_260ms_var(--ease-spring)]" />
-      ) : state === 'error' ? (
-        <TriangleAlert className="size-3.5" />
-      ) : (
-        <Loader2 className="size-3.5 animate-spin" />
-      )}
-      {label}
     </span>
   )
 }
 
-function CvName({ cv }: { cv: Cv }) {
-  const update = useEditor((s) => s.update)
+/**
+ * Bu CV başka bir sekmede değişti ya da silindi ve bu sekmede kaydedilmemiş değişiklik var (ya da CV
+ * silindi). Kayıt durdurulmuştur; hangi sürümün kalacağını kullanıcı seçer. Sessizce ezme yok.
+ * Tuvalin üst ortasında yüzen uyarı (renkli bant değil); sayfa sığdırılınca onun altından başlar.
+ */
+function SaveConflictNotice({ conflict, onLeave }: { conflict: SaveConflict; onLeave: () => void }) {
+  const [busy, setBusy] = useState(false)
+  const resolve = async (choice: 'mine' | 'theirs') => {
+    setBusy(true)
+    const result = await useEditor.getState().resolveConflict(choice)
+    setBusy(false)
+    if (!result.ok) toast({ message: m.conflict_failed(), tone: 'error' })
+  }
+  const deleted = conflict === 'deleted'
   return (
-    <input
-      value={cv.name}
-      aria-label={m.new_cv_name()}
-      onChange={(e) =>
-        update((d) => {
-          d.name = e.target.value
-        }, { coalesceKey: 'name' })
-      }
-      onBlur={(e) => {
-        if (!e.target.value.trim())
-          update((d) => {
-            d.name = m.untitled_cv()
-          })
-      }}
-      className="h-8 max-w-[22rem] min-w-24 truncate rounded-md [field-sizing:content] border border-transparent bg-transparent px-2 text-[15px] font-semibold tracking-tight transition-colors hover:border-line focus:border-accent focus:outline-none"
-    />
+    <div data-save-conflict={conflict} className="flex max-w-full justify-center">
+      <FloatingNotice tone="warn" role="alert" className="max-w-[min(100%,620px)] animate-rise-in items-start py-2.5 pr-3 [&>svg]:mt-px">
+        <span className="block">
+          <span className="font-semibold">{deleted ? m.conflict_deleted_title() : m.conflict_changed_title()}</span>{' '}
+          {deleted ? m.conflict_deleted_body() : m.conflict_changed_body()}
+        </span>
+        <span className="mt-2 flex flex-wrap justify-end gap-2">
+          {deleted ? (
+            <>
+              <Button disabled={busy} onClick={onLeave}>
+                {m.nav_back_to_list()}
+              </Button>
+              <Button variant="primary" disabled={busy} onClick={() => void resolve('mine')}>
+                {m.conflict_resave()}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button disabled={busy} onClick={() => void resolve('theirs')}>
+                {m.conflict_load_theirs()}
+              </Button>
+              <Button variant="primary" disabled={busy} onClick={() => void resolve('mine')}>
+                {m.conflict_keep_mine()}
+              </Button>
+            </>
+          )}
+        </span>
+      </FloatingNotice>
+    </div>
   )
 }
 
-function Splitter({ onDrag, onReset }: { onDrag: (dx: number) => void; onReset: () => void }) {
+/**
+ * Editörden çıkış koruması: bekleyen kayıt çıkmadan önce yazılır; yazılamıyorsa (hata ya da çakışma)
+ * gezinme durur ve kullanıcıya sorulur. Değişiklik hiçbir yolda uyarısız atılmaz.
+ */
+function useLeaveGuard() {
+  return useBlocker({
+    shouldBlockFn: async () => {
+      const state = useEditor.getState()
+      if (!state.cv) return false
+      return !(await state.flush()).ok
+    },
+    withResolver: true,
+    // Sekme kapatma / yenileme uyarısı depoda (editor/store.ts): editör açık olmasa da geçerli.
+    enableBeforeUnload: false,
+  })
+}
+
+function LeaveDialog({ guard }: { guard: ReturnType<typeof useLeaveGuard> }) {
+  const conflict = useEditor((s) => s.saveState === 'conflict')
+  const [busy, setBusy] = useState(false)
+  const open = guard.status === 'blocked'
+  const retry = async () => {
+    setBusy(true)
+    const state = useEditor.getState()
+    const result = conflict ? await state.resolveConflict('mine') : await state.flush()
+    setBusy(false)
+    if (result.ok) guard.proceed?.()
+    else toast({ message: result.reason === 'conflict' ? m.save_conflict_toast() : m.save_failed_toast(), tone: 'error' })
+  }
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => !next && guard.reset?.()}
+      title={m.leave_unsaved_title()}
+      description={conflict ? m.leave_unsaved_conflict() : m.leave_unsaved_body()}
+      footer={
+        <>
+          <Button
+            variant="destructive"
+            size="lg"
+            className="sm:mr-auto"
+            data-leave-anyway
+            onClick={() => {
+              // Kullanıcı açıkça seçti: bellekteki değişiklikler bırakılır.
+              useEditor.getState().unload()
+              guard.proceed?.()
+            }}
+          >
+            {m.leave_anyway()}
+          </Button>
+          <Button
+            size="lg"
+            onClick={() => {
+              const current = useEditor.getState().cv
+              if (current) exportCvJson(current)
+            }}
+          >
+            <Download />
+            {m.leave_download()}
+          </Button>
+          <Button variant="primary" size="lg" loading={busy} onClick={() => void retry()}>
+            {conflict ? m.conflict_keep_mine() : m.common_retry()}
+          </Button>
+        </>
+      }
+    >
+      <p className="text-body text-fg-2">{m.leave_unsaved_hint()}</p>
+    </Dialog>
+  )
+}
+
+/** CV adı: üst çubukta yerinde düzenlenir; kalem her zaman görünür. Uzun ad sarmaz, alan esner. */
+function CvName({ cv }: { cv: Cv }) {
+  const update = useEditor((s) => s.update)
+  const inputRef = useRef<HTMLInputElement>(null)
+  return (
+    <span className="flex min-w-0 items-center gap-0.5">
+      <input
+        ref={inputRef}
+        {...cvForm}
+        value={cv.name}
+        aria-label={m.new_cv_name()}
+        onChange={(e) =>
+          update((d) => {
+            d.name = e.target.value
+          }, { coalesceKey: 'name' })
+        }
+        onBlur={(e) => {
+          if (!e.target.value.trim())
+            update((d) => {
+              d.name = m.untitled_cv()
+            })
+        }}
+        className="h-7 max-w-[min(24rem,28vw)] min-w-16 rounded-md bg-transparent px-1.5 text-title-3 text-fg [field-sizing:content] transition-colors hover:bg-fill-4 focus:bg-content"
+      />
+      <IconButton
+        size="sm"
+        tabIndex={-1}
+        label={m.editor_rename_cv()}
+        icon={<Pencil />}
+        onClick={() => {
+          inputRef.current?.focus()
+          inputRef.current?.select()
+        }}
+      />
+    </span>
+  )
+}
+
+/** Dil rozeti: tıklanınca CV dilinin ne demek olduğu ve diğer dile çeviri. */
+function LanguageButton({ cv, onTranslate }: { cv: Cv; onTranslate: () => void }) {
+  const language = cv.language === 'en' ? m.lang_en() : m.lang_tr()
+  return (
+    <Popover>
+      <Tooltip content={m.editor_language_hint()}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            aria-label={m.editor_lang_label({ language })}
+            className="press-sm inline-flex h-6 shrink-0 items-center gap-0.5 rounded-sm bg-fill-3 pr-1 pl-1.5 text-caption text-fg transition-colors hover:bg-fill-2 active:bg-fill-1 data-[state=open]:bg-fill-2"
+          >
+            {cv.language.toUpperCase()}
+            <ChevronDown aria-hidden className="size-3" />
+          </button>
+        </PopoverTrigger>
+      </Tooltip>
+      <PopoverContent align="start" aria-label={m.editor_lang_label({ language })} className="w-72">
+        <p className="text-headline text-fg">{m.editor_lang_label({ language })}</p>
+        <p className="mt-1 text-callout text-fg-2">{m.new_cv_language_hint()}</p>
+        <PopoverClose asChild>
+          <Button className="mt-3" onClick={onTranslate}>
+            <Languages />
+            {cv.language === 'en' ? m.editor_translate_to_tr() : m.editor_translate_to_en()}
+          </Button>
+        </PopoverClose>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+/**
+ * Inspector'ın solundaki bölme çizgisi: görünen 1px, tutma alanı 9px; üstüne gelince, odakta ve
+ * sürüklerken 2px vurgu. Ok tuşları 24px, çift tık varsayılana döner.
+ */
+function Splitter({
+  onDrag,
+  onReset,
+  value,
+  min,
+  max,
+}: {
+  onDrag: (dx: number) => void
+  onReset: () => void
+  /** Panelin genişliği ve sınırları (px): ekran okuyucu ayırıcının konumunu bilsin. */
+  value: number
+  min: number
+  max: number
+}) {
   const start = useRef<number | null>(null)
+  const [dragging, setDragging] = useState(false)
   const onPointerDown = (e: ReactPointerEvent) => {
     start.current = e.clientX
     ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
     document.body.style.cursor = 'col-resize'
     document.body.style.userSelect = 'none'
+    setDragging(true)
   }
   const onPointerMove = (e: ReactPointerEvent) => {
     if (start.current === null) return
     onDrag(e.clientX - start.current)
     start.current = e.clientX
   }
+  // Bırakma, iptal (dokunma kesildi, pencere odağı gitti) ve yakalamanın kaybı aynı: sürükleme biter.
   const onPointerUp = () => {
     start.current = null
     document.body.style.cursor = ''
     document.body.style.userSelect = ''
+    setDragging(false)
   }
   return (
     <div
       role="separator"
       aria-orientation="vertical"
       aria-label={m.splitter_label()}
+      aria-valuenow={Math.round(value)}
+      aria-valuemin={min}
+      aria-valuemax={max}
       tabIndex={0}
+      data-dragging={dragging ? '' : undefined}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      onLostPointerCapture={onPointerUp}
       onDoubleClick={onReset}
       onKeyDown={(e) => {
         if (e.key === 'ArrowLeft') onDrag(-24)
         if (e.key === 'ArrowRight') onDrag(24)
       }}
-      className="group relative z-10 w-px shrink-0 cursor-col-resize bg-line outline-none"
+      className="group relative z-10 w-px shrink-0 cursor-col-resize bg-separator outline-none"
     >
-      <span className="absolute inset-y-0 -left-1.5 w-3" />
-      <span className="absolute inset-y-0 left-0 w-px bg-accent opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 group-active:opacity-100" />
+      <span aria-hidden className="absolute inset-y-0 -left-1 w-[9px]" />
+      <span
+        aria-hidden
+        className="absolute inset-y-0 -left-px w-0.5 bg-accent opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 group-data-[dragging]:opacity-100"
+      />
     </div>
   )
+}
+
+/** Ctrl+S: yalnız gerçekten yazıldıysa "Kaydedildi"; yazılamadıysa nedenini söyler. */
+async function saveNow() {
+  const result = await useEditor.getState().flush()
+  if (result.ok) toast({ message: m.save_saved_toast() })
+  else toast({ message: result.reason === 'conflict' ? m.save_conflict_toast() : m.save_failed_toast(), tone: 'error' })
 }
 
 function useEditorShortcuts(onPrint: () => void) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const mod = e.ctrlKey || e.metaKey
-      if (!mod) return
-      const key = e.key.toLowerCase()
-      // Açık bir pencerede (ör. çeviri incelemesi) Ctrl+Z o pencerenin alanına aittir, arkadaki CV'ye değil.
-      if ((key === 'z' || key === 'y') && document.querySelector('[role="dialog"]')) return
-      if (key === 'z' && !e.shiftKey) {
-        e.preventDefault()
-        useEditor.getState().undo()
-      } else if ((key === 'z' && e.shiftKey) || key === 'y') {
-        e.preventDefault()
-        useEditor.getState().redo()
-      } else if (key === 'p') {
-        e.preventDefault()
-        onPrint()
-      } else if (key === 's') {
-        e.preventDefault()
-        void useEditor.getState().flush().then(() => toast({ message: m.save_saved_toast() }))
-      }
+      // Kural editor/shortcuts.ts'te: AltGr kısayol değildir; CV'ye bağlı olmayan metin alanında
+      // (istek kutusu, bölüm adı kutusu) ve açık pencerede Ctrl+Z tarayıcıya bırakılır.
+      const shortcut = editorShortcut(e, !!document.querySelector('[role="dialog"]'))
+      if (!shortcut) return
+      e.preventDefault()
+      if (shortcut === 'undo') useEditor.getState().undo()
+      else if (shortcut === 'redo') useEditor.getState().redo()
+      else if (shortcut === 'print') onPrint()
+      else void saveNow()
     }
-    // Yakalama evresinde: giriş alanlarının kendi geri al'ı yerine editörün ortak geçmişi çalışsın.
+    // Yakalama evresinde: CV alanlarının kendi geri al'ı yerine editörün ortak geçmişi çalışsın.
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
   }, [onPrint])
+}
+
+/** Ctrl+\: sol rayı aç/kapat (kapalıysa Şablonlar ile açılır). AltGr (Ctrl+Alt) kısayol değildir. */
+function useRailShortcut() {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return
+      if (e.key !== '\\' && e.code !== 'Backslash') return
+      e.preventDefault()
+      const ui = useEditorUi.getState()
+      ui.setRail(ui.rail ? null : 'templates')
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 }
 
 /**
@@ -253,13 +490,17 @@ function PdfConfirmDialog({
   open,
   onClose,
   onConfirm,
+  serverOversized,
 }: {
   cv: Cv
   open: boolean
   onClose: () => void
   onConfirm: () => void
+  /** Sunucunun 409 ile bildirdiği kayıtlar (yoksa önizlemenin bulduğu) */
+  serverOversized?: OversizedBlock[] | null
 }) {
-  const oversized = useEditorUi((s) => s.oversized)
+  const previewOversized = useEditorUi((s) => s.oversized)
+  const oversized = serverOversized ?? previewOversized
   const [agreed, setAgreed] = useState(false)
   if (useChanged(open, false) && open) setAgreed(false)
   const labels = oversizedLabels(cv, oversized)
@@ -271,51 +512,113 @@ function PdfConfirmDialog({
       description={labels.length === 1 ? m.ux_pdf_confirm_desc_one() : m.pdf_confirm_desc({ count: labels.length })}
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>
+          <Button size="lg" onClick={onClose}>
             {m.pdf_confirm_cancel()}
           </Button>
-          <Button variant="primary" disabled={!agreed} onClick={onConfirm}>
+          <Button variant="primary" size="lg" disabled={!agreed} onClick={onConfirm}>
             {m.pdf_confirm_go()}
           </Button>
         </>
       }
     >
-      <ul className="mb-4 flex flex-col gap-1.5">
+      <ul className="mb-4 flex flex-col gap-2">
         {labels.map((l, i) => (
-          <li key={`${l.id}-${i}`} className="flex items-center gap-2 rounded-lg bg-warn-soft px-3 py-2 text-sm">
-            <TriangleAlert className="size-4 shrink-0 text-warn" />
-            {l.label}
+          <li key={`${l.id}-${i}`}>
+            <InlineNotice tone="warn">{l.label}</InlineNotice>
           </li>
         ))}
       </ul>
-      <label className="flex cursor-pointer items-start gap-2.5 text-sm">
-        <input
-          type="checkbox"
-          checked={agreed}
-          onChange={(e) => setAgreed(e.target.checked)}
-          className="mt-0.5 size-4 accent-[var(--accent)]"
-        />
-        <span>{labels.length === 1 ? m.ux_pdf_confirm_check_one() : m.pdf_confirm_check()}</span>
-      </label>
+      <Checkbox
+        checked={agreed}
+        onCheckedChange={setAgreed}
+        label={labels.length === 1 ? m.ux_pdf_confirm_check_one() : m.pdf_confirm_check()}
+      />
     </Dialog>
   )
 }
 
-function MobileEditor({ cv, onPrint, frameRef }: { cv: Cv; onPrint: () => void; frameRef: React.RefObject<CvFrameHandle | null> }) {
+/** "CV'lerime dön": araç çubuğunun başında yalnız ikon (‹), adı ve ipucu var. */
+function BackLink() {
   return (
-    <div className="flex h-dvh flex-col">
-      <header className="flex h-14 items-center gap-2 border-b border-line px-3">
-        <Link to="/cvler" className="inline-flex size-9 items-center justify-center rounded-lg text-muted" aria-label={m.nav_back_to_list()}>
-          <ArrowLeft className="size-4" />
-        </Link>
-        <span className="min-w-0 flex-1 truncate font-semibold">{cv.name}</span>
-        <Button variant="primary" size="sm" onClick={onPrint}>
+    <Tooltip content={m.nav_back_to_list()}>
+      <Link
+        to="/cvler"
+        aria-label={m.nav_back_to_list()}
+        className={buttonClass({ variant: 'ghost', size: 'icon', className: '[&_svg]:size-5' })}
+      >
+        <ChevronLeft strokeWidth={1.5} />
+      </Link>
+    </Tooltip>
+  )
+}
+
+/**
+ * Telefon (< 900px): üst çubukta geri + CV adı, ortada salt okunur önizleme (genişliğe sığar, hapla
+ * sayfa ve yakınlaştırma), altta tam genişlik "PDF al". "Bilgisayardan aç" notu tuvalde yüzer.
+ */
+function MobileEditor({
+  cv,
+  onPrint,
+  frameRef,
+  notices,
+}: {
+  cv: Cv
+  onPrint: () => void
+  frameRef: React.RefObject<CvFrameHandle | null>
+  notices?: React.ReactNode
+}) {
+  return (
+    <div className="flex h-dvh flex-col bg-window">
+      <Toolbar scrolled className="shrink-0 gap-1 px-2 pt-[env(safe-area-inset-top)]">
+        <BackLink />
+        <h1 className="min-w-0 flex-1 text-title-3 break-words text-fg">{cv.name}</h1>
+        <Badge className="mr-2">{cv.language.toUpperCase()}</Badge>
+      </Toolbar>
+      <div className="min-h-0 flex-1">
+        <PreviewPane ref={frameRef} cv={cv} readOnly notice={m.mobile_note()} notices={notices} />
+      </div>
+      <Toolbar as="footer" edge="top" scrolled className="shrink-0 px-4 pt-3 pb-[max(16px,env(safe-area-inset-bottom))]">
+        <Button variant="primary" size="xl" className="w-full" onClick={onPrint}>
           <FileDown />
           {m.pdf_button()}
         </Button>
-      </header>
-      <div className="min-h-0 flex-1">
-        <PreviewPane ref={frameRef} cv={cv} readOnly notice={m.mobile_note()} />
+      </Toolbar>
+    </div>
+  )
+}
+
+type Loaded =
+  | { cvId: string; status: 'ready' | 'missing' | 'error'; raw?: undefined }
+  /** `raw`: okunamayan kaydın ham hâli (kullanıcı indirebilsin) */
+  | { cvId: string; status: 'broken'; raw: unknown }
+
+/** Her editör açılışında artar: eski açılışın temizliği yenisinin yüklediği CV'yi boşaltmasın. */
+let mountSeq = 0
+
+/**
+ * Editörden çıkıldı ama son değişiklikler yazılamadı (çıkış koruması atlandıysa son güvenlik ağı):
+ * CV bellekte tutulur, kullanıcı uyarılır ve yedeğini indirebilir.
+ */
+function warnUnsavedLeft() {
+  // Yedek, uyarı anındaki CV'dir: bu arada başka bir CV açılsa da indirilen o olmaz.
+  const snapshot = useEditor.getState().cv
+  if (!snapshot) return
+  toast({
+    message: m.leave_unsaved_kept(),
+    tone: 'error',
+    duration: Infinity,
+    action: { label: m.leave_download(), run: () => exportCvJson(snapshot) },
+  })
+}
+
+/** Açılırken boş ekran yerine iskelet: üst çubuk, gri tuval, panel. */
+function EditorSkeleton({ panelWidth }: { panelWidth: number }) {
+  return (
+    <div aria-busy className="flex h-dvh flex-col bg-window">
+      <div className="material scroll-edge-bottom h-13 shrink-0" data-scrolled="" />
+      <div className="flex min-h-0 flex-1">
+        <div className="flex-1 bg-canvas" />
+        <div className="shrink-0 border-l border-separator bg-window" style={{ width: panelWidth }} />
       </div>
     </div>
   )
@@ -329,18 +632,24 @@ export function EditorPage() {
   const unload = useEditor((s) => s.unload)
   const canUndo = useEditor((s) => s.past.length > 0)
   const canRedo = useEditor((s) => s.future.length > 0)
-  const tab = useEditorUi((s) => s.tab)
-  const setTab = useEditorUi((s) => s.setTab)
-  const pageCount = useEditorUi((s) => s.pageCount)
   const resetUi = useEditorUi((s) => s.reset)
+  const rail = useEditorUi((s) => s.rail)
+  const setRail = useEditorUi((s) => s.setRail)
+  const theme = usePrefs((s) => s.theme)
+  const setTheme = usePrefs((s) => s.setTheme)
+  const conflict = useEditor((s) => (s.saveState === 'conflict' ? s.conflict : null))
   // Yükleme sonucu hangi CV için: cvId değişince yenisi gelene dek 'loading'.
-  const [loaded, setLoaded] = useState<{ cvId: string; status: 'ready' | 'missing' | 'broken' } | null>(null)
+  const [loaded, setLoaded] = useState<Loaded | null>(null)
   const status = loaded?.cvId === cvId ? loaded.status : 'loading'
+  // Yeniden okuma isteği ("Yeniden dene", başarısız silmeden sonra).
+  const [reloadKey, setReloadKey] = useState(0)
+  const guard = useLeaveGuard()
   const [savedPanelWidth, setSavedPanelWidth] = useState(readSavedPanelWidth)
   const viewport = useViewportWidth()
   const maxPanel = panelMax(viewport)
-  const panelWidth = Math.min(maxPanel, savedPanelWidth ?? panelDefault(viewport))
+  const panelWidth = Math.min(maxPanel, savedPanelWidth ?? PANEL_DEFAULT)
   const [confirmPdf, setConfirmPdf] = useState(false)
+  const [serverOversized, setServerOversized] = useState<OversizedBlock[] | null>(null)
   const [deleting, setDeleting] = useState<Cv | null>(null)
   const [translating, setTranslating] = useState(false)
   const frameRef = useRef<CvFrameHandle>(null)
@@ -348,26 +657,73 @@ export function EditorPage() {
 
   useEffect(() => {
     let cancelled = false
+    const mount = ++mountSeq
     resetUi()
-    void getCv(cvId).then((raw) => {
-      if (cancelled) return
-      if (!raw) {
-        setLoaded({ cvId, status: 'missing' })
-        return
+    const open = async (): Promise<Loaded> => {
+      const held = useEditor.getState()
+      // Önceki çıkışta kaydedilemeyen değişiklikler hâlâ bellekteyse veritabanındaki eski hâlle ezilmez.
+      if (held.cv?.id === cvId && held.saveState !== 'saved') {
+        void held.flush()
+        return { cvId, status: 'ready' }
       }
+      const raw = await getCv(cvId)
+      if (!raw) return { cvId, status: 'missing' }
       try {
-        load(migrateCv(raw))
-        setLoaded({ cvId, status: 'ready' })
+        const next = migrateCv(raw)
+        if (!cancelled) load(next, versionOf(raw))
+        return { cvId, status: 'ready' }
       } catch (error) {
         console.error(error)
-        setLoaded({ cvId, status: 'broken' })
+        return { cvId, status: 'broken', raw }
       }
-    })
+    }
+    void open()
+      .catch((error): Loaded => {
+        // Okuma reddedildi (veritabanı kapalı, depolama erişilemez): sonsuz "yükleniyor" yerine hata ekranı.
+        console.error(error)
+        return { cvId, status: 'error' }
+      })
+      .then((result) => {
+        if (!cancelled) setLoaded(result)
+      })
     return () => {
       cancelled = true
-      void useEditor.getState().flush().then(() => unload(cvId))
+      void useEditor
+        .getState()
+        .flush()
+        .then((result) => {
+          // Bu arada yeni bir editör açıldıysa depo artık onundur.
+          if (mountSeq !== mount) return
+          if (result.ok) unload(cvId)
+          // Kayıt başarısız: bellekteki CV atılmaz (yeniden açınca kaldığı yerden sürer), kullanıcı uyarılır.
+          else warnUnsavedLeft()
+        })
     }
-  }, [cvId, load, unload, resetUi])
+  }, [cvId, load, unload, resetUi, reloadKey])
+
+  // Başka sekmedeki değişiklik kendiliğinden yüklenince haber ver (geri alma geçmişi sıfırlandı).
+  useEffect(
+    () =>
+      useEditor.subscribe((state, prev) => {
+        if (state.remoteLoads > prev.remoteLoads) toast({ message: m.remote_loaded_toast() })
+      }),
+    [],
+  )
+
+  const leaveToList = useCallback(() => {
+    // Silinmiş CV'nin bu sekmedeki kopyası bırakılır (kullanıcı "CV'lerime dön" dedi).
+    useEditor.getState().unload()
+    void navigate({ to: '/cvler' })
+  }, [navigate])
+
+  const openReview = useCallback(
+    (id: string) =>
+      void useEditor
+        .getState()
+        .flush()
+        .then(() => navigate({ to: '/inceleme', search: { cv: id } })),
+    [navigate],
+  )
 
   useEffect(() => {
     if (cv) document.title = `${cv.name} · CVeditör`
@@ -385,10 +741,29 @@ export function EditorPage() {
     }
   }, [savedPanelWidth])
 
-  const doPrint = useCallback(() => {
+  // PDF: sunucu varsa /api/pdf, yoksa önizlemenin yazdır penceresi (src/lib/pdfExport.ts).
+  const doPrint = useCallback((allowSplit = false) => {
     const current = useEditor.getState().cv
     if (!current) return
-    void frameRef.current?.print(printTitle(current))
+    void exportPdf(current, {
+      allowSplit,
+      print: async () => {
+        if (!frameRef.current) throw new Error('Önizleme hazır değil')
+        // Çizim başarısızsa print() reddeder; exportPdf bunu "PDF alınamadı" bildirimine çevirir.
+        await frameRef.current.print(printTitle(current))
+      },
+    })
+      .then((outcome) => {
+        // Sunucu, önizlemenin görmediği uzun kayıt buldu (409): aynı onay penceresi o kayıtlarla açılır.
+        if (outcome.kind === 'oversized') {
+          setServerOversized(outcome.oversized)
+          setConfirmPdf(true)
+        }
+      })
+      .catch((error: unknown) => {
+        console.error(error)
+        toast({ message: m.pdf_failed(), tone: 'error' })
+      })
   }, [])
 
   const requestPrint = useCallback(() => {
@@ -398,6 +773,7 @@ export function EditorPage() {
       return
     }
     if (ui.oversized.length > 0) {
+      setServerOversized(null)
       setConfirmPdf(true)
       return
     }
@@ -405,7 +781,11 @@ export function EditorPage() {
   }, [doPrint])
 
   useEditorShortcuts(requestPrint)
-  const openConfirm = useCallback(() => setConfirmPdf(true), [])
+  useRailShortcut()
+  const openConfirm = useCallback(() => {
+    setServerOversized(null)
+    setConfirmPdf(true)
+  }, [])
   useBrowserMenuPrint(frameRef, openConfirm)
   // Menü baskısında aynanın yazı tipleri hazır olsun (beforeprint yüklemeyi beklemez).
   const font = cv?.template.font
@@ -413,99 +793,118 @@ export function EditorPage() {
     if (font) warmMirrorFonts(font)
   }, [font])
 
-  if (status === 'missing' || status === 'broken') {
+  if (status === 'missing' || status === 'broken' || status === 'error') {
+    const raw = loaded?.raw
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 px-6 text-center">
+      <div data-editor-status={status} className="flex min-h-dvh flex-col items-center justify-center bg-window px-6">
         <Wordmark />
-        <h1 className="text-xl font-semibold tracking-tight">
-          {status === 'missing' ? m.editor_missing_title() : m.editor_broken_title()}
-        </h1>
-        <p className="max-w-sm text-muted">{status === 'missing' ? m.editor_missing_body() : m.editor_broken_body()}</p>
-        <Link to="/cvler" className="text-sm font-medium text-accent hover:underline">
-          {m.nav_back_to_list()}
-        </Link>
+        <EmptyState
+          icon={status === 'missing' ? FileQuestion : FileWarning}
+          title={status === 'missing' ? m.editor_missing_title() : status === 'broken' ? m.editor_broken_title() : m.editor_load_error_title()}
+          description={status === 'missing' ? m.editor_missing_body() : status === 'broken' ? m.editor_broken_body() : m.editor_load_error_body()}
+          className="pt-8"
+          actions={
+            <>
+              <Link to="/cvler" className={buttonClass({ variant: status === 'error' ? 'secondary' : 'primary', size: 'lg' })}>
+                {m.nav_back_to_list()}
+              </Link>
+              {status === 'broken' && raw != null && (
+                // Okunamayan kayıt kullanıcının verisidir: ham hâliyle indirilebilir.
+                <Button size="lg" onClick={() => exportRawJson(raw, cvId)}>
+                  <Download />
+                  {m.editor_broken_download()}
+                </Button>
+              )}
+              {status === 'error' && (
+                <Button variant="primary" size="lg" onClick={() => setReloadKey((key) => key + 1)}>
+                  {m.common_retry()}
+                </Button>
+              )}
+            </>
+          }
+        />
       </div>
     )
   }
 
   if (!cv || status === 'loading') {
-    return <div className="h-dvh bg-bg" />
+    return narrow ? <div className="h-dvh bg-window" /> : <EditorSkeleton panelWidth={panelWidth} />
   }
+
+  const conflictNotice = conflict && <SaveConflictNotice conflict={conflict} onLeave={leaveToList} />
+  const pdfConfirm = (
+    <PdfConfirmDialog
+      cv={cv}
+      open={confirmPdf}
+      serverOversized={serverOversized}
+      onClose={() => setConfirmPdf(false)}
+      onConfirm={() => {
+        setConfirmPdf(false)
+        doPrint(true)
+      }}
+    />
+  )
 
   if (narrow) {
     return (
       <>
-        <MobileEditor cv={cv} onPrint={requestPrint} frameRef={frameRef} />
-        <PdfConfirmDialog
-          cv={cv}
-          open={confirmPdf}
-          onClose={() => setConfirmPdf(false)}
-          onConfirm={() => {
-            setConfirmPdf(false)
-            doPrint()
-          }}
-        />
+        <MobileEditor cv={cv} onPrint={requestPrint} frameRef={frameRef} notices={conflictNotice} />
+        <LeaveDialog guard={guard} />
+        {pdfConfirm}
       </>
     )
   }
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden animate-fade-in">
-      <header className="flex h-14 shrink-0 items-center gap-2 border-b border-line bg-surface px-3">
-        <Tooltip content={m.nav_back_to_list()}>
-          <Link
-            to="/cvler"
-            aria-label={m.nav_back_to_list()}
-            className="inline-flex size-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-text"
-          >
-            <ArrowLeft className="size-4" />
-          </Link>
-        </Tooltip>
-        <CvName cv={cv} />
-        <Tooltip content={m.editor_language_hint()}>
-          <span className="rounded bg-surface-2 px-1.5 py-px text-[11px] font-semibold tracking-wide uppercase">
-            {cv.language}
+    <div className="flex h-dvh flex-col overflow-hidden bg-window animate-fade-in">
+      {/* Üst çubuk birden çok bölmenin üstünde: ayırıcı çizgi her zaman (macOS bölmeli pencere). */}
+      <Toolbar scrolled className="shrink-0 gap-4 px-3">
+        <ToolbarSection grow className="gap-1.5">
+          <BackLink />
+          <CvName cv={cv} />
+          <LanguageButton cv={cv} onTranslate={() => setTranslating(true)} />
+          <span className="ml-1.5 flex min-w-0 items-center">
+            <SaveIndicator />
           </span>
-        </Tooltip>
-        <span className="ml-2 flex items-center">
-          <SaveIndicator />
-        </span>
+        </ToolbarSection>
 
-        <div className="ml-auto flex items-center gap-1">
-          <Tooltip content={`${m.common_undo()} · Ctrl+Z`}>
-            <Button
-              size="icon"
-              variant="ghost"
-              aria-label={m.common_undo()}
+        <ToolbarSection className="shrink-0">
+          <ToolbarGroup aria-label={m.editor_history()}>
+            <IconButton
+              label={m.common_undo()}
+              shortcut="Ctrl+Z"
+              icon={<Undo2 />}
               disabled={!canUndo}
               onClick={() => useEditor.getState().undo()}
-            >
-              <Undo2 />
-            </Button>
-          </Tooltip>
-          <Tooltip content={`${m.common_redo()} · Ctrl+Shift+Z`}>
-            <Button
-              size="icon"
-              variant="ghost"
-              aria-label={m.common_redo()}
+            />
+            <IconButton
+              label={m.common_redo()}
+              shortcut="Ctrl+Shift+Z"
+              icon={<Redo2 />}
               disabled={!canRedo}
               onClick={() => useEditor.getState().redo()}
+            />
+          </ToolbarGroup>
+          <Tooltip content={m.rail_toggle_hint()} shortcut="Ctrl+\">
+            <Button
+              variant="ghost"
+              aria-pressed={rail === 'templates'}
+              className={cn(rail === 'templates' && 'bg-fill-2 hover:bg-fill-2')}
+              onClick={() => setRail(rail === 'templates' ? null : 'templates')}
             >
-              <Redo2 />
+              <LayoutTemplate />
+              {m.rail_templates()}
             </Button>
           </Tooltip>
-          <span className="mx-1.5 h-5 w-px bg-line" />
-          <Tooltip content={pageCount > 1 ? m.pages_hint() : undefined}>
-            <span className={cn('px-1 text-xs tabular-nums', pageCount > 1 ? 'text-warn' : 'text-faint')}>
-              {m.page_count({ count: pageCount })}
-            </span>
+          <Tooltip content={m.rv_editor_menu()}>
+            <Button variant="ghost" onClick={() => openReview(cv.id)}>
+              <ListChecks />
+              {m.editor_review()}
+            </Button>
           </Tooltip>
-          <ThemeToggle />
           <Menu>
             <MenuTrigger asChild>
-              <Button size="icon" variant="ghost" aria-label={m.editor_more()}>
-                <MoreHorizontal />
-              </Button>
+              <IconButton label={m.editor_more()} icon={<MoreHorizontal />} />
             </MenuTrigger>
             <MenuContent>
               <MenuItem
@@ -514,8 +913,8 @@ export function EditorPage() {
                   void useEditor
                     .getState()
                     .flush()
-                    .then(() => duplicate(cv))
-                    .then((copy) => navigate({ to: '/editor/$cvId', params: { cvId: copy.id } }))
+                    .then(() => duplicate(useEditor.getState().cv ?? cv))
+                    .then((copy) => copy && navigate({ to: '/editor/$cvId', params: { cvId: copy.id } }))
                 }
               >
                 {m.list_duplicate()}
@@ -526,96 +925,59 @@ export function EditorPage() {
               <MenuItem icon={<Languages />} onSelect={() => setTranslating(true)}>
                 {m.editor_translate_cv()}
               </MenuItem>
-              <MenuItem
-                icon={<ListChecks />}
-                onSelect={() =>
-                  void useEditor
-                    .getState()
-                    .flush()
-                    .then(() => navigate({ to: '/inceleme', search: { cv: cv.id } }))
-                }
-              >
+              <MenuItem icon={<ListChecks />} onSelect={() => openReview(cv.id)}>
                 {m.rv_editor_menu()}
               </MenuItem>
+              <MenuSeparator />
+              <MenuCheckboxItem checked={theme === 'dark'} onCheckedChange={(dark) => setTheme(dark ? 'dark' : 'light')}>
+                {m.settings_dark()}
+              </MenuCheckboxItem>
               <MenuSeparator />
               <MenuItem icon={<Trash2 />} danger onSelect={() => setDeleting(cv)}>
                 {m.common_delete()}
               </MenuItem>
             </MenuContent>
           </Menu>
-          <Tooltip content={`${m.pdf_hint()} · Ctrl+P`}>
-            <Button variant="primary" className="ml-1" onClick={requestPrint}>
+          <Tooltip content={m.pdf_hint()} shortcut="Ctrl+P">
+            <Button variant="primary" size="lg" onClick={requestPrint}>
               <FileDown />
               {m.pdf_button()}
             </Button>
           </Tooltip>
-        </div>
-      </header>
+        </ToolbarSection>
+      </Toolbar>
 
       <div className="flex min-h-0 flex-1">
-        <div className="min-w-0 flex-1">
-          <PreviewPane ref={frameRef} cv={cv} />
-        </div>
+        <Rail cv={cv} />
+        <main className="min-w-0 flex-1">
+          <PreviewPane ref={frameRef} cv={cv} notices={conflictNotice} />
+        </main>
         <Splitter
           onDrag={(dx) => setSavedPanelWidth((w) => Math.min(maxPanel, Math.max(PANEL_MIN, Math.min(maxPanel, w ?? panelWidth) - dx)))}
           onReset={() => setSavedPanelWidth(null)}
+          value={panelWidth}
+          min={PANEL_MIN}
+          max={maxPanel}
         />
-        <aside className="flex min-h-0 shrink-0 flex-col bg-surface" style={{ width: panelWidth }}>
-          <div className="flex shrink-0 items-center border-b border-line px-4 py-2.5">
-            <Segmented
-              value={tab}
-              onChange={setTab}
-              aria-label={m.editor_panel_tabs()}
-              options={[
-                { value: 'content', label: m.tab_content() },
-                { value: 'appearance', label: m.tab_appearance() },
-              ]}
-            />
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain" data-panel-scroll>
-            <div key={tab} className="px-4 pt-4 pb-10 animate-[rise-in_200ms_var(--ease-out-soft)]">
-              {tab === 'content' ? (
-                <div className="flex flex-col gap-6">
-                  <section id="personal-card" aria-label={m.editor_personal_title()} className="rounded-2xl">
-                    {/* Bölüm başlıklarıyla aynı satır yapısı: tutamak yuvası boş, başlık ve alanlar aynı x'te. */}
-                    <header className="flex items-center gap-1.5 py-2">
-                      <span aria-hidden className="h-7 w-5 shrink-0" />
-                      <h2 className="px-1 py-0.5 text-[15px] font-semibold tracking-tight">{m.editor_personal_title()}</h2>
-                    </header>
-                    <div className="pb-2 pl-7.5">
-                      <PersonalForm personal={cv.personal} showPhoto={cv.template.showPhoto} />
-                    </div>
-                  </section>
-                  <SectionList sections={cv.sections} language={cv.language} cvId={cv.id} />
-                </div>
-              ) : (
-                <AppearanceTab cv={cv} />
-              )}
-            </div>
-          </div>
-          <PromptBox cv={cv} />
+        <aside className="flex min-h-0 shrink-0 flex-col bg-window" style={{ width: panelWidth }}>
+          <Inspector cv={cv} />
         </aside>
       </div>
 
-      <PdfConfirmDialog
-        cv={cv}
-        open={confirmPdf}
-        onClose={() => setConfirmPdf(false)}
-        onConfirm={() => {
-          setConfirmPdf(false)
-          doPrint()
-        }}
-      />
+      {pdfConfirm}
       <TranslateCvDialog cv={cv} open={translating} onClose={() => setTranslating(false)} />
+      <LeaveDialog guard={guard} />
       <DeleteDialog
         cv={deleting}
         onClose={() => setDeleting(null)}
         beforeDelete={async () => {
-          // Bekleyen otomatik kayıt silinen CV'yi geri yazmasın.
+          // Bekleyen otomatik kayıt silinen CV'yi geri yazmasın; editör silmeyi "başka sekme sildi" sanmasın.
           await useEditor.getState().flush()
           useEditor.getState().unload()
         }}
         onDeleted={() => void navigate({ to: '/cvler' })}
+        // Silinemedi: CV duruyor, editöre yeniden yüklenir.
+        onFailed={() => setReloadKey((key) => key + 1)}
       />
     </div>
   )

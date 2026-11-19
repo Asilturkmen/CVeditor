@@ -1,14 +1,17 @@
 import type { ReactNode } from 'react'
+import { Badge } from '@/components/ui/Badge'
+import { buttonClass } from '@/components/ui/buttonClass'
 import { Dialog } from '@/components/ui/Dialog'
+import { InlineNotice } from '@/components/ui/Notice'
 import { cn } from '@/lib/cn'
 import { m } from '@/paraglide/messages'
 
 /** "Örnek" rozeti: örnek sağlayıcının çıktısının yanında. */
 export function DemoBadge({ className }: { className?: string }) {
   return (
-    <span className={cn('rounded-full bg-warn-soft px-1.5 py-px text-[11px] font-medium text-warn', className)}>
+    <Badge tone="warn" className={className}>
       {m.badge_sample()}
-    </span>
+    </Badge>
   )
 }
 
@@ -16,25 +19,18 @@ export function DemoBadge({ className }: { className?: string }) {
  * Yüklenen PDF'te kişinin adı tahmin edilemedi: metinde geçiyorsa maskelenmeden
  * gidebilir. Gönder düğmesinin üstünde, istek atılmadan önce görünür.
  */
-export function NameMissingNote({ className }: { className?: string }) {
+export function NameMissingNote({ className, children }: { className?: string; children?: ReactNode }) {
   return (
-    <p data-testid="ai-name-missing" className={cn('mt-3 rounded-lg bg-warn-soft px-3 py-2 text-[13px] leading-snug text-warn', className)}>
-      {m.rv_ai_name_missing()}
-    </p>
+    <div data-testid="ai-name-missing" className={cn('mt-3', className)}>
+      <InlineNotice tone="warn">{children ?? m.rv_ai_name_missing()}</InlineNotice>
+    </div>
   )
 }
 
-/** "Ne gönderilir?" bağlantısı (PromptBox'taki ile aynı görünüm). */
+/** "Ne gönderilir?" bağlantısı (PromptBox, İnceleme): düz vurgu düğmesi, pencere açar. */
 export function WhatIsSentButton({ onClick, className }: { onClick: () => void; className?: string }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'shrink-0 rounded font-medium text-muted underline decoration-line-strong underline-offset-2 transition-colors hover:text-text',
-        className,
-      )}
-    >
+    <button type="button" onClick={onClick} className={buttonClass({ variant: 'plain', size: 'sm', className: cn('-mx-2 phone:h-11', className) })}>
       {m.ai2_what_is_sent()}
     </button>
   )
@@ -45,6 +41,9 @@ export function WhatIsSentButton({ onClick, className }: { onClick: () => void; 
  * `build`, gönderimin kullandığı fonksiyonla aynı girdilerden kurulmalı. Pencere
  * açıkken her işlemede yeniden çağrılır: girdiler (ör. ilan metni) değişirse
  * gösterilen de değişir, pencere her zaman o an gönderilecek olanı gösterir.
+ *
+ * Düzen: önce uyarı (varsa), sonra neyin gidip neyin gitmediği (kurallar, örnek sağlayıcı notu),
+ * en altta gidecek verinin kendisi. Veri her zaman DOM'da ve seçilebilir; uzunsa kendi kabında kayar.
  */
 export function AiPayloadDialog({
   open,
@@ -71,23 +70,29 @@ export function AiPayloadDialog({
       onOpenChange={(next) => !next && onClose()}
       title={m.ai2_payload_title()}
       description={description}
-      className="w-[min(92vw,640px)]"
+      size="lg"
+      closeButton
     >
-      {warning && (
-        <p data-testid="ai-payload-warning" className="mb-3 rounded-lg bg-warn-soft px-3 py-2 text-[13px] leading-relaxed text-warn">
-          {warning}
-        </p>
-      )}
-      <p className="mb-3 text-[13px] leading-relaxed text-muted">
-        {rules}
-        {demo && <span className="mt-1.5 block font-medium text-text">{m.ai2_payload_demo()}</span>}
-      </p>
-      <pre
-        data-testid="ai-payload"
-        className="max-h-[52vh] overflow-auto rounded-lg border border-line bg-surface-2 p-3 font-mono text-[11.5px] leading-relaxed break-words whitespace-pre-wrap text-text"
-      >
-        {json}
-      </pre>
+      <div className="flex flex-col gap-3">
+        {warning && (
+          <div data-testid="ai-payload-warning">
+            <InlineNotice tone="warn">{warning}</InlineNotice>
+          </div>
+        )}
+        <p className="text-body text-fg">{rules}</p>
+        {demo && <InlineNotice tone="info">{m.ai2_payload_demo()}</InlineNotice>}
+        <div>
+          <h3 className="mb-1.5 text-headline text-fg">{m.ai2_payload_data()}</h3>
+          <pre
+            data-testid="ai-payload"
+            tabIndex={0}
+            aria-label={m.ai2_payload_data()}
+            className="max-h-[min(48dvh,28rem)] overflow-auto rounded-lg bg-fill-4 px-3 py-2.5 font-mono text-callout break-words whitespace-pre-wrap text-fg"
+          >
+            {json}
+          </pre>
+        </div>
+      </div>
     </Dialog>
   )
 }

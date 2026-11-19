@@ -7,6 +7,7 @@ EB Garamond: SIL Open Font License 1.1 (@fontsource/eb-garamond) — LICENSE-eb-
 Archivo: SIL Open Font License 1.1 (@fontsource/archivo) — LICENSE-archivo.txt
 Manrope: SIL Open Font License 1.1 (@fontsource/manrope) — LICENSE-manrope.txt
 Space Grotesk: SIL Open Font License 1.1 (@fontsource/space-grotesk) — LICENSE-space-grotesk.txt
+Libre Franklin: SIL Open Font License 1.1 (@fontsource/libre-franklin) — LICENSE-libre-franklin.txt
 Poppins: SIL Open Font License 1.1 (@fontsource/poppins) — LICENSE-poppins.txt
 DM Serif Display: SIL Open Font License 1.1 (@fontsource/dm-serif-display) — LICENSE-dm-serif-display.txt
 Playfair Display: SIL Open Font License 1.1 (@fontsource/playfair-display) — LICENSE-playfair-display.txt

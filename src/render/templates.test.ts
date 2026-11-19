@@ -18,6 +18,7 @@ import {
   templateSettingsForCopy,
   type TemplateId,
 } from './templates'
+import { DEFAULT_TEMPLATE_ID } from './templateMeta'
 import { nameMetrics } from './nameMetrics'
 
 const tr = JSON.parse(trRaw) as Record<string, string>
@@ -42,14 +43,21 @@ function parse(html: string) {
 }
 
 describe('şablon kaydı', () => {
-  it('10 şablon onaylı sırada', () => {
-    expect(TEMPLATE_LIST.map((t) => t.id)).toEqual(['zarif', 'panel', 'bant', 'manset', 'gece', 'isvicre', 'cizelge', 'cift', 'afis', 'cerceve'])
+  it('14 şablon onaylı sırada (SET-14 §4.1); varsayılan Yalın', () => {
+    expect(TEMPLATE_LIST.map((t) => t.id)).toEqual(['yalin', 'zarif', 'ikili', 'panel', 'teknik', 'cizgi', 'bant', 'cizelge', 'isvicre', 'yonetici', 'portre', 'denge', 'dergi', 'blok'])
+    expect(DEFAULT_TEMPLATE_ID).toBe('yalin')
   })
 
-  it('bilinmeyen ya da eski kimlik Zarif’e düşer', () => {
-    expect(getTemplate('klasik').id).toBe('zarif')
-    expect(getTemplate('yok').id).toBe('zarif')
-    expect(getTemplate('__proto__').id).toBe('zarif')
+  it('kancalar: Çizelge tarihi başa (K1), İkili yan sütunu sona (K2) alır; her şablonun ölçeği var (K4)', () => {
+    expect(TEMPLATE_LIST.filter((t) => t.datePosition === 'start').map((t) => t.id)).toEqual(['cizelge'])
+    expect(TEMPLATE_LIST.filter((t) => t.sidePosition === 'end').map((t) => t.id)).toEqual(['ikili'])
+    for (const t of TEMPLATE_LIST) expect(t.scale, t.id).toBeTruthy()
+  })
+
+  it('bilinmeyen ya da eski kimlik Yalın’a düşer', () => {
+    expect(getTemplate('klasik').id).toBe('yalin')
+    expect(getTemplate('manset').id).toBe('yalin')
+    expect(getTemplate('__proto__').id).toBe('yalin')
   })
 
   it('her şablonun adı, açıklaması, etiketleri ve renk takımı adları iki dilde var', () => {
@@ -61,19 +69,23 @@ describe('şablon kaydı', () => {
     }
   })
 
-  it('sütun kararları: Panel ve Çift Ton yalnız 2; Zarif, Gece, İsviçre, Çizelge yalnız 1; diğerleri 2 (+1)', () => {
+  it('sütun kararları (SET-14 §3)', () => {
     const cols = Object.fromEntries(TEMPLATE_LIST.map((t) => [t.id, [...t.columns]]))
     expect(cols).toEqual({
+      yalin: [1],
       zarif: [1],
+      ikili: [2],
       panel: [2],
-      bant: [2, 1],
-      manset: [2, 1],
-      gece: [1],
-      isvicre: [1],
+      teknik: [1],
+      cizgi: [1],
+      bant: [1, 2],
       cizelge: [1],
-      cift: [2],
-      afis: [2, 1],
-      cerceve: [2, 1],
+      isvicre: [1],
+      yonetici: [1],
+      portre: [1, 2],
+      denge: [2, 1],
+      dergi: [2, 1],
+      blok: [1, 2],
     })
   })
 
@@ -105,13 +117,13 @@ describe('şablon değiştirme ayarları', () => {
   it('dokunulmamış renk takımı, yazı tipi ve sütun yeni şablonunkine geçer', () => {
     const next = settingsForTemplate(TEMPLATES.zarif, TEMPLATES.panel, templateSettingsFor('zarif', sections), sections)
     expect(next.accentColor).toBe(TEMPLATES.panel.defaults.accentColor)
-    expect(next.font).toBe('inter')
+    expect(next.font).toBe('source-sans-3')
     expect(next.columns).toBe(2)
     expect(next.sideSections.length).toBeGreaterThan(0)
   })
 
   it('hazır takımlardan biri seçiliyse de yeni şablonun takımına geçer; zemin sıfırlanır', () => {
-    const settings = { ...templateSettingsFor('panel', sections), accentColor: '#c9a45c', baseColor: '#1e3a2f' }
+    const settings = { ...templateSettingsFor('panel', sections), accentColor: '#256b52', baseColor: '#1d3a30' }
     expect(activeColorSet(TEMPLATES.panel, settings)?.id).toBe('orman')
     const next = settingsForTemplate(TEMPLATES.panel, TEMPLATES.bant, settings, sections)
     expect(next.accentColor).toBe(TEMPLATES.bant.defaults.accentColor)
@@ -134,11 +146,11 @@ describe('şablon değiştirme ayarları', () => {
 
   it('başka CV’den kopyalarken vurgu rengi aynı kuralla taşınır', () => {
     // Kaynak Panel'in hazır takımında: yeni şablonun varsayılanı
-    const preset = { templateId: 'panel', template: { ...templateSettingsFor('panel', sections), accentColor: '#c9a45c', baseColor: '#1e3a2f' } }
+    const preset = { templateId: 'panel', template: { ...templateSettingsFor('panel', sections), accentColor: '#256b52', baseColor: '#1d3a30' } }
     expect(templateSettingsForCopy(preset, 'bant', sections).accentColor).toBe(TEMPLATES.bant.defaults.accentColor)
     // Kaynağın varsayılan rengi de öyle
-    expect(templateSettingsForCopy({ templateId: 'zarif', template: templateSettingsFor('zarif', sections) }, 'gece', sections).accentColor).toBe(
-      TEMPLATES.gece.defaults.accentColor,
+    expect(templateSettingsForCopy({ templateId: 'zarif', template: templateSettingsFor('zarif', sections) }, 'yonetici', sections).accentColor).toBe(
+      TEMPLATES.yonetici.defaults.accentColor,
     )
     // Özel renk kalır; geri kalanı yeni şablonun varsayılanı
     const custom = { templateId: 'zarif', template: { ...templateSettingsFor('zarif', sections), accentColor: '#123456', font: 'literata' as const } }
@@ -148,16 +160,16 @@ describe('şablon değiştirme ayarları', () => {
     expect(copy.columns).toBe(2)
     expect(copy.baseColor).toBeNull()
     // Bilinmeyen kaynak şablon varsayılan şablon sayılır
-    expect(templateSettingsForCopy({ templateId: 'klasik', template: templateSettingsFor('zarif', sections) }, 'afis', sections).accentColor).toBe(
-      TEMPLATES.afis.defaults.accentColor,
+    expect(templateSettingsForCopy({ templateId: 'klasik', template: templateSettingsFor('zarif', sections) }, 'blok', sections).accentColor).toBe(
+      TEMPLATES.blok.defaults.accentColor,
     )
   })
 
   it('özel renk ve kullanıcının seçtiği sütun (destekleniyorsa) kalır', () => {
-    const settings = { ...templateSettingsFor('bant', sections), accentColor: '#123456', columns: 1 as const }
-    const next = settingsForTemplate(TEMPLATES.bant, TEMPLATES.afis, settings, sections)
+    const settings = { ...templateSettingsFor('bant', sections), accentColor: '#123456', columns: 2 as const }
+    const next = settingsForTemplate(TEMPLATES.bant, TEMPLATES.blok, settings, sections)
     expect(next.accentColor).toBe('#123456')
-    expect(next.columns).toBe(1)
+    expect(next.columns).toBe(2)
     // Desteklenmeyen sütun desteklenene çekilir.
     expect(settingsForTemplate(TEMPLATES.bant, TEMPLATES.panel, settings, sections).columns).toBe(2)
   })
@@ -192,22 +204,30 @@ describe('renkler ve kontrast koruması', () => {
   })
 
   it('CV değişkenleri şablonun zeminini, yazı tiplerini ve hazır takımın elle seçilmiş tonlarını taşır', () => {
-    const cv = cvWith('cift')
-    const css = cvVariables(cv.template, TEMPLATES.cift)
-    expect(css).toContain('--base:#3d3a7a')
-    expect(css).toContain('--base-soft:#e7e3f7')
-    expect(css).toContain("--font-display:'CV Space Grotesk'")
-    const isvicre = cvVariables(cvWith('isvicre').template, TEMPLATES.isvicre)
-    expect(isvicre).toContain("--font-mono:'CV IBM Plex Mono'")
-    // Özel renkte takımın elle seçilmiş tonu uygulanmaz, türetilen kullanılır.
-    const custom = cvVariables({ ...cv.template, baseColor: '#204060' }, TEMPLATES.cift)
-    expect(custom).not.toContain('--base-soft:#e7e3f7')
+    const cv = cvWith('panel')
+    const css = cvVariables(cv.template, TEMPLATES.panel)
+    expect(css).toContain('--base:#1c2b3f')
+    expect(css).toContain("--font-display:'CV Source Serif 4'")
+    expect(cvVariables(cvWith('ikili').template, TEMPLATES.ikili)).toContain("--font:'CV Libre Franklin'")
+    // Zarif'in fildişi takımı kâğıdı değiştirir; özel renkte takımın elle seçilmiş tonu uygulanmaz.
+    const zarif = cvWith('zarif')
+    expect(cvVariables({ ...zarif.template, accentColor: '#6b3a2a' }, TEMPLATES.zarif)).toContain('--paper:#fbf8f1')
+    expect(cvVariables({ ...zarif.template, accentColor: '#6b3a2b' }, TEMPLATES.zarif)).toContain('--paper:#ffffff')
+  })
+
+  it('K4: boy ve aralık değişkenleri şablonun ölçeğiyle çarpılır', () => {
+    const yalin = cvVariables(cvWith('yalin').template, TEMPLATES.yalin)
+    expect(yalin).toContain('--fs:8.97pt')
+    expect(yalin).toContain('--pad-x:18mm')
+    expect(yalin).toContain('--section-gap:7mm')
+    const teknik = cvVariables({ ...cvWith('teknik').template, spacing: 'compact' }, TEMPLATES.teknik)
+    expect(teknik).toContain('--block-gap:1.32mm')
   })
 })
 
 describe('markup kancaları', () => {
   it('ad iç span’da, ad + unvan .cv-heading içinde; DOM sırası ad → unvan → iletişim', () => {
-    const doc = parse(renderCvSource(cvWith('afis')))
+    const doc = parse(renderCvSource(cvWith('blok')))
     expect(doc.querySelector('.cv-identity > .cv-heading > h1.cv-name > span.cv-name-text')?.textContent).toBe('Deniz Aksoy')
     const order = [...doc.querySelectorAll('.cv-name, .cv-headline, .cv-contact')].map((el) => el.className)
     expect(order).toEqual(['cv-name', 'cv-headline', 'cv-contact'])
@@ -216,7 +236,7 @@ describe('markup kancaları', () => {
   it('bilinmeyen şablon varsayılana, desteklenmeyen sütun desteklenene düşer', () => {
     const cv = cvWith('zarif')
     const unknown = parse(renderCvSource({ ...cv, templateId: 'klasik' as TemplateId }))
-    expect(unknown.querySelector('.cv')?.className).toContain('tpl-zarif')
+    expect(unknown.querySelector('.cv')?.className).toContain('tpl-yalin')
     // Zarif yalnız tek sütun: kayıtta 2 olsa da yan sütun akışı yok, hepsi ana akışta.
     const zarif2 = parse(renderCvSource({ ...cv, template: { ...cv.template, columns: 2, sideSections: cv.sections.map((s) => s.id) } }))
     expect(zarif2.querySelector('.cv')?.className).toContain('cols-1')
@@ -235,7 +255,7 @@ describe('markup kancaları', () => {
     expect(nameMetrics('Abdurrahman Kahramanoğlu')).toEqual({ isLong: false, hasLongWord: true, longest: 12 })
     expect(nameMetrics('Ayşegül Nur Karamustafaoğlu Öztürk').isLong).toBe(true)
     expect(nameMetrics('Ali Yılmazoğlu').hasLongWord).toBe(false)
-    const cv = structuredClone(cvWith('manset'))
+    const cv = structuredClone(cvWith('dergi'))
     cv.personal.fullName = 'Abdurrahman Kahramanoğlu'
     expect(parse(renderCvSource(cv)).querySelector<HTMLElement>('.cv-name')?.getAttribute('style')).toBe('--name-longest:12')
     // Boş ad: önizlemedeki yer tutucunun ölçüsü
@@ -244,7 +264,7 @@ describe('markup kancaları', () => {
   })
 
   it('uzun ad işaretlenir', () => {
-    const cv = structuredClone(cvWith('manset'))
+    const cv = structuredClone(cvWith('dergi'))
     expect(parse(renderCvSource(cv)).querySelector('.cv-name')?.className).toBe('cv-name')
     cv.personal.fullName = 'Ayşegül Karamustafapaşaoğlu Yıldırım'
     const name = parse(renderCvSource(cv)).querySelector('.cv-name')!
@@ -279,5 +299,29 @@ describe('markup kancaları', () => {
     expect(withPhoto.querySelector('.cv-header')?.className).toBe('cv-header has-photo')
     expect(withPhoto.querySelector('img.cv-photo')).toBeTruthy()
     expect(withPhoto.querySelector('.ph-photo')).toBeNull()
+  })
+  it('K1: tarih sütunlu şablonda tarih DOM’da başlıktan önce; tarihsiz kayıt değişmez', () => {
+    const doc = parse(renderCvSource(cvWith('cizelge')))
+    const head = doc.querySelector('.entry-experience .entry-head')!
+    expect(head.className).toBe('entry-head date-first')
+    expect([...head.children].map((el) => el.className)).toEqual(['entry-date', 'entry-title'])
+    const ref = parse(renderCvSource(cvWith('yalin'))).querySelector('.entry-experience .entry-head')!
+    expect([...ref.children].map((el) => el.className)).toEqual(['entry-title', 'entry-date'])
+  })
+
+  it('K2: yan sütunu sağdaki şablonda ana akış DOM’da önce, kökte side-end', () => {
+    const doc = parse(renderCvSource(cvWith('ikili')))
+    const root = doc.querySelector('.cv')!
+    expect(root.classList.contains('side-end')).toBe(true)
+    expect([...root.children].map((el) => el.getAttribute('data-flow'))).toEqual(['header', 'main', 'side'])
+    const panel = parse(renderCvSource(cvWith('panel'))).querySelector('.cv')!
+    expect(panel.classList.contains('side-end')).toBe(false)
+    expect([...panel.children].map((el) => el.getAttribute('data-flow'))).toEqual(['header', 'side', 'main'])
+  })
+
+  it('K5: beceri etiketinin iki noktası ayrı öğe; metin aynı', () => {
+    const label = parse(renderCvSource(cvWith('yalin'))).querySelector('.entry-skills .line-label')!
+    expect(label.textContent).toBe('Diller: ')
+    expect(label.querySelector('.line-colon')?.textContent).toBe(': ')
   })
 })

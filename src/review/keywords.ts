@@ -1,4 +1,5 @@
 import type { CvLanguage } from '@/cv/schema'
+import { headingKey } from './headings'
 import { fold } from './text'
 
 /**
@@ -208,9 +209,63 @@ interface Candidate {
   forms: Map<string, number>
 }
 
-/** İlandan anahtar kelimeleri çıkarır, önem sırasıyla. */
+/**
+ * İlanların bölüm başlıkları (katlanmış; `headingKey` biçiminde karşılaştırılır).
+ * Başlık satırı ve "Başlık: içerik" satırındaki başlık anahtar kelime olmaz.
+ */
+const AD_HEADINGS = new Set(
+  `
+is tanimi|is ilani|is detaylari|is ozeti|pozisyon hakkinda|pozisyon detaylari|genel nitelikler|aranan nitelikler
+aradigimiz nitelikler|aranan ozellikler|aranan yetkinlikler|nitelikler|is tanimi ve sorumluluklar|sorumluluklar
+gorev ve sorumluluklar|gorevler ve sorumluluklar|gorevler|temel sorumluluklar|ucret ve yan haklar|yan haklar
+neler sunuyoruz|sana neler sunuyoruz|size neler sunuyoruz|sunduklarimiz|sunduğumuz imkanlar|olanaklar|hakkimizda
+biz kimiz|sirket hakkinda|firma hakkinda|kimi ariyoruz|nasil birini ariyoruz|seni neler bekliyor|neler yapacaksin
+beklentilerimiz|tercih sebebi|tercih sebepleri|tercih edilen nitelikler|artilar|olursa iyi olur|calisma sekli
+calisma kosullari|nasil basvurulur|basvuru|aday kriterleri|aday profili|genel bilgiler|is tanımı ve gorevler
+requirements|minimum requirements|key requirements|responsibilities|key responsibilities|main responsibilities
+duties|job duties|what we offer|what we can offer|what you will do|what you ll do|what you will bring|what you bring
+what we are looking for|what we re looking for|who you are|who we are|about us|about the role|about the job
+about the company|about the team|about you|perks|benefits|perks benefits|benefits perks|compensation benefits
+qualifications|minimum qualifications|basic qualifications|preferred qualifications|job description|job summary
+role overview|the role|your role|nice to have|nice to haves|bonus points|must have|must haves|how to apply
+`
+    .split(/[|\n]/)
+    .map((t) => headingKey(t))
+    .filter(Boolean),
+)
+
+/** Satır bir ilan bölüm başlığı mı: bilinen başlık ya da tamamen büyük harfli kısa satır ("ÜCRET VE YAN HAKLAR")? */
+export function isAdHeading(line: string): boolean {
+  const t = line.trim().replace(/^[-–—•*#>\s]+/, '').replace(/[:：]\s*$/, '').trim()
+  if (!t) return false
+  if (AD_HEADINGS.has(headingKey(t))) return true
+  const words = t.split(/\s+/)
+  if (words.length > 6 || /[\p{N},;/+#.()]/u.test(t)) return false
+  const letters = t.replace(/[^\p{L}]/gu, '')
+  if (letters.length < 4) return false
+  const upper = t === t.toLocaleUpperCase('tr') || t === t.toUpperCase()
+  if (!upper || t === t.toLocaleLowerCase('tr')) return false
+  // Kısaltma satırı ("SQL", "AWS GCP") ya da bilinen teknoloji içeren satır başlık değildir.
+  if (words.every((w) => w.replace(/[^\p{L}]/gu, '').length <= 4)) return false
+  return !words.some((w) => KNOWN.has(fold(w.replace(/[^\p{L}\p{N}]/gu, ''))))
+}
+
+/** Başlık satırları boşalır; "Başlık: içerik" satırında başlık atılır. Satır sayısı ve sırası korunur. */
+export function stripAdHeadings(adText: string): string {
+  return adText
+    .split('\n')
+    .map((line) => {
+      if (isAdHeading(line)) return ''
+      const inline = /^(\s*[-–—•*]?\s*)([^:：\n]{2,40})[:：]\s*(.*)$/.exec(line)
+      if (inline && AD_HEADINGS.has(headingKey(inline[2]))) return inline[1] + inline[3]
+      return line
+    })
+    .join('\n')
+}
+
+/** İlandan anahtar kelimeleri çıkarır, önem sırasıyla. Bölüm başlıkları atlanır. */
 export function extractKeywords(adText: string, language: CvLanguage, limit = 40): Omit<Keyword, 'cvCount'>[] {
-  const tokens = tokenize(adText)
+  const tokens = tokenize(stripAdHeadings(adText))
   const content = tokens.map((t) => isContent(t, language))
   const keys = tokens.map((t) => keyOf(t, language))
   const unigrams = new Map<string, Candidate>()

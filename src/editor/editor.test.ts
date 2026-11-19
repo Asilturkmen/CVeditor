@@ -127,8 +127,8 @@ describe('düzenleme', () => {
 
   it('şablon değişince dokunulmamış renk ve yazı tipi yeni şablonunkine geçer', () => {
     switchTemplate('panel')
-    expect(cv().template.font).toBe('inter')
-    expect(cv().template.accentColor).toBe('#2f8f7f')
+    expect(cv().template.font).toBe('source-sans-3')
+    expect(cv().template.accentColor).toBe('#1f4e79')
   })
 
   it('otomatik kayıt veritabanına yazar', async () => {

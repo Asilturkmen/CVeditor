@@ -11,6 +11,11 @@ export interface RenderGate {
   isCurrent: (token: number) => boolean
   /** Çizim bitti (yalnız en son başlayan çizim için anlamlı) */
   complete: (token: number) => void
+  /**
+   * Süren çizimleri geçersiz kılar (bileşen kaldırıldı): hiçbiri artık "en son" değildir,
+   * yazı tiplerini beklerken uyanınca yarıda bırakılır. Yeni bir çizim bitene kadar settled() false döner.
+   */
+  invalidate: () => void
   /** Çizimin sözünü izler; settled() en son izlenen sözü bekler */
   track: <T>(promise: Promise<T>) => Promise<T>
   /**
@@ -29,6 +34,9 @@ export function createRenderGate(): RenderGate {
     isCurrent: (token) => token === started,
     complete: (token) => {
       if (token === started) completed = token
+    },
+    invalidate: () => {
+      started++
     },
     track(promise) {
       latest = promise.catch(() => undefined)

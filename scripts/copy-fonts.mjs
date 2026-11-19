@@ -26,16 +26,17 @@ const BODY = ['400', '500', '600', '700', '400i', '700i']
 const FONTS = [
   // Gövde (Görünüm sekmesinde seçilebilir)
   { id: 'inter', pkg: 'inter', family: 'CV Inter', faces: BODY },
-  { id: 'ibm-plex-sans', pkg: 'ibm-plex-sans', family: 'CV IBM Plex Sans', faces: ['300', ...BODY] }, // İsviçre adı 300
+  { id: 'ibm-plex-sans', pkg: 'ibm-plex-sans', family: 'CV IBM Plex Sans', faces: BODY },
   { id: 'source-sans-3', pkg: 'source-sans-3', family: 'CV Source Sans 3', faces: BODY },
   { id: 'source-serif-4', pkg: 'source-serif-4', family: 'CV Source Serif 4', faces: BODY },
   { id: 'literata', pkg: 'literata', family: 'CV Literata', faces: BODY },
   { id: 'eb-garamond', pkg: 'eb-garamond', family: 'CV EB Garamond', faces: BODY },
-  { id: 'archivo', pkg: 'archivo', family: 'CV Archivo', faces: [...BODY, '800', '900'] }, // Afiş adı 900, etiketler 800
+  { id: 'archivo', pkg: 'archivo', family: 'CV Archivo', faces: [...BODY, '800'] }, // Blok'un adı 800
   { id: 'manrope', pkg: 'manrope', family: 'CV Manrope', faces: ['400', '500', '600', '700', '800'] }, // italiği yok
   { id: 'space-grotesk', pkg: 'space-grotesk', family: 'CV Space Grotesk', faces: ['400', '500', '600', '700'] }, // italiği yok
+  { id: 'libre-franklin', pkg: 'libre-franklin', family: 'CV Libre Franklin', faces: BODY }, // İkili
   // Yalnız şablonun başlık/ad ailesi (Görünüm'de seçilmez)
-  { id: 'poppins', pkg: 'poppins', family: 'CV Poppins', faces: ['500', '600', '700'] },
+  { id: 'poppins', pkg: 'poppins', family: 'CV Poppins', faces: ['500', '600'] }, // Denge'nin adı
   { id: 'dm-serif-display', pkg: 'dm-serif-display', family: 'CV DM Serif Display', faces: ['400', '400i'] },
   { id: 'playfair-display', pkg: 'playfair-display', family: 'CV Playfair Display', faces: ['400', '700', '400i'] },
   { id: 'ibm-plex-mono', pkg: 'ibm-plex-mono', family: 'CV IBM Plex Mono', faces: ['400', '500'] },

@@ -1,0 +1,123 @@
+/*
+ * İkili (`ikili`): docs/sablonlar/SET-14.md Şablon 3. Ana sütun solda, yetkinlikler sağda zeminsiz dar
+ * sütunda (K2: kökte `side-end`, DOM'da ana sütun önce); başlıkların altında kalın siyah çizgi.
+ * Gövde Libre Franklin (K6). Yalnız iki sütun.
+ * Her kural `.tpl-ikili` ile başlar. Sözleşme ve ortak varsayılanlar: base.css başı. Gövde boyu,
+ * satır aralığı ve boşluklar templateMeta.ts `scale` ile gelir (CSS'te yeniden çarpma).
+ * Ölçüler (orta boy, normal aralık): gövde 9.2 pt / 1.42; ad 23 pt; kenar 15 × 14 mm;
+ * blok 3 mm, bölüm 7 mm; sütunlar arası 7 mm, çizgisiz.
+ */
+
+.tpl-ikili {
+  --side-width: 35%;
+}
+
+/* Sütunlar arası toplam 7 mm (dikey çizgi yok) */
+.tpl-ikili.cols-2.side-end .col-main {
+  padding-right: 3.5mm;
+}
+
+.tpl-ikili.cols-2.side-end .col-side {
+  padding-left: 3.5mm;
+}
+
+/* ---------- Başlık: ad solda, daire fotoğraf sağda ---------- */
+
+/*
+ * Fotoğraf üstten hizalı: üst kenarı başlığın iç boşluğunda (adın satır kutusunun üstü), ad
+ * uzayıp iki satıra inse de yerinde kalır. Fotoğrafa bağlı boşluk fotoğrafta (baskıda yer
+ * tutucu kalkınca başlık kısalır, uzamaz).
+ */
+.tpl-ikili .cv-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0;
+  padding: var(--pad-y) var(--pad-x) 6mm;
+}
+
+.tpl-ikili .cv-identity {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.tpl-ikili .cv-photo {
+  grid-column: 2;
+  grid-row: 1;
+  width: 24mm;
+  height: 24mm;
+  margin-left: 6mm;
+  border-radius: 50%;
+}
+
+.tpl-ikili .cv-name {
+  --name-size: 2.5em;
+  --name-room: 150mm;
+  --name-char: 0.7;
+  font-weight: 700;
+  line-height: 1.05;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+
+.tpl-ikili .cv-headline {
+  margin-top: 1.2mm;
+  font-size: 1.15em;
+  font-weight: 600;
+  color: var(--accent-ink);
+}
+
+.tpl-ikili .cv-contact {
+  margin-top: 2.2mm;
+  color: var(--muted);
+}
+
+.tpl-ikili.align-center .cv-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.tpl-ikili.align-center .cv-photo {
+  margin: 0 0 3.5mm;
+}
+
+/* ---------- Bölüm başlığı (iki sütunda aynı): büyük harf + kalın siyah alt çizgi ---------- */
+
+.tpl-ikili .section-title {
+  padding-bottom: 0.9mm;
+  border-bottom: 0.6mm solid var(--ink);
+  font-size: 1em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+}
+
+/* ---------- Kayıtlar ---------- */
+
+.tpl-ikili .entry-title strong {
+  font-size: 1.04em;
+}
+
+/* Kurum adı vurgu renginde (setteki tek istisna) */
+.tpl-ikili .col-main .entry-sub .part:first-child {
+  font-weight: 600;
+  color: var(--accent-ink);
+}
+
+.tpl-ikili .rich li + li {
+  margin-top: 0.5mm;
+}
+
+/*
+ * Yan sütun: kayıt başlığı, altında soluk tarih, sonra kurum. Kurum 400 (500 kalın başlığın
+ * altında ikinci bir kalın satır gibi okunuyordu); dil seviyesi alt satırda soluk.
+ */
+.tpl-ikili .col-side .entry-sub .part:first-child {
+  font-weight: 400;
+}
+
+.tpl-ikili .col-side .entry-languages .line-value {
+  color: var(--muted);
+}

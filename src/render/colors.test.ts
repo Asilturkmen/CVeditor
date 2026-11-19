@@ -1,6 +1,10 @@
-import { describe, expect, it } from 'vitest'
-import { colorVariables, contrast, ensureContrast, mix, MIN_TEXT_CONTRAST, toHex } from './colors'
+import { describe, expect, it, vi } from 'vitest'
+import { colorVariables, contrast, ensureContrast, isDark, luminance, mix, MIN_TEXT_CONTRAST, onColor, onTones, toHex } from './colors'
 import { activeColorSet, TEMPLATE_LIST, type TemplateDef, type TemplateId } from './templates'
+
+// Renk küpü taramaları tek başına ~1 sn sürüyor; paralel testlerin yükü altında 5 sn'lik
+// varsayılanı aşabiliyor. Taramalar deterministik, süre sınırı yalnız yük için gevşetildi.
+vi.setConfig({ testTimeout: 30_000 })
 
 /**
  * Şablonların gerçekten kullandığı metin/zemin çiftleri (styles/<id>.css). Bir renk ya
@@ -14,7 +18,6 @@ import { activeColorSet, TEMPLATE_LIST, type TemplateDef, type TemplateId } from
 type Color = `--${string}` | { mix: [Color, number, Color] }
 type Pair = [fg: Color, bg: Color, label: string]
 
-const cm = (a: Color, percent: number, b: Color): Color => ({ mix: [a, percent, b] })
 
 const COMMON: Pair[] = [
   ['--ink', '--paper', 'metin'],
@@ -23,36 +26,32 @@ const COMMON: Pair[] = [
 ]
 
 const PAIRS: Record<TemplateId, Pair[]> = {
-  zarif: [[cm('--ink', 82, '--muted'), '--paper', 'özet']],
+  yalin: [],
+  zarif: [],
+  ikili: [],
   panel: [
     ['--on-base', '--base', 'yan sütun başlığı ve kayıt adı'],
     ['--on-base-dim', '--base', 'yan sütun metni'],
     ['--on-base-muted', '--base', 'yan sütun tarih/alt satır'],
   ],
+  teknik: [],
+  cizgi: [],
   bant: [
     ['--on-accent', '--accent', 'bantta ad'],
     ['--on-accent-dim', '--accent', 'bantta unvan'],
     ['--on-accent-muted', '--accent', 'bantta iletişim'],
-    ['--ink', '--accent-soft', 'yan kart metni'],
-    ['--muted', '--accent-soft', 'yan kart tarihi'],
-    ['--accent-ink', '--accent-soft', 'yan kart başlığı ve alt satırı'],
   ],
-  manset: [[cm('--ink', 82, '--paper'), '--paper', 'iletişim']],
-  gece: [['--on-base', '--paper', 'kayıt adı']],
-  isvicre: [[cm('--ink', 84, '--paper'), '--paper', 'iletişim']],
-  cizelge: [[cm('--accent-ink', 82, '--ink'), cm('--accent', 13, '--paper'), 'tarih hapı']],
-  cift: [
-    ['--on-base', '--paper', 'koyu yarıda ad ve kayıt adı'],
-    ['--base-ink', '--base-soft', 'açık yarı metni ve başlığı'],
-    ['--base-ink-muted', '--base-soft', 'açık yarı tarihi'],
-  ],
-  afis: [
-    ['--ink', '--accent-mark', 'fosforlu kalem altında ad ve unvan'],
+  cizelge: [['--ink', '--accent-soft', 'şeritte bölüm başlığı']],
+  isvicre: [],
+  yonetici: [],
+  portre: [],
+  denge: [],
+  dergi: [],
+  blok: [
+    ['--ink', '--accent-mark', 'renk bloğunda ad, unvan, iletişim'],
     ['--paper', '--ink', 'siyah etiket kutusunda bölüm başlığı'],
   ],
-  cerceve: [],
 }
-
 function resolve(color: Color, vars: Record<string, string>): string {
   if (typeof color === 'string') {
     const value = vars[color]
@@ -145,12 +144,71 @@ describe('şablon renkleri: her metin/zemin çifti ≥ 4.5:1', () => {
     }
   })
 
-  it('inceleme örnekleri: Çift Ton #42904b ve Gece #ff0b13 zemininde metin okunur', () => {
-    const cift = TEMPLATE_LIST.find((t) => t.id === 'cift')!
-    const gece = TEMPLATE_LIST.find((t) => t.id === 'gece')!
-    const a = varsFor(cift, '#ffcf70', '#42904b')
-    expect(contrast(a['--ink'], a['--paper'])).toBeGreaterThanOrEqual(4.5)
-    const b = varsFor(gece, '#d4a85a', '#ff0b13')
-    expect(contrast(b['--ink'], b['--paper'])).toBeGreaterThanOrEqual(4.5)
+  it('aynı zeminde bütün on-* renkleri aynı kutupta (beyaz ad + siyah unvan olmaz)', () => {
+    // Zeminden açık mı koyu mu: ≥ 4.5:1 okunan metin ikisinden biridir.
+    const pole = (text: string, bg: string) => (luminance(text) > luminance(bg) ? 'açık' : 'koyu')
+    const mixed = (color: string) => {
+      const v = colorVariables({ accent: color, base: color, paper: '#ffffff' })
+      const accent = [v['--on-accent'], v['--on-accent-dim'], v['--on-accent-muted']].map((c) => pole(c, color))
+      const base = [v['--on-base'], v['--on-base-dim'], v['--on-base-muted']].map((c) => pole(c, color))
+      return new Set(accent).size > 1 || new Set(base).size > 1 ? `${color}: ${accent.join('/')} · ${base.join('/')}` : null
+    }
+    // İnceleme örnekleri: onColor'ın beyazı seçtiği ama eski eşiğin (L < 0.18) "açık" saydığı bant.
+    for (const color of ['#e03131', '#d63384', '#c94f00', '#008577', '#767676']) {
+      const v = colorVariables({ accent: color, base: color, paper: '#ffffff' })
+      expect(mixed(color), color).toBeNull()
+      for (const name of ['--on-accent', '--on-accent-dim', '--on-accent-muted', '--on-base', '--on-base-dim', '--on-base-muted'] as const) {
+        expect(contrast(v[name], color), `${name} / ${color}`).toBeGreaterThanOrEqual(MIN_TEXT_CONTRAST)
+      }
+    }
+    // RGB taraması, colorVariables'ın kullandığı aynı fonksiyon ve oranlarla: bütün küp 15'er adımla
+    // (18³ renk), kutbun değiştiği parlaklık bandı (beyaz/koyu sınırı ≈ 0.18) 5'er adımla (52³ içinden
+    // bandda kalanlar). Bandın dışında üç ton da aynı uca (beyaz ya da koyu) uzaktır.
+    const lum = Array.from({ length: 256 }, (_, v) => {
+      const c = v / 255
+      return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+    })
+    const candidates: [number, number, number][] = []
+    for (let r = 0; r <= 255; r += 5) {
+      for (let g = 0; g <= 255; g += 5) {
+        for (let b = 0; b <= 255; b += 5) {
+          const l = 0.2126 * lum[r] + 0.7152 * lum[g] + 0.0722 * lum[b]
+          if ((r % 15 === 0 && g % 15 === 0 && b % 15 === 0) || (l > 0.15 && l < 0.22)) candidates.push([r, g, b])
+        }
+      }
+    }
+    expect(candidates.length).toBeGreaterThan(10_000)
+    const problems: string[] = []
+    for (const rgb of candidates) {
+      const bg = toHex(rgb)
+      for (const [dim, muted] of [
+        [0.12, 0.22],
+        [0.1, 0.32],
+      ]) {
+        const tones = Object.values(onTones(bg, dim, muted))
+        if (new Set(tones.map((c) => pole(c, bg))).size > 1) problems.push(`${bg}: ${tones.join(' ')}`)
+        if (tones.some((c) => contrast(c, bg) < MIN_TEXT_CONTRAST)) problems.push(`${bg} okunmuyor: ${tones.join(' ')}`)
+      }
+    }
+    expect(problems.slice(0, 20)).toEqual([])
+  })
+
+  it('kontrast yönü onColor ile aynı: koyu sayılan zeminde beyaza, açıkta siyaha', () => {
+    for (const bg of ['#e03131', '#d63384', '#c94f00', '#008577', '#767676']) {
+      expect(onColor(bg)).toBe('#ffffff')
+      expect(isDark(bg)).toBe(true)
+      // Zeminin kendisi metin olarak okunmaz; düzeltme beyaza doğru gider.
+      expect(luminance(ensureContrast(bg, bg))).toBeGreaterThan(luminance(bg))
+    }
+    expect(isDark('#787878')).toBe(false)
+    expect(luminance(ensureContrast('#787878', '#787878'))).toBeLessThan(luminance('#787878'))
+  })
+
+  it('inceleme örnekleri: zemin renkli kâğıtta (#42904b, #ff0b13) metin okunur', () => {
+    for (const base of ['#42904b', '#ff0b13']) {
+      const v = colorVariables({ accent: '#d4a85a', base, paper: 'base' })
+      expect(contrast(v['--ink'], v['--paper'])).toBeGreaterThanOrEqual(4.5)
+      expect(contrast(v['--muted'], v['--paper'])).toBeGreaterThanOrEqual(4.5)
+    }
   })
 })

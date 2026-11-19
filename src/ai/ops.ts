@@ -3,24 +3,26 @@ import { CONTACT_FIELDS, PERSONAL_TEXT_FIELDS, textField, TEXT_FIELDS } from '@/
 import type { AnyItem, Cv, Section } from '@/cv/schema'
 import type { Suggestion } from '@/editor/ui'
 import { sanitizeRichText } from '@/render/richtext'
-import { hasPlaceholder } from './payload'
 import type { EditPayload, EditResult } from './types'
 
 /**
  * Model işlemlerini (EditOperation) arayüzün önerilerine çevirir. Her işlem
  * ayrı doğrulanır; uymayan işlem sessizce atılır ve `dropped` sayısına girer:
  * - hedef kayıt/bölüm var ve istekte gönderilen kapsamın içinde
- * - alan o bölüm türünün metin alanı (kişisel bilgide: unvan; iletişim alanı —
- *   kişinin ya da referansın — yalnız istekte gönderildiyse)
- * - zengin metin süzgeçten geçer, düz metinden etiket atılır
+ * - alan o bölüm türünün metin alanı ve istekte o bölümün `fields` listesinde
+ *   (kişisel bilgide: unvan; iletişim alanı — kişinin ya da referansın — yalnız
+ *   istekte gönderildiyse)
+ * - zengin metin süzgeçten geçer, düz metinden etiket ve satır sonu atılır
  * - değişiklik yaratmayan işlem öneri olmaz (atılmış sayılmaz)
- * - geri konamayan yer tutucu (⟦…⟧) kalan değer atılır
+ * - tanınmayan ya da bozulmuş yer tutucu içeren değer atılır (`restore` null
+ *   döner: gönderilen/dönen yer tutucu kümesi karşılaştırması, mask.ts)
  */
 
 const MAX_VALUE = 8000
 const MAX_NOTE = 240
 
-function plain(value: string): string {
+/** Düz alan: etiketsiz, tek satır, fazla boşluksuz (çeviri de kullanır). */
+export function plain(value: string): string {
   return value
     .replace(/<[^>]*>/g, ' ')
     .replace(/[ \t]+/g, ' ')
@@ -40,7 +42,7 @@ function same(before: string, after: string, rich: boolean): boolean {
 export function operationsToSuggestions(
   cv: Cv,
   result: EditResult,
-  unmask: (s: string) => string,
+  restore: (s: string) => string | null,
   payload: Pick<EditPayload, 'scope' | 'sections' | 'personal'>,
 ): { suggestions: Suggestion[]; dropped: number } {
   const suggestions: Suggestion[] = []
@@ -62,10 +64,10 @@ export function operationsToSuggestions(
     }
     return undefined
   }
-  const note = (reason: string | undefined) => (reason ? unmask(reason).trim().slice(0, MAX_NOTE) : '')
+  const note = (reason: string | null | undefined) => (reason ? (restore(reason) ?? '').trim().slice(0, MAX_NOTE) : '')
   const value = (raw: string, rich: boolean): string | null => {
-    const restored = unmask(raw)
-    if (restored.length > MAX_VALUE || hasPlaceholder(restored)) return null
+    const restored = restore(raw)
+    if (restored === null || restored.length > MAX_VALUE) return null
     return clean(restored, rich)
   }
 
@@ -118,9 +120,10 @@ export function operationsToSuggestions(
       const item = createItem(section.type) as AnyItem
       const record = item as unknown as Record<string, unknown>
       let invalid = false
+      // Yalnız istekte bu bölüm için bildirilen alanlar (iletişim gönderilmediyse yeni kayda da yazılmaz).
+      const allowed = new Set((sentSections.get(section.id)?.fields ?? []).map((f) => f.key))
       for (const f of TEXT_FIELDS[section.type]) {
-        // İletişim istenmediyse yeni kayda da iletişim alanı yazılmaz.
-        if (f.contact && !(f.contact in payload.personal)) continue
+        if (!allowed.has(f.key)) continue
         const raw = op.fields[f.key]
         if (typeof raw !== 'string') continue
         const v = value(raw, f.rich)

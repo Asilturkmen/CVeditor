@@ -4,7 +4,7 @@ import { formatDateRange, formatYearMonth, isRangeInverted } from './dates'
 import { createCv, createItem, defaultSections, duplicateCv, isItemEmpty } from './factory'
 import { createBackup, migrateCv, parseBackup } from './migrate'
 import { samplePersonal, sampleSections } from './sample'
-import { CvSchema } from './schema'
+import { CURRENT_SCHEMA_VERSION, CvSchema } from './schema'
 
 function sampleCv(language: 'tr' | 'en' = 'tr') {
   const sections = sampleSections(language)
@@ -119,6 +119,6 @@ describe('yedek', () => {
   })
 
   it('gelecek şema sürümünü reddeder', () => {
-    expect(() => migrateCv({ ...sampleCv(), schemaVersion: 3 })).toThrow('daha yeni')
+    expect(() => migrateCv({ ...sampleCv(), schemaVersion: CURRENT_SCHEMA_VERSION + 1 })).toThrow('daha yeni')
   })
 })

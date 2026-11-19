@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, CircleCheck, Lightbulb, Loader2, Square } from 'lucide-react'
+import { BriefcaseBusiness, CircleCheck, Lightbulb, Square } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
 import type { PdfText } from '@/ai/pdfText'
 import { getAiProvider } from '@/ai/provider'
@@ -7,6 +7,9 @@ import type { ReviewComment, ReviewCommentKind } from '@/ai/types'
 import { parseReviewResult } from '@/ai/validate'
 import type { Cv } from '@/cv/schema'
 import { Button } from '@/components/ui/Button'
+import { Group } from '@/components/ui/Group'
+import { InlineNotice } from '@/components/ui/Notice'
+import { Spinner } from '@/components/ui/Spinner'
 import { AiPayloadDialog, DemoBadge, NameMissingNote, WhatIsSentButton } from '@/features/ai/AiPayloadDialog'
 import { useAiTask } from '@/features/ai/useAiTask'
 import { cn } from '@/lib/cn'
@@ -16,8 +19,8 @@ import type { FindingTarget } from '@/review/rules'
 
 const KIND: Record<ReviewCommentKind, { label: () => string; icon: ReactNode; tone: string }> = {
   strength: { label: () => m.rv_ai_kind_strength(), icon: <CircleCheck />, tone: 'text-ok' },
-  improve: { label: () => m.rv_ai_kind_improve(), icon: <Lightbulb />, tone: 'text-muted' },
-  job_fit: { label: () => m.rv_ai_kind_job_fit(), icon: <BriefcaseBusiness />, tone: 'text-muted' },
+  improve: { label: () => m.rv_ai_kind_improve(), icon: <Lightbulb />, tone: 'text-fg-2' },
+  job_fit: { label: () => m.rv_ai_kind_job_fit(), icon: <BriefcaseBusiness />, tone: 'text-fg-2' },
 }
 
 const uiLanguage = () => (getLocale() === 'en' ? 'en' : 'tr')
@@ -26,21 +29,18 @@ function CommentRow({ comment, onEdit }: { comment: ReviewComment; onEdit?: (tar
   const kind = KIND[comment.kind]
   const target = comment.target
   return (
-    <li className="flex items-start gap-3 px-4 py-3" data-ai-comment={comment.kind}>
-      <span className={cn('mt-[3px] shrink-0 [&_svg]:size-4', kind.tone)} aria-hidden>
+    <li className="flex items-start gap-3 px-[var(--row-px)] py-3" data-ai-comment={comment.kind}>
+      <span className={cn('mt-px shrink-0 [&_svg]:size-4', kind.tone)} aria-hidden>
         {kind.icon}
       </span>
-      <p className="min-w-0 flex-1 leading-snug">
-        <span className={cn('mr-2 text-[12.5px] font-semibold', kind.tone === 'text-ok' ? 'text-ok' : 'text-text')}>
-          {kind.label()}
-        </span>
-        <span className="text-[13px] break-words">{comment.message}</span>
-      </p>
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <p className="text-callout text-fg-2">{kind.label()}</p>
+        <p className="text-body break-words text-fg">{comment.message}</p>
+      </div>
       {target && onEdit && (
         <Button
-          size="sm"
-          variant="ghost"
-          className="-my-0.5 text-accent hover:text-accent"
+          variant="plain"
+          className="-my-1 -mr-2"
           aria-label={m.rv_edit_label({ title: kind.label() })}
           onClick={() => onEdit({ sectionId: target.sectionId, itemId: target.itemId })}
         >
@@ -93,55 +93,59 @@ export function ReviewAiCard({
   const stale = done !== null && done.ad !== ad
 
   return (
-    <section aria-labelledby="rv-ai" className="rounded-xl border border-line bg-surface" data-testid="review-ai">
-      <div className="px-4 pt-3.5 pb-4">
-        <h2 id="rv-ai" className="flex items-center gap-2 text-[15px] font-semibold tracking-tight">
-          {m.rv_ai_title()}
-          {done && provider.isDemo && <DemoBadge />}
-        </h2>
-        <p className="mt-1 text-[13px] text-muted">
-          {m.rv_ai_body()}
-          {provider.isDemo && <> {m.rv_ai_body_demo()}</>}
-        </p>
-        {!nameFound && <NameMissingNote />}
+    <div data-testid="review-ai">
+      <Group
+        inset="lg"
+        title={
+          <span className="flex items-center gap-2">
+            {m.rv_ai_title()}
+            {done && provider.isDemo && <DemoBadge />}
+          </span>
+        }
+      >
+        <div className="flex flex-col gap-3 px-[var(--row-px)] py-3">
+          <p className="text-callout text-fg-2">
+            {m.rv_ai_body()}
+            {provider.isDemo && <> {m.rv_ai_body_demo()}</>}
+          </p>
+          {!nameFound && <NameMissingNote className="mt-0" />}
 
-        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
-          {state.status === 'running' ? (
-            <>
-              <span role="status" className="inline-flex h-7 items-center gap-2 text-[13px] text-muted">
-                <Loader2 className="size-4 animate-spin text-accent" aria-hidden />
-                {m.rv_ai_running()}
-              </span>
-              <Button size="sm" variant="ghost" onClick={task.cancel}>
-                <Square className="!size-3 fill-current" aria-hidden />
-                {m.ai_stop()}
-              </Button>
-            </>
-          ) : (
-            <Button size="sm" onClick={request}>
-              {done ? m.rv_ai_again() : m.rv_ai_request()}
-            </Button>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            {state.status === 'running' ? (
+              <>
+                <span role="status" className="inline-flex h-7 items-center gap-2 text-body text-fg">
+                  <Spinner />
+                  {m.rv_ai_running()}
+                </span>
+                <Button onClick={task.cancel}>
+                  <Square className="size-3! fill-current" aria-hidden />
+                  {m.ai_stop()}
+                </Button>
+              </>
+            ) : (
+              <Button onClick={request}>{done ? m.rv_ai_again() : m.rv_ai_request()}</Button>
+            )}
+            <WhatIsSentButton className="ml-auto" onClick={() => setShowPayload(true)} />
+          </div>
+          {ad && <p className="text-callout text-fg-2">{m.rv_ai_with_ad()}</p>}
+
+          {state.status === 'error' && (
+            <div role="alert" className="animate-fade-in">
+              <InlineNotice tone="danger">{state.message}</InlineNotice>
+            </div>
           )}
-          {ad && <span className="text-[13px] text-muted">{m.rv_ai_with_ad()}</span>}
-          <WhatIsSentButton className="ml-auto text-[13px]" onClick={() => setShowPayload(true)} />
+          {stale && <p className="text-callout text-fg-2">{m.rv_ai_stale()}</p>}
+          {done && done.comments.length === 0 && <p className="text-body text-fg">{m.rv_ai_empty()}</p>}
         </div>
 
-        {state.status === 'error' && (
-          <p role="alert" className="mt-3 rounded-lg bg-danger-soft px-3 py-2 text-[13px] text-danger animate-fade-in">
-            {state.message}
-          </p>
+        {done && done.comments.length > 0 && (
+          <ul aria-label={m.rv_ai_list_label()} className="group-rows animate-rise-in">
+            {done.comments.map((comment, i) => (
+              <CommentRow key={i} comment={comment} onEdit={onEdit} />
+            ))}
+          </ul>
         )}
-        {stale && <p className="mt-3 text-[13px] text-muted">{m.rv_ai_stale()}</p>}
-        {done && done.comments.length === 0 && <p className="mt-3 text-sm">{m.rv_ai_empty()}</p>}
-      </div>
-
-      {done && done.comments.length > 0 && (
-        <ul aria-label={m.rv_ai_list_label()} className="divide-y divide-line border-t border-line animate-rise-in">
-          {done.comments.map((comment, i) => (
-            <CommentRow key={i} comment={comment} onEdit={onEdit} />
-          ))}
-        </ul>
-      )}
+      </Group>
 
       <AiPayloadDialog
         open={showPayload}
@@ -152,6 +156,6 @@ export function ReviewAiCard({
         warning={nameFound ? undefined : m.rv_ai_name_missing_payload()}
         demo={provider.isDemo}
       />
-    </section>
+    </div>
   )
 }

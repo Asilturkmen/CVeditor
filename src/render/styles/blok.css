@@ -1,0 +1,149 @@
+/*
+ * Blok (`blok`): docs/sablonlar/SET-14.md Şablon 14. Sayfanın sol üst köşesine dayalı kare fotoğraf ve
+ * yanında açık renkli ad bloğu (--accent-mark; üstünde --ink ≥ 4.5:1); bölüm başlıkları küçük siyah
+ * etiket kutuları. Archivo. Tek ya da iki sütun. Başlık kenardan kenara, yalnız ilk sayfada.
+ * Her kural `.tpl-blok` ile başlar. Sözleşme ve ortak varsayılanlar: base.css başı. Gövde boyu,
+ * satır aralığı ve boşluklar templateMeta.ts `scale` ile gelir (CSS'te yeniden çarpma).
+ *
+ * Renk yalnız başlık bloğunda; gövde siyah-beyaz. Siyah iki yerde tekrar eder (başlığın altındaki
+ * kalın çizgi, bölüm etiketleri): blok ile gövdeyi aynı sese bağlar. Köşe yok, gölge yok.
+ */
+
+.tpl-blok {
+  --side-width: 31%;
+}
+
+/* ---------- Başlık: köşe fotoğrafı + renk bloğu ---------- */
+
+.tpl-blok .cv-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  margin-bottom: 6.5mm;
+  /* Her takımda; "siyah-beyaz" takımında blok beyaz olduğu için başlığı bu çizgi kapatır */
+  border-bottom: 0.8mm solid var(--ink);
+}
+
+#cv-pages.tpl-blok .cv-header {
+  border-radius: 0;
+}
+
+/* Kare; ad bloğu uzarsa (iki satırlık ad, uzun iletişim) fotoğraf da blok boyunca uzar, altında boşluk kalmaz */
+.tpl-blok .cv-photo {
+  grid-column: 1;
+  grid-row: 1;
+  width: 42mm;
+  /* Satır yüksekliğine katkısı yok (ad bloğu belirler: en az 42 mm); sonra satırı doldurur */
+  height: 0;
+  min-height: 100%;
+  border-radius: 0;
+}
+
+/* Kimlik bloğu (kimlik seçici: editördeki üzerine gelme zemini bloğu ezmesin) */
+.tpl-blok .cv-identity {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 42mm;
+  padding: 7mm 12mm;
+  --sg-surface: var(--accent-mark);
+}
+
+#cv-pages.tpl-blok .cv-identity {
+  background: var(--accent-mark);
+}
+
+/* Fotoğrafsız: blok kenardan kenara; ad gövdenin sol kenarıyla aynı x'te başlar */
+.tpl-blok .cv-header.no-photo .cv-identity {
+  grid-column: 1 / -1;
+  min-height: 34mm;
+  padding-left: var(--pad-x);
+  padding-right: var(--pad-x);
+}
+
+.tpl-blok .cv-name {
+  --name-size: 2.9em;
+  --name-room: 130mm;
+  --name-char: 0.72;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.tpl-blok .cv-headline {
+  margin-top: 1.4mm;
+  font-size: 1.15em;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.tpl-blok .cv-contact {
+  margin-top: 2.8mm;
+  line-height: 1.45;
+  color: var(--ink);
+}
+
+.tpl-blok .cv-contact .sep {
+  padding-right: 1.4mm;
+  color: var(--ink);
+}
+
+.tpl-blok.align-center .cv-identity {
+  align-items: center;
+  text-align: center;
+}
+
+/* ---------- Bölüm başlığı: siyah etiket kutusu ---------- */
+
+.tpl-blok .section-title {
+  align-self: flex-start;
+  padding: 0.8mm 2.2mm 0.7mm;
+  background: var(--ink);
+  font-size: 0.82em;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.05em;
+  color: var(--paper);
+}
+
+.tpl-blok .section-title + * {
+  margin-top: calc(2.2mm - var(--block-gap));
+}
+
+/* ---------- Kayıtlar ---------- */
+
+.tpl-blok .entry-title strong {
+  font-weight: 700;
+}
+
+.tpl-blok .entry-date {
+  font-size: 0.82em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tpl-blok .entry-sub .part:first-child {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.tpl-blok .rich li::marker {
+  color: var(--ink);
+}
+
+/* ---------- İki sütun: aralık 8 mm ---------- */
+
+.tpl-blok.cols-2 .col-side {
+  padding-right: 4mm;
+}
+
+.tpl-blok.cols-2 .col-main {
+  padding-left: 4mm;
+}

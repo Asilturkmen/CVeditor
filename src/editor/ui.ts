@@ -80,7 +80,10 @@ interface EditorUiState {
   focusedItemId: string | null
   /** En son odaklanılan kayıt; odak panelden çıkınca da kalır (kapsam menüsündeki "Seçili kayıt") */
   lastFocusedItemId: string | null
-  /** Sağ panelde kaydırılacak hedef; nonce aynı hedefe tekrar kaydırmayı sağlar */
+  /**
+   * Sağ panelde kaydırılacak hedef; nonce aynı hedefe tekrar kaydırmayı sağlar. Hedef bir kez
+   * tüketilir (`consumeScrollTarget`): İçerik sekmesine her dönüşte yeniden kaydırıp odağı çalmaz.
+   */
   scrollTarget: { id: string; nonce: number } | null
   /** Önizlemede gösterilecek öneri (data-sg-id) */
   reveal: { id: string; nonce: number } | null
@@ -92,8 +95,13 @@ interface EditorUiState {
   clipped: boolean
   suggestions: Suggestion[]
   aiScope: AiScope
+  /** Tuvalin solundaki ray: şablonlar ya da sayfa küçük resimleri; null = kapalı */
+  rail: 'templates' | 'pages' | null
+  setRail: (rail: EditorUiState['rail']) => void
   setTab: (tab: EditorUiState['tab']) => void
   focusItem: (id: string | null, scroll?: boolean) => void
+  /** Kaydırma hedefi işlendi: `nonce` hâlâ o hedefse temizlenir (arada yeni hedef geldiyse kalır). */
+  consumeScrollTarget: (nonce: number) => void
   /** Odak kayıttan çıktı: vurgu kalkar, "son odak" kalır */
   blurItem: (id: string) => void
   /** Yalnız önizleme vurgusu (son odağı değiştirmez) */
@@ -106,6 +114,32 @@ interface EditorUiState {
   removeSuggestions: (ids: string[]) => void
   setAiScope: (scope: AiScope) => void
   reset: () => void
+  /**
+   * Sağ paneldeki anahat: tek açık satır ('personal' ya da kayıt id'si). "Tümünü aç" kapalıyken
+   * geçerli; bir satır açılınca öbürü kapanır.
+   */
+  openRowId: string | null
+  /** "Tümünü aç": bütün kayıtlar açık (eski hep açık form). Tarayıcıda hatırlanır; `reset` değiştirmez. */
+  expandAll: boolean
+  /** "Tümünü aç" açıkken kullanıcının tek tek kapattığı satırlar. */
+  collapsedRows: string[]
+  setRowOpen: (id: string, open: boolean) => void
+  setExpandAll: (expandAll: boolean) => void
+}
+
+const EXPAND_ALL_KEY = 'cveditor:inspectorExpandAll'
+
+function readExpandAll(): boolean {
+  try {
+    return typeof localStorage !== 'undefined' && localStorage.getItem(EXPAND_ALL_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+/** Anahat satırı açık mı (seçici içinde kullan: `useEditorUi((s) => isRowOpen(s, id))`). */
+export function isRowOpen(s: Pick<EditorUiState, 'openRowId' | 'expandAll' | 'collapsedRows'>, id: string): boolean {
+  return s.expandAll ? !s.collapsedRows.includes(id) : s.openRowId === id
 }
 
 const initial = {
@@ -121,17 +155,25 @@ const initial = {
   clipped: false,
   suggestions: [],
   aiScope: { kind: 'all' } as AiScope,
+  rail: null as EditorUiState['rail'],
+  openRowId: null as string | null,
+  collapsedRows: [] as string[],
 }
+
+/** Hedef temizlense de sayaç geri dönmez: her kaydırma isteği ayrı bir nonce alır. */
+let scrollNonce = 0
 
 export const useEditorUi = create<EditorUiState>((set) => ({
   ...initial,
+  setRail: (rail) => set({ rail }),
   setTab: (tab) => set({ tab }),
   focusItem: (id, scroll = false) =>
     set((s) => ({
       focusedItemId: id,
       lastFocusedItemId: id ?? s.lastFocusedItemId,
-      scrollTarget: scroll && id ? { id, nonce: (s.scrollTarget?.nonce ?? 0) + 1 } : s.scrollTarget,
+      scrollTarget: scroll && id ? { id, nonce: ++scrollNonce } : s.scrollTarget,
     })),
+  consumeScrollTarget: (nonce) => set((s) => (s.scrollTarget?.nonce === nonce ? { scrollTarget: null } : {})),
   blurItem: (id) => set((s) => (s.focusedItemId === id ? { focusedItemId: null } : {})),
   highlightItem: (id) => set({ focusedItemId: id }),
   revealSuggestion: (id) => set((s) => ({ reveal: { id, nonce: (s.reveal?.nonce ?? 0) + 1 } })),
@@ -142,4 +184,22 @@ export const useEditorUi = create<EditorUiState>((set) => ({
   removeSuggestions: (ids) => set((s) => ({ suggestions: s.suggestions.filter((x) => !ids.includes(x.id)) })),
   setAiScope: (aiScope) => set({ aiScope }),
   reset: () => set({ ...initial }),
+  expandAll: readExpandAll(),
+  setRowOpen: (id, open) =>
+    set((s) => {
+      if (s.expandAll) {
+        const rest = s.collapsedRows.filter((x) => x !== id)
+        return { collapsedRows: open ? rest : [...rest, id] }
+      }
+      if (open) return { openRowId: id }
+      return s.openRowId === id ? { openRowId: null } : {}
+    }),
+  setExpandAll: (expandAll) => {
+    try {
+      localStorage.setItem(EXPAND_ALL_KEY, expandAll ? '1' : '0')
+    } catch {
+      // Depolama kapalıysa yalnız bu oturumda geçerli.
+    }
+    set({ expandAll, collapsedRows: [] })
+  },
 }))

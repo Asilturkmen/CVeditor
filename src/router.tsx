@@ -7,10 +7,11 @@ import { HomeRedirect } from '@/features/shell/HomeRedirect'
 import { CvListPage } from '@/features/cv-list/CvListPage'
 import { TemplatesPage } from '@/features/templates/TemplatesPage'
 import { NotFound } from '@/features/shell/NotFound'
+import { RouteError } from '@/features/shell/RouteError'
 
 const rootRoute = createRootRoute({
   component: () => (
-    <TooltipProvider delayDuration={350}>
+    <TooltipProvider>
       <Outlet />
       <Toaster />
       <AiAuthDialog />
@@ -46,18 +47,44 @@ export const editorRoute = createRoute({
   component: lazyRouteComponent(() => import('@/features/editor/EditorPage'), 'EditorPage'),
 })
 
+/** Bileşen vitrini: yalnız geliştirmede (üretimde dal ve dinamik içe aktarma paketten düşer). */
+const devRoutes = import.meta.env.DEV
+  ? [
+      createRoute({
+        getParentRoute: () => rootRoute,
+        path: '/_ui',
+        component: lazyRouteComponent(() => import('@/components/ui/showcase/UiShowcase'), 'UiShowcase'),
+      }),
+    ]
+  : []
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   shellRoute.addChildren([listRoute, templatesRoute, settingsRoute, reviewRoute]),
   editorRoute,
+  ...devRoutes,
 ])
+
+/** Sekme görünürken sayfa geçişi animasyonlu (View Transition); gizliyken değil. */
+const viewTransitionAllowed = () => typeof document === 'undefined' || document.visibilityState === 'visible'
 
 export const router = createRouter({
   routeTree,
-  defaultViewTransition: true,
+  defaultViewTransition: viewTransitionAllowed(),
   defaultPreload: 'intent',
   scrollRestoration: true,
+  defaultErrorComponent: RouteError,
 })
+
+// Gizli sekmede başlatılan görünüm geçişi "InvalidStateError: Transition was aborted… Document hidden"
+// ile reddedilir ve bu red işlenmemiş hata olarak kalır. Sekme gizliyken geçiş hiç kullanılmaz
+// (yönlendirici seçeneği her gezinmede okur). Geçiş sürerken gizlenen sekmenin reddini genel
+// yakalayıcı zararsız sayar (lib/errors.ts).
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    router.options.defaultViewTransition = viewTransitionAllowed()
+  })
+}
 
 declare module '@tanstack/react-router' {
   interface Register {

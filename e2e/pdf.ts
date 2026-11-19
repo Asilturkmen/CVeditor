@@ -112,7 +112,7 @@ export async function pdfText(pdf: Buffer): Promise<PdfPage[]> {
  * (ör. yazı tipi alt kümesi değişince bölünen "Geli" + "ş" + "tirici")
  * boşluksuz, satır değişince ya da arada boşluk varsa boşlukla.
  *
- * Eşikler yazı boyuna oranlıdır: dev boyda (Manşet'in 70 pt adı) harf aralığı ve
+ * Eşikler yazı boyuna oranlıdır: dev boyda (ör. 70 pt'lik ad) harf aralığı ve
  * kerning yüzünden bitişik parçalar arasında birkaç pt'lik açıklık olur; sabit 1 pt
  * eşik orada kelimenin içine boşluk koyardı ("Ay ş e"). Kelime boşluğu ~0.25em.
  */

@@ -1,14 +1,19 @@
+import { formatDateRange, formatYearMonth } from '@/cv/dates'
 import { stripHtml } from '@/cv/factory'
-import type { AnyItem, SectionType } from '@/cv/schema'
+import type { AnyItem, CvLanguage, DateRange, SectionType, YearMonth } from '@/cv/schema'
 
-/** Kaydın tek satırlık adı (kart başlığı, uyarılar, kapsam seçimi için). */
+/**
+ * Kaydın adı (satır, uyarılar, kapsam seçimi, bildirim için). Metin "…" ile kesilmez: uzun ad
+ * gösterildiği yerde sarar; özetin adı yalnız ilk cümlesidir (yapıyla kısalır).
+ */
 export function itemLabel(type: SectionType, item: AnyItem): string {
   const it = item as Record<string, unknown>
   const s = (key: string) => (typeof it[key] === 'string' ? (it[key] as string).trim() : '')
   const join = (...parts: string[]) => parts.filter(Boolean).join(' — ')
   switch (type) {
     case 'summary':
-      return truncate(stripHtml(s('content')).replace(/\s+/g, ' ').trim(), 60)
+      // Özetin adı ilk cümlesidir (kesilmez; satırda sarar).
+      return firstSentence(stripHtml(s('content')))
     case 'experience':
       return join(s('position'), s('company'))
     case 'education':
@@ -16,7 +21,7 @@ export function itemLabel(type: SectionType, item: AnyItem): string {
     case 'projects':
       return s('name')
     case 'skills':
-      return s('name') || truncate(s('keywords'), 40)
+      return s('name') || s('keywords')
     case 'languages':
       return join(s('name'), s('level'))
     case 'certificates':
@@ -32,6 +37,48 @@ export function itemLabel(type: SectionType, item: AnyItem): string {
   }
 }
 
-function truncate(text: string, max: number) {
-  return text.length > max ? `${text.slice(0, max - 1)}…` : text
+/**
+ * Anahat satırının parçaları: ad (kalın), kurum (soluk, adın yanında), tarih (sağda). Metin
+ * kısaltılmaz; satır sarar. Boş parça ''.
+ */
+export function rowParts(type: SectionType, item: AnyItem, language: CvLanguage): { title: string; meta: string; date: string } {
+  const it = item as Record<string, unknown>
+  const s = (key: string) => (typeof it[key] === 'string' ? (it[key] as string).trim() : '')
+  const range = () => {
+    const r = it.dates as DateRange | undefined
+    return r ? formatDateRange(r, language) : ''
+  }
+  const month = () => formatYearMonth((it.date as YearMonth | null | undefined) ?? null, language)
+  const join = (...parts: string[]) => parts.filter(Boolean).join(' · ')
+  switch (type) {
+    case 'summary':
+      return { title: firstSentence(stripHtml(s('content'))), meta: '', date: '' }
+    case 'experience':
+      return { title: s('position'), meta: s('company'), date: range() }
+    case 'education':
+      return { title: s('school'), meta: join(s('field'), s('degree')), date: range() }
+    case 'projects':
+      return { title: s('name'), meta: s('role'), date: range() }
+    case 'skills':
+      return { title: s('name'), meta: s('keywords'), date: '' }
+    case 'languages':
+      return { title: s('name'), meta: s('level'), date: '' }
+    case 'certificates':
+      return { title: s('name'), meta: s('issuer'), date: month() }
+    case 'awards':
+      return { title: s('title'), meta: s('issuer'), date: month() }
+    case 'volunteer':
+      return { title: s('role'), meta: s('organization'), date: range() }
+    case 'references':
+      return { title: s('name'), meta: join(s('position'), s('organization')), date: '' }
+    case 'custom':
+      return { title: s('title'), meta: s('subtitle'), date: range() }
+  }
+}
+
+/** Metnin ilk cümlesi (boşluklar sadeleşir). Cümle uzunsa kesilmez; satır sarar. */
+export function firstSentence(text: string): string {
+  const clean = text.replace(/\s+/g, ' ').trim()
+  const match = /^(.+?[.!?])(\s|$)/.exec(clean)
+  return match ? match[1] : clean
 }

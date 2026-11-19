@@ -1,4 +1,4 @@
-import '@fontsource-variable/instrument-sans'
+import '@fontsource-variable/inter/opsz.css'
 import './styles/app.css'
 import './lib/prefs'
 import { RouterProvider } from '@tanstack/react-router'
@@ -11,6 +11,7 @@ import { getLocale } from './paraglide/runtime'
 import { m } from './paraglide/messages'
 import { toast } from './components/ui/toast'
 import { db, watchVersionChange } from './db/db'
+import { watchUnhandledRejections } from './lib/errors'
 
 // Arayüz dili (Paraglide: localStorage, yoksa Türkçe). CV iframe'inin lang'ı ayrı, CV dilinden gelir.
 document.documentElement.lang = getLocale()
@@ -27,6 +28,9 @@ createRoot(document.getElementById('root')!).render(
 )
 
 void requestPersistence()
+
+// Hiçbir hata sessizce yutulmasın: işlenmemiş redde kullanıcıya sakin bir bildirim (ayrıntı konsolda).
+watchUnhandledRejections(() => toast({ message: m.err_unexpected(), tone: 'error', duration: 8000 }))
 
 // Başka sekmede daha yeni sürüm veritabanını yükseltirse: bağlantı kapanır, kullanıcı sayfayı yeniler.
 watchVersionChange(db, (event) =>

@@ -153,9 +153,12 @@ describe('uydurma yer tutucu geri konmaz', () => {
   it('istekte gönderilmeyen ⟦PHONE⟧/⟦EMAIL⟧/⟦NAME⟧ değeri yerelde doldurulmaz; işlem atılır', () => {
     const cv = sampleCv()
     const summary = cv.sections.find((s) => s.type === 'summary')!.items[0]
-    const { payload, unmask } = buildEditPayload(cv, { kind: 'all' }, 'Özeti düzelt')
+    const { payload, unmask, restore } = buildEditPayload(cv, { kind: 'all' }, 'Özeti düzelt')
     expect(payload.placeholders).not.toContain('⟦PHONE⟧')
-    for (const p of ['⟦PHONE⟧', '⟦EMAIL⟧', '⟦NAME⟧', '⟦LOCATION_4⟧']) expect(unmask(`Ara: ${p}`)).toBe(`Ara: ${p}`)
+    for (const p of ['⟦PHONE⟧', '⟦EMAIL⟧', '⟦NAME⟧', '⟦LOCATION_4⟧']) {
+      expect(unmask(`Ara: ${p}`)).toBe(`Ara: ${p}`)
+      expect(restore(`Ara: ${p}`)).toBeNull()
+    }
     const result = operationsToSuggestions(
       cv,
       {
@@ -164,20 +167,23 @@ describe('uydurma yer tutucu geri konmaz', () => {
           { op: 'set', target: 'personal', field: 'headline', value: '⟦NAME⟧ — Frontend Geliştirici' },
         ],
       },
-      unmask,
+      restore,
       payload,
     )
     expect(result.suggestions).toEqual([])
     expect(result.dropped).toBe(2)
   })
 
-  it('istek iletişim alanıyla ilgiliyse o alanın yer tutucusu kişisel değerle doldurulur (yalnız o alan)', () => {
+  it('iletişim açıkça seçildiyse iletişim alanlarının yer tutucusu kişisel değerle doldurulur; ad asla', () => {
     const cv = sampleCv()
-    const { payload, unmask } = buildEditPayload(cv, { kind: 'all' }, 'Telefonumu özete ekle')
+    const hinted = buildEditPayload(cv, { kind: 'all' }, 'Telefonumu özete ekle')
+    expect(hinted.payload.personal.phone).toBeUndefined()
+    expect(hinted.restore('⟦PHONE⟧')).toBeNull()
+    const { payload, restore } = buildEditPayload(cv, { kind: 'all' }, 'Telefonumu özete ekle', { contact: true })
     expect(payload.personal.phone).toBe(cv.personal.phone)
-    expect(unmask('⟦PHONE⟧')).toBe(cv.personal.phone)
-    expect(unmask('⟦EMAIL⟧')).toBe('⟦EMAIL⟧')
-    expect(unmask('⟦NAME⟧')).toBe('⟦NAME⟧')
+    expect(restore('⟦PHONE⟧')).toBe(cv.personal.phone)
+    expect(restore('⟦EMAIL⟧')).toBe(cv.personal.email)
+    expect(restore('⟦NAME⟧')).toBeNull()
   })
 
   it('çeviri yanıtında uydurma yer tutucu alanı kaynak metinle bırakır', () => {

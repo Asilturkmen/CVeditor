@@ -33,7 +33,7 @@ vi.mock('pdfjs-dist', () => ({
 }))
 vi.mock('pdfjs-dist/build/pdf.worker.min.mjs?url', () => ({ default: '' }))
 
-const { extractPdfText, MAX_PDF_PAGES, PdfTextError } = await import('./pdfText')
+const { extractPdfText, hasPdfSignature, MAX_PDF_PAGES, PdfTextError } = await import('./pdfText')
 
 const pdfBytes = () => new TextEncoder().encode('%PDF-1.7 sahte').buffer as ArrayBuffer
 
@@ -91,5 +91,34 @@ describe('PDF metni okuma sınırları', () => {
 
   it('PDF olmayan dosya reddedilir', async () => {
     await expect(extractPdfText(new TextEncoder().encode('merhaba').buffer as ArrayBuffer)).rejects.toMatchObject({ code: 'not_pdf' })
+  })
+
+  it('%PDF- imzası baştaki BOM, boşluk ya da çöp baytlardan sonra da tanınır (ilk 1024 bayt)', async () => {
+    const withPrefix = (prefix: Uint8Array) => {
+      const tail = new TextEncoder().encode('%PDF-1.7 sahte')
+      const out = new Uint8Array(prefix.length + tail.length)
+      out.set(prefix)
+      out.set(tail, prefix.length)
+      return out
+    }
+    const bom = new Uint8Array([0xef, 0xbb, 0xbf])
+    const junk = new Uint8Array(700).fill(0x00)
+    junk.set(new TextEncoder().encode('\r\n  çöp başlık\n'))
+    for (const prefix of [bom, new TextEncoder().encode('\n\n   '), junk, new Uint8Array(1023).fill(0x20)]) {
+      expect(hasPdfSignature(withPrefix(prefix))).toBe(true)
+    }
+    const pdf = await extractPdfText(withPrefix(junk).buffer as ArrayBuffer)
+    expect(pdf.pageCount).toBe(1)
+
+    // 1024 bayttan sonra gelen imza ve tiresiz "%PDF" sayılmaz
+    expect(hasPdfSignature(withPrefix(new Uint8Array(1024).fill(0x20)))).toBe(false)
+    expect(hasPdfSignature(new TextEncoder().encode('%PDF'))).toBe(false)
+    expect(hasPdfSignature(new Uint8Array(0))).toBe(false)
+    await expect(extractPdfText(withPrefix(new Uint8Array(2000).fill(0x20)).buffer as ArrayBuffer)).rejects.toMatchObject({ code: 'not_pdf' })
+  })
+
+  it('içerik akışının ham sırası da döner (flow)', async () => {
+    const pdf = await extractPdfText(pdfBytes())
+    expect(pdf.flow?.map((l) => l.text)).toEqual(pdf.lines.map((l) => l.text))
   })
 })

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
-import { createCv, patchCv, preview } from './helpers.ts'
+import { createCv, openRowIn, openTemplate, patchCv, preview } from './helpers.ts'
 
 test('ilk ziyarette Şablonlar açılır, CV varsa CV\'lerim', async ({ page }) => {
   await page.goto('/')
@@ -12,17 +12,112 @@ test('ilk ziyarette Şablonlar açılır, CV varsa CV\'lerim', async ({ page }) 
   await expect(page.getByRole('heading', { name: 'Genel TR' })).toBeVisible()
 })
 
+test('galeri: sütun süzgeci kartları ve sayıyı TEMPLATE_META\'ya göre süzer', async ({ page }) => {
+  await page.goto('/sablonlar')
+  const meta = await page.evaluate(async () => {
+    const { TEMPLATE_META } = await import('/src/render/templateMeta.ts' as string)
+    return (TEMPLATE_META as { id: string; columns: number[] }[]).map((t) => ({ id: t.id, columns: [...t.columns] }))
+  })
+  const cards = page.locator('[data-template]')
+  const count = page.getByRole('status').filter({ hasText: /şablon$/ })
+  await expect(cards).toHaveCount(meta.length)
+  await expect(count).toHaveText(`${meta.length} şablon`)
+  const filters = page.getByRole('radiogroup', { name: 'Sütun' })
+  for (const [label, columns] of [['Tek sütun', 1], ['İki sütun', 2]] as const) {
+    await filters.getByRole('radio', { name: label }).click()
+    const expected = meta.filter((t) => t.columns.includes(columns)).map((t) => t.id)
+    await expect(cards).toHaveCount(expected.length)
+    await expect(count).toHaveText(`${expected.length} şablon`)
+    expect(await cards.evaluateAll((els) => els.map((el) => el.getAttribute('data-template')))).toEqual(expected)
+  }
+  // Örnek kipi süzmez, yalnız küçük resmi fotoğrafsız çizer.
+  await filters.getByRole('radio', { name: 'Tümü' }).click()
+  await page.getByRole('radiogroup', { name: 'Örnek' }).getByRole('radio', { name: 'Fotoğrafsız' }).click()
+  await expect(cards).toHaveCount(meta.length)
+  await expect(page.frameLocator('[data-template] iframe').first().locator('img.cv-photo')).toHaveCount(0)
+})
+
+test('şablon sayfası: önceki/sonraki gezinir, yazılan ad kalır, seçilen renk yeni CV\'ye yazılır', async ({ page }) => {
+  await openTemplate(page, 'Zarif')
+  const sheet = page.getByRole('dialog')
+  await expect(sheet.getByRole('heading', { name: 'Zarif' })).toBeVisible()
+  await sheet.getByLabel('CV adı').fill('Gezinen')
+  // Odak yazı alanında değilken ← → şablon değiştirir; düğmeler de.
+  await sheet.getByRole('button', { name: 'Sonraki şablon' }).click()
+  const nextHeading = sheet.getByRole('heading', { level: 2 })
+  const nextName = await nextHeading.innerText()
+  expect(nextName).not.toBe('Zarif')
+  await page.keyboard.press('ArrowLeft')
+  await expect(sheet.getByRole('heading', { name: 'Zarif' })).toBeVisible()
+  await expect(sheet.getByLabel('CV adı')).toHaveValue('Gezinen')
+  // İkinci renk takımı
+  const swatch = sheet.getByRole('radiogroup', { name: 'Renk' }).getByRole('radio').nth(1)
+  await swatch.click()
+  await expect(swatch).toHaveAttribute('aria-checked', 'true')
+  await sheet.getByRole('button', { name: 'Bu şablonla başla' }).click()
+  await page.waitForURL(/\/editor\//)
+  const id = page.url().split('/').pop()!
+  const stored = await page.evaluate(async (id) => {
+    const db = (window as unknown as { __cveditorDb: { cvs: { get: (id: string) => Promise<{ name: string; templateId: string; template: { accentColor: string } }> } } }).__cveditorDb
+    const { TEMPLATE_META } = await import('/src/render/templateMeta.ts' as string)
+    const cv = await db.cvs.get(id)
+    const meta = (TEMPLATE_META as { id: string; colorSets: { accent: string }[] }[]).find((t) => t.id === cv.templateId)!
+    return { name: cv.name, templateId: cv.templateId, accent: cv.template.accentColor, expected: meta.colorSets[1].accent }
+  }, id)
+  expect(stored).toMatchObject({ name: 'Gezinen', templateId: 'zarif' })
+  expect(stored.accent).toBe(stored.expected)
+})
+
+test('"Eski CV\'ni içe aktar (PDF)" şablon sayfasını içe aktarma seçili açar; CV\'lerim boş durumundan da', async ({ page }) => {
+  await page.goto('/sablonlar')
+  await page.getByRole('button', { name: "Eski CV'ni içe aktar (PDF)" }).click()
+  const sheet = page.getByRole('dialog')
+  await expect(sheet.getByRole('radio', { name: /Eski CV'yi içe aktar/ })).toBeChecked()
+  await expect(sheet.getByRole('button', { name: 'Devam: PDF seç' })).toBeVisible()
+  await sheet.getByRole('button', { name: 'Vazgeç' }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+
+  await page.goto('/cvler')
+  await page.getByRole('link', { name: "Eski CV'ni içe aktar" }).click()
+  await expect(page).toHaveURL(/\/sablonlar$/)
+  await expect(page.getByRole('dialog').getByRole('radio', { name: /Eski CV'yi içe aktar/ })).toBeChecked()
+})
+
+test('CV\'lerim: ⋯ menüsünden İncele o CV seçili açılır; kartta dil, şablon, sayfa ve zaman yazar', async ({ page }) => {
+  const id = await createCv(page, { name: 'Listeden', template: 'Panel' })
+  await page.goto('/cvler')
+  const card = page.locator(`[data-cv-card="${id}"]`)
+  await expect(card).toContainText('TR')
+  await expect(card).toContainText('Panel')
+  await expect(card).toContainText('1 sayfa')
+  await expect(card).toContainText('az önce')
+  // Çeviri listeden de açılır (editördeki pencerenin aynısı); Vazgeç ile kapanır, odak kartın ⋯ düğmesine döner.
+  await page.getByRole('button', { name: 'Listeden için işlemler' }).click()
+  await page.getByRole('menuitem', { name: 'Diğer dile çevir…' }).click()
+  await expect(page.getByRole('dialog').getByRole('heading', { name: 'İngilizceye çevir' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Listeden için işlemler' })).toBeFocused()
+  await page.getByRole('button', { name: 'Listeden için işlemler' }).click()
+  await page.getByRole('menuitem', { name: 'İncele' }).click()
+  await expect(page).toHaveURL(new RegExp(`/inceleme\\?cv=${id}`))
+})
+
 test('yazılan bilgi canlı önizlemeye düşer ve yenileyince kalır', async ({ page }) => {
   await createCv(page)
   await page.getByLabel('Ad soyad').fill('Ece Yıldız')
   await page.getByLabel('Unvan').fill('Veri Analisti')
-  await page.getByLabel('Pozisyon').first().fill('Analist Stajyeri')
+  // Kayıtlar anahatta kapalı gelir: önce Deneyim'deki (boş) kaydı aç.
+  await openRowIn(page, 'Deneyim')
+  await page.getByLabel('Pozisyon').fill('Analist Stajyeri')
   await expect(preview(page).locator('.cv-name')).toHaveText('Ece Yıldız')
   await expect(preview(page).getByText('Analist Stajyeri')).toBeVisible()
   await expect(page.getByRole('status').filter({ hasText: 'Kaydedildi' })).toBeVisible()
   await page.reload()
+  // CV açılınca Kişisel bilgiler açık gelir.
   await expect(page.getByLabel('Ad soyad')).toHaveValue('Ece Yıldız')
   await expect(preview(page).locator('.cv-name')).toHaveText('Ece Yıldız')
+  await expect(page.locator('[id^="item-"]', { hasText: 'Analist Stajyeri' })).toHaveCount(1)
 })
 
 test('geri al ve yinele klavyeyle çalışır', async ({ page }) => {
@@ -56,8 +151,9 @@ test('Türkçe CV büyük harfte İ kullanır (lang=tr)', async ({ page }) => {
 
 test('şablon değiştirmek içeriği korur ve iki sütuna geçer', async ({ page }) => {
   await createCv(page, { start: 'sample' })
-  await page.getByRole('radio', { name: 'Görünüm' }).click()
-  await page.getByRole('radio', { name: /Panel/ }).click()
+  // Şablonlar tuvalin solundaki rayda (üst çubuktaki "Şablonlar" açar).
+  await page.getByRole('button', { name: 'Şablonlar' }).click()
+  await page.locator('[data-rail="templates"]').getByRole('radio', { name: /Panel/ }).click()
   const frame = preview(page)
   await expect(frame.locator('.col-side').first()).toBeVisible()
   await expect(frame.locator('.col-side').first()).toContainText('Beceriler')
@@ -74,7 +170,8 @@ test('bir sayfadan uzun kayıt uyarı verir, PDF onay ister, metin kaybolmaz', a
   )
   await page.reload()
   await expect(page.getByRole('alert')).toContainText('1 kayıt bir sayfadan uzun')
-  await expect(page.getByText(/^[23] sayfa$/)).toBeVisible()
+  // Sayfa sayısı tuvalin alt ortasındaki hapta ("1 / 3").
+  await expect(page.getByRole('group', { name: 'Sayfa', exact: true })).toContainText(/1 \/ [23]/)
   // Bütün maddeler bir yerde görünür (alttan kesilip kaybolmaz).
   const frame = preview(page)
   await expect(frame.locator('#cv-pages li', { hasText: /^Madde 70 / })).toHaveCount(1)
@@ -113,6 +210,10 @@ test('önizlemede kayda tıklayınca sağ panel o kayda gider', async ({ page })
   await preview(page).getByText('Kampüs Etkinlik Takvimi').click()
   const card = page.locator('[id^="item-"]', { hasText: 'Kampüs Etkinlik Takvimi' }).first()
   await expect(card).toBeInViewport()
+  // Kayıt yerinde açılır ve ilk alanına imleç gelir; Kişisel bilgiler kapanır (tek açık kayıt).
+  await expect(card.locator('[aria-expanded]').first()).toHaveAttribute('aria-expanded', 'true')
+  await expect(card.getByLabel('Proje adı')).toBeFocused()
+  await expect(page.locator('#personal-card [aria-expanded]')).toHaveAttribute('aria-expanded', 'false')
 })
 
 test('örnek öneri: işaretlenir, toplu kabul edilir, tek adımda geri alınır', async ({ page }) => {
@@ -188,7 +289,8 @@ test('boş CV önizlemesinde ipucu görünür, içerik girilince kaybolur', asyn
   await createCv(page)
   const hint = preview(page).locator('.ph-hint')
   await expect(hint).toBeVisible()
-  await page.getByLabel('Pozisyon').first().fill('Stajyer')
+  await openRowIn(page, 'Deneyim')
+  await page.getByLabel('Pozisyon').fill('Stajyer')
   await expect(hint).toHaveCount(0)
 })
 
@@ -196,6 +298,8 @@ test('bölüm sırası sürüklenerek değişir, önizlemeye yansır, geri alın
   await createCv(page, { start: 'sample' })
   const titles = async () => (await preview(page).locator('.section-title').allInnerTexts()).slice(0, 2)
   expect(await titles()).toEqual(['ÖZET', 'DENEYİM'])
+  // Kişisel bilgiler kapanınca ilk iki bölüm panelde birlikte görünür.
+  await page.locator('#personal-card [aria-expanded]').click()
   const handles = page.getByRole('button', { name: 'Bölümü sürükleyerek sırala' })
   await handles.first().scrollIntoViewIfNeeded()
   const from = (await handles.first().boundingBox())!

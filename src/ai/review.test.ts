@@ -57,12 +57,14 @@ describe('inceleme yorumu: şema', () => {
   it('bilinmeyen tür, boş ileti ve eksik alan reddedilir', () => {
     for (const raw of [
       { comments: [{ kind: 'score', message: 'x' }] },
-      { comments: [{ kind: 'improve', message: '   ' }] },
+      { comments: [{ kind: 'improve' }] },
       { notes: [] },
       'bu bir JSON değil',
     ]) {
       expect(() => parseReviewResult(raw)).toThrow(AiError)
     }
+    // Boş ileti tek başına atılır (bütün yanıt reddedilmez)
+    expect(parseReviewResult({ comments: [{ kind: 'improve', message: '   ' }, { kind: 'strength', message: 'İyi' }] }).comments).toHaveLength(1)
   })
 })
 

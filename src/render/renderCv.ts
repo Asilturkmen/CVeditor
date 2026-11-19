@@ -37,6 +37,30 @@ const SPACING: Record<TemplateSettings['spacing'], Record<string, string>> = {
   relaxed: { '--block-gap': '4mm', '--section-gap': '7mm', '--pad-x': '18mm', '--pad-y': '16mm', '--lh': '1.48' },
 }
 
+/** "9.75pt" × 0.92 → "8.97pt" (birim korunur; 3 ondalık) */
+function times(value: string, factor: number | undefined): string {
+  if (factor === undefined || factor === 1) return value
+  const match = /^(-?\d*\.?\d+)([a-z%]*)$/.exec(value)
+  return match ? `${Number((parseFloat(match[1]) * factor).toFixed(3))}${match[2]}` : value
+}
+
+/**
+ * Boy ve aralık değişkenleri: Görünüm'deki ayar (yazı boyu, aralık) × şablonun ölçek çarpanları
+ * (K4, templateMeta `scale`). Şablon CSS'i bu değişkenleri yeniden çarpmaz; `--fs` gövde boyudur.
+ */
+export function scaledMetrics(settings: Pick<TemplateSettings, 'fontSize' | 'spacing'>, template: TemplateDef): Record<string, string> {
+  const scale = template.scale ?? {}
+  const spacing = SPACING[settings.spacing]
+  return {
+    '--fs': times(FONT_SIZES[settings.fontSize], scale.fs),
+    '--lh': times(spacing['--lh'], scale.lh),
+    '--block-gap': times(spacing['--block-gap'], scale.blockGap),
+    '--section-gap': times(spacing['--section-gap'], scale.sectionGap),
+    '--pad-x': times(spacing['--pad-x'], scale.padX),
+    '--pad-y': times(spacing['--pad-y'], scale.padY),
+  }
+}
+
 /** Şablonun ve CV'nin yazı tipleri: gövde (Görünüm'deki seçim), başlık ve eş aralıklı aile. */
 export function cvFonts(template: TemplateDef, settings: Pick<TemplateSettings, 'font'>): { body: FontDef; display: FontDef; mono: FontDef } {
   const body = FONTS[settings.font] ?? FONTS.inter
@@ -67,8 +91,7 @@ export function cvVariables(settings: TemplateSettings, template: TemplateDef = 
     '--font': fonts.body.stack,
     '--font-display': fonts.display.stack,
     '--font-mono': fonts.mono.stack,
-    '--fs': FONT_SIZES[settings.fontSize],
-    ...SPACING[settings.spacing],
+    ...scaledMetrics(settings, template),
   }
   return `:root{${Object.entries(vars)
     .map(([k, v]) => `${k}:${v}`)

@@ -1,0 +1,150 @@
+/*
+ * Denge (`denge`): docs/sablonlar/SET-14.md Şablon 12. Ortalı büyük harfli ad (Poppins), altında tam çizgi;
+ * gövde dikey ince çizgiyle ikiye bölünür, solda dar zeminsiz sütun. Gövde Source Sans 3.
+ * İki ya da tek sütun (tekte dikey çizgi yok).
+ * Her kural `.tpl-denge` ile başlar. Sözleşme ve ortak varsayılanlar: base.css başı. Gövde boyu,
+ * satır aralığı ve boşluklar templateMeta.ts `scale` ile gelir (CSS'te yeniden çarpma).
+ * Ölçüler (orta boy, normal aralık): gövde 9.75 pt / 1.4; ad 21 pt; kenar 15 mm; blok 2.8 mm,
+ * bölüm 5.6 mm. Tek sütunda satır daha uzun, yan bölümler ana akışa iner: aralıklar biraz sıkışır.
+ */
+
+.tpl-denge {
+  --side-width: 31%;
+}
+
+/* ---------- Başlık: ortalı; altında tam çizgi, sütunlar çizgiye dayanır ---------- */
+
+.tpl-denge .cv-header {
+  margin: 0 var(--pad-x);
+  padding: var(--pad-y) 0 5mm;
+  gap: 0;
+  border-bottom: 0.25mm solid var(--rule);
+}
+
+#cv-pages.tpl-denge .cv-header {
+  border-radius: 0;
+}
+
+/* Başlığın altında boşluk yok: sütunlar 5 mm iç boşlukla başlar, dikey çizgi yatay çizgiye değer */
+.tpl-denge .page-inner.has-header .col {
+  padding-top: 5mm;
+}
+
+.tpl-denge .cv-photo {
+  width: 24mm;
+  height: 24mm;
+  border-radius: 50%;
+}
+
+.tpl-denge.align-center .cv-photo {
+  margin-bottom: 3.5mm;
+}
+
+/* Sola yaslı hâl: fotoğraf adın solunda, üst kenarı başlığın iç boşluğunda */
+.tpl-denge.align-left .cv-header {
+  align-items: flex-start;
+}
+
+.tpl-denge.align-left .cv-photo {
+  margin-right: 6mm;
+}
+
+.tpl-denge .cv-name {
+  --name-size: 2.15em;
+  --name-room: 150mm;
+  --name-char: 0.78;
+  font-weight: 500;
+  line-height: 1.1;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.tpl-denge .cv-headline {
+  margin-top: 1.6mm;
+  font-size: 0.9em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent-ink);
+}
+
+.tpl-denge .cv-contact {
+  margin-top: 2.4mm;
+  color: var(--muted);
+}
+
+/* ---------- İki sütun: dikey ince çizgi (ana sütunun zemini; kenarlık sayfa boyu uzardı) ---------- */
+
+.tpl-denge.cols-2 .col-side {
+  padding-right: 6mm;
+}
+
+.tpl-denge.cols-2 .col-main {
+  padding-left: 6mm;
+  background: linear-gradient(var(--rule), var(--rule)) no-repeat left top / 0.25mm calc(100% - var(--pad-y));
+}
+
+.tpl-denge.cols-2 .page-inner:not(.has-header) .col-main {
+  background-position: left var(--pad-y);
+  background-size: 0.25mm calc(100% - 2 * var(--pad-y));
+}
+
+/* ---------- Bölüm başlığı: büyük harf, ince alt çizgi ---------- */
+
+.tpl-denge .section-title {
+  padding-bottom: 1mm;
+  border-bottom: 0.25mm solid var(--rule);
+  font-size: 0.9em;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--accent-ink);
+}
+
+/* Yan sütun: dil seviyesi alt satırda soluk */
+.tpl-denge .col-side .entry-languages .line-value {
+  color: var(--muted);
+}
+
+/*
+ * ---------- Tek sütun ----------
+ * Satır 180 mm; beceri, dil ve sertifika ana akışın sonuna iner. Sayfayı aynı içerikle tek sayfada
+ * tutmak için aralıklar sıkışır (oranlar korunur: bölüm ≈ 2 × blok), fotoğraf küçülür.
+ */
+.tpl-denge.cols-1 .col {
+  gap: calc(var(--block-gap) * 0.85);
+  line-height: calc(var(--lh) * 0.95);
+}
+
+.tpl-denge.cols-1 .section-title {
+  margin-top: calc(var(--section-gap) * 0.8 - var(--block-gap) * 0.85);
+}
+
+.tpl-denge.cols-1 .col > .section-title:first-child {
+  margin-top: 0;
+}
+
+.tpl-denge.cols-1 .section-title + * {
+  margin-top: calc(1.6mm - var(--block-gap) * 0.85);
+}
+
+.tpl-denge.cols-1 .entry-skills + .entry-skills,
+.tpl-denge.cols-1 .entry-languages + .entry-languages {
+  margin-top: calc(0.8mm - var(--block-gap) * 0.85);
+}
+
+.tpl-denge.cols-1 .cv-photo {
+  width: 20mm;
+  height: 20mm;
+}
+
+.tpl-denge.cols-1.align-center .cv-photo {
+  margin-bottom: 3mm;
+}
+
+.tpl-denge.cols-1 .cv-header {
+  padding-bottom: 4.5mm;
+}
+
+.tpl-denge.cols-1 .page-inner.has-header .col {
+  padding-top: 4.5mm;
+}

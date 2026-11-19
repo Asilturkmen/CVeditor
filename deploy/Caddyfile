@@ -1,0 +1,28 @@
+# CVeditör için Caddy örneği (VDS'te, Docker kapsayıcısının önünde). Ayrıntı: docs/YAYIN.md
+#
+# Alan adı CV_DOMAIN ortam değişkeninden gelir (yoksa aşağıdaki varsayılan). DNS'te alan adının
+# A/AAAA kaydı bu sunucuyu göstermeli; Caddy TLS sertifikasını kendisi alır ve yeniler.
+#
+# Caddy zaten başka siteler için çalışıyorsa yalnız aşağıdaki bloğu mevcut Caddyfile'a ekle,
+# sonra: sudo systemctl reload caddy
+
+{$CV_DOMAIN:cv.asilturkmen.com} {
+	encode zstd gzip
+
+	# PDF isteği (CV + fotoğraf) en çok ~6 MB; sunucu da ayrıca sınırlar.
+	request_body {
+		max_size 8MB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	reverse_proxy 127.0.0.1:8787 {
+		# Uzun CV'nin PDF'i ve yapay zekâ çağrıları birkaç saniye sürebilir.
+		transport http {
+			read_timeout 150s
+		}
+	}
+}

@@ -58,7 +58,7 @@ export function toRichText(paragraphs: string | undefined, bullets: string[] = [
   return sanitizeRichText(paras.join('') + list)
 }
 
-const plain = (value: string | undefined) => (value ?? '').replace(/\s+/g, ' ').trim()
+const plain = (value: string | null | undefined) => (value ?? '').replace(/\s+/g, ' ').trim()
 
 export function importResultToCv(result: ImportResult): ImportedCv {
   const personal = emptyPersonal()

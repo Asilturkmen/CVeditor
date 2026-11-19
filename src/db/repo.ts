@@ -1,19 +1,79 @@
 import { duplicateCv } from '@/cv/factory'
 import type { Cv } from '@/cv/schema'
+import { nextTimestamp } from '@/lib/time'
 import { db } from './db'
 
 export async function getCv(id: string): Promise<Cv | undefined> {
   return db.cvs.get(id)
 }
 
+/** Sürüm karşılaştırmadan yazar: yeni CV, silmenin geri alınması, kullanıcının açıkça "üzerine yaz" demesi. */
 export async function saveCv(cv: Cv): Promise<void> {
   await db.cvs.put(cv)
 }
 
+/**
+ * Kayıtlı satırın sürümü. Sürüm `updatedAt`'tir: her değişiklikte yenilenir (bkz. `nextTimestamp`).
+ * Satır yoksa null.
+ */
+export function versionOf(row: unknown): string | null {
+  if (!row || typeof row !== 'object') return null
+  const value = (row as { updatedAt?: unknown }).updatedAt
+  return typeof value === 'string' ? value : ''
+}
+
+export type SaveOutcome = { ok: true } | { ok: false; reason: 'changed' | 'deleted' }
+
+/**
+ * Editörün kaydı. Veritabanındaki satır, bu sekmenin son okuduğu/yazdığı sürümde (`expected`;
+ * null = satır henüz yok) duruyorsa yazar. Başka bir sekme araya girip yazdıysa ya da CV'yi sildiyse
+ * YAZMAZ ve nedenini döndürür: bayat sekme diğerinin yazdığını sessizce ezmesin. Karşılaştırma ve
+ * yazma tek işlemdedir (iki sekme aynı anda geçemez).
+ */
+export async function saveCvIfUnchanged(cv: Cv, expected: string | null): Promise<SaveOutcome> {
+  return db.transaction('rw', db.cvs, async (): Promise<SaveOutcome> => {
+    const row = await db.cvs.get(cv.id)
+    if (versionOf(row) !== expected) return { ok: false, reason: row ? 'changed' : 'deleted' }
+    await db.cvs.put(cv)
+    return { ok: true }
+  })
+}
+
+/**
+ * Kayıtlı bir CV'yi tek işlemde okuyup değiştirir (ör. başka CV'ye kayıt ekleme). Okuma ile yazma
+ * arasına başka sekmenin kaydı giremez; `updatedAt` yenilendiği için o CV'yi açık tutan editör
+ * değişikliği fark eder.
+ */
+export async function updateStoredCv<T>(id: string, mutate: (cv: Cv) => T): Promise<T> {
+  return db.transaction('rw', db.cvs, async () => {
+    const cv = await db.cvs.get(id)
+    if (!cv) throw new Error('CV bulunamadı')
+    const result = mutate(cv)
+    cv.updatedAt = nextTimestamp(cv.updatedAt)
+    await db.cvs.put(cv)
+    return result
+  })
+}
+
 export async function deleteCv(id: string): Promise<Cv | undefined> {
-  const existing = await db.cvs.get(id)
-  await db.cvs.delete(id)
-  return existing
+  return db.transaction('rw', db.cvs, async () => {
+    const existing = await db.cvs.get(id)
+    await db.cvs.delete(id)
+    return existing
+  })
+}
+
+/**
+ * Silinen CV'yi geri koyar ("Geri al"). Aynı id'li CV bu arada yeniden oluştuysa (ör. başka sekmedeki
+ * editör "Yeniden kaydet" dedi) ona dokunmaz: daha yeni olanın üzerine eski kopya yazılmaz. Geri
+ * konduysa true.
+ */
+export async function restoreCv(cv: Cv): Promise<boolean> {
+  return db.transaction('rw', db.cvs, async () => {
+    if (await db.cvs.get(cv.id)) return false
+    await db.cvs.add(cv)
+    return true
+  })
 }
 
 export async function countCvs(): Promise<number> {

@@ -217,21 +217,46 @@ describe('çeviri gizliliği', () => {
     expect(summary.translated).toContain('github.com/deniz-aksoy-ornek')
   })
 
-  it('yer tutucu kaybolur ya da uydurulursa kaynak metin kalır ve işaretlenir', () => {
+  it('yer tutucu kaybolur, uydurulur ya da bozulursa kaynak metin kalır ve işaretlenir', () => {
     const cv = sampleCv()
-    summaryOf(cv).content = '<p>Deniz Aksoy, deniz.aksoy@example.com</p>'
+    summaryOf(cv).content = '<p>Ben Deniz Aksoy, deniz.aksoy@example.com</p>'
     const entries = collectCvTexts(cv)
     const key = itemKey(byType(cv, 'summary').items[0].id, 'content')
     const entry = entries.filter((e) => e.key === key)
     const prepared = buildTranslateRequest('tr', 'en', entry, cv.personal)
-    const lost = mergeTranslations(entry, { items: [{ key, text: '<p>⟦NAME⟧ here</p>' }] }, prepared)[0]
+    const lost = mergeTranslations(entry, { items: [{ key, text: '<p>I am ⟦NAME⟧ here</p>' }] }, prepared)[0]
     expect(lost).toMatchObject({ translated: entry[0].text, missing: true, unrestored: true })
-    const invented = mergeTranslations(entry, { items: [{ key, text: '<p>⟦NAME⟧, ⟦EMAIL⟧, ⟦PHONE⟧</p>' }] }, prepared)[0]
+    const invented = mergeTranslations(entry, { items: [{ key, text: '<p>I am ⟦NAME⟧, ⟦EMAIL⟧, ⟦PHONE⟧</p>' }] }, prepared)[0]
     expect(invented).toMatchObject({ translated: entry[0].text, unrestored: true })
-    const bogus = mergeTranslations(entry, { items: [{ key, text: '<p>⟦NAME⟧, ⟦EMAIL⟧ ⟦FOO⟧</p>' }] }, prepared)[0]
+    const bogus = mergeTranslations(entry, { items: [{ key, text: '<p>I am ⟦NAME⟧, ⟦EMAIL⟧ ⟦FOO⟧</p>' }] }, prepared)[0]
     expect(bogus.unrestored).toBe(true)
-    const ok = mergeTranslations(entry, { items: [{ key, text: '<p>⟦EMAIL⟧ — ⟦NAME⟧</p>' }] }, prepared)[0]
-    expect(ok).toMatchObject({ translated: '<p>deniz.aksoy@example.com — Deniz Aksoy</p>', unrestored: false })
+    for (const broken of ['<p>I am ⟦NAME⟧, [EMAIL] ⟦EMAIL⟧</p>', '<p>I am ⟦İSİM⟧ ⟦NAME⟧, ⟦EMAIL⟧</p>', '<p>I am ⟦NAME 2⟧ ⟦NAME⟧, ⟦EMAIL⟧</p>']) {
+      expect(mergeTranslations(entry, { items: [{ key, text: broken }] }, prepared)[0].unrestored, broken).toBe(true)
+    }
+    const ok = mergeTranslations(entry, { items: [{ key, text: '<p>I am ⟦NAME⟧ — ⟦EMAIL⟧</p>' }] }, prepared)[0]
+    expect(ok).toMatchObject({ translated: '<p>I am Deniz Aksoy — deniz.aksoy@example.com</p>', unrestored: false })
+  })
+
+  it('kişinin konumuyla aynı konum alanı gönderilmez, kaynak metinle kalır ve "kontrol et" diye işaretlenir', () => {
+    const cv = sampleCv() // konum: "İzmir, Türkiye"; ilk deneyimin konumu "İzmir"
+    const entries = collectCvTexts(cv)
+    const prepared = buildTranslateRequest('tr', 'en', entries, cv.personal)
+    const expItem = byType(cv, 'experience').items[0]
+    const locKey = itemKey(expItem.id, 'location')
+    expect(prepared.request.items.some((i) => i.key === locKey)).toBe(false)
+    const merged = mergeTranslations(entries, mockTranslate(prepared.request), prepared)
+    expect(merged.find((e) => e.key === locKey)).toMatchObject({ translated: 'İzmir', missing: false, unrestored: false, locationKept: true })
+    // Başka şehir olduğu gibi gider ve işaretlenmez
+    const other = merged.find((e) => e.key === itemKey(byType(cv, 'experience').items[1].id, 'location'))!
+    expect(other.locationKept).toBe(false)
+  })
+
+  it('düz alan çevirisi tek satır, etiketsiz', () => {
+    const cv = sampleCv()
+    const entries = collectCvTexts(cv).filter((e) => !e.rich).slice(0, 1)
+    const prepared = buildTranslateRequest('tr', 'en', entries, cv.personal)
+    const [merged] = mergeTranslations(entries, { items: [{ key: entries[0].key, text: '<b>Senior</b>\n  Developer ' }] }, prepared)
+    expect(merged.translated).toBe('Senior Developer')
   })
 
   it("gizli bölüm ve kayıtlar gönderilmez; yeni CV'ye olduğu gibi kopyalanır", () => {

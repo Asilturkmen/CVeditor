@@ -28,6 +28,8 @@ export function readFileText(file: File): Promise<string> {
   return file.text()
 }
 
-export function todayStamp(): string {
-  return new Date().toISOString().slice(0, 10)
+/** Bugünün tarihi (YYYY-AA-GG), kullanıcının yerel saatine göre: gece yarısından sonra alınan yedek dünün adını taşımasın. */
+export function todayStamp(now = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
 }

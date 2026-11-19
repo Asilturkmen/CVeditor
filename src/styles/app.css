@@ -1,124 +1,338 @@
 @import 'tailwindcss';
 
 /*
- * Site kimliği: sade ve nötr, tek sakin vurgu rengi. CV sahnenin yıldızı;
- * arayüz geri planda. Renkler token olarak burada; bileşenler yalnız
- * token'ları kullanır (bg-surface, text-muted, border-line, bg-accent ...).
+ * CVeditör arayüz token'ları. Kural kitabı: DESIGN.md (değerlerin kaynağı ve kullanım yeri orada).
+ *
+ * Özet: gri pencere + beyaz gruplar (derinlik çerçeveyle değil tonla), tek vurgu rengi,
+ * 16px kök ve 4'lük ızgara, Apple metin stilleri, yalnız dört yapışkan yüzeyde malzeme.
+ * Bileşenler yalnız token'ları kullanır (bg-window, bg-content, bg-fill-3, text-fg-2,
+ * border-separator, bg-accent ...). Renk için hex yazılmaz.
  */
 
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+/* Telefon: dokunmatik VE dar. Kontroller 44px, gövde 16px (iOS 16px altı girişte yakınlaştırır). */
+@custom-variant phone (@media (pointer: coarse) and (max-width: 599.98px));
 
 :root {
-  --accent-base: #1f6f6b;
-
-  --bg: #f6f6f3;
-  --surface: #ffffff;
-  --surface-2: #f0efeb;
-  --surface-3: #e8e7e2;
-  --canvas: #e9e8e3;
-  --line: #e2e1dc;
-  --line-strong: #cfcec8;
-  --text: #1b1b19;
-  --muted: #66655f;
-  --faint: #6e6d66; /* bg 4.8:1, surface 5.2:1, surface-2 4.5:1 */
-  --accent: var(--accent-base);
-  --accent-hover: color-mix(in oklab, var(--accent-base) 86%, black);
-  --accent-fg: #ffffff;
-  --accent-soft: color-mix(in oklab, var(--accent-base) 10%, var(--surface));
-  --accent-line: color-mix(in oklab, var(--accent-base) 35%, var(--surface));
-  --danger: #b42318;
-  --danger-soft: #fdecea;
-  --warn: #9a5b00;
-  --warn-soft: #fff4dc;
-  --ok: #1f7a46;
-  --shadow-sm: 0 1px 2px rgb(20 20 18 / 0.05);
-  --shadow-md: 0 1px 2px rgb(20 20 18 / 0.04), 0 8px 24px rgb(20 20 18 / 0.08);
-  --shadow-lg: 0 2px 6px rgb(20 20 18 / 0.05), 0 24px 64px rgb(20 20 18 / 0.16);
-
   color-scheme: light;
+
+  /* Zeminler */
+  --bg-window: #f5f5f7;
+  --bg-canvas: #e5e5ea;
+  --bg-content: #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-paper: #ffffff;
+
+  /* Dolgular: yarı saydam, hem beyaz hem gri zeminde çalışır */
+  --fill-1: rgb(120 120 128 / 0.2);
+  --fill-2: rgb(120 120 128 / 0.16);
+  --fill-3: rgb(118 118 128 / 0.12);
+  --fill-4: rgb(116 116 128 / 0.08);
+
+  /* Metin. text-3 yalnız süs ve devre dışı (beyazda 3.6:1); okunan her metin text-1/text-2. */
+  --text-1: #1d1d1f;
+  --text-2: #6c6c70;
+  --text-3: #86868b;
+
+  /* Ayırıcı ve kenar */
+  --separator: rgb(0 0 0 / 0.08);
+  --separator-strong: #d1d1d6;
+  --control-border: #8e8e93;
+  --ring-elevated: rgb(0 0 0 / 0.08);
+
+  /* Vurgu: prefs.ts kökte --accent-light / --accent-dark verir; yoksa Petrol. */
+  --accent: var(--accent-light, #00786f);
+  --accent-fg: #ffffff;
+  --accent-hover: color-mix(in srgb, var(--accent) 90%, black);
+  --accent-pressed: color-mix(in srgb, var(--accent) 80%, black);
+  --accent-soft: color-mix(in srgb, var(--accent) 10%, transparent);
+  --focus-ring: color-mix(in srgb, var(--accent) 80%, transparent);
+
+  /* Durum */
+  --danger: #d70015;
+  --warn: #9a5b00;
+  --ok: #007a2d;
+  --suggest: #ffcc00;
+  --danger-soft: color-mix(in srgb, var(--danger) 10%, transparent);
+  --warn-soft: color-mix(in srgb, var(--warn) 10%, transparent);
+  --ok-soft: color-mix(in srgb, var(--ok) 10%, transparent);
+  --suggest-soft: color-mix(in srgb, var(--suggest) 22%, transparent);
+
+  /* Gölge: renksiz, iki-üç kat, her zaman 1px halkayla */
+  --shadow-1: 0 0 0 1px rgb(0 0 0 / 0.04), 0 1px 2px rgb(0 0 0 / 0.06);
+  --shadow-2: 0 0 0 1px rgb(0 0 0 / 0.06), 0 2px 6px rgb(0 0 0 / 0.06), 0 8px 24px rgb(0 0 0 / 0.08);
+  --shadow-3: 0 0 0 1px rgb(0 0 0 / 0.08), 0 4px 12px rgb(0 0 0 / 0.08), 0 16px 40px rgb(0 0 0 / 0.14);
+  --shadow-4: 0 0 0 1px rgb(0 0 0 / 0.08), 0 12px 32px rgb(0 0 0 / 0.12), 0 32px 80px rgb(0 0 0 / 0.2);
+  --shadow-page: 0 0 0 1px rgb(0 0 0 / 0.06), 0 1px 3px rgb(0 0 0 / 0.06), 0 12px 32px rgb(0 0 0 / 0.1);
+  --shadow-thumb: 0 0 0 1px rgb(0 0 0 / 0.06), 0 2px 8px rgb(0 0 0 / 0.08);
+  --shadow-knob: 0 1px 2px rgb(0 0 0 / 0.2), 0 0 0 1px rgb(0 0 0 / 0.04);
+
+  /* Malzeme ve örtü */
+  --material: rgb(245 245 247 / 0.8);
+  --overlay: rgb(0 0 0 / 0.25);
+  --segment-thumb: var(--bg-content);
+  --switch-knob: #ffffff;
+
+  /* Hareket: süreler */
+  --dur-press: 100ms;
+  --dur-exit: 120ms;
+  --dur-fast: 150ms;
+  --dur-base: 200ms;
+  --dur-slow: 300ms;
+  /* Eğriler. ease-in hiçbir yerde yok. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+  /* Yaylar (Apple Spring(duration, bounce) analitik çözümü). Yalnız konum/ölçekte; renk ve opaklıkta değil. */
+  /* smooth = Spring(0.2, 0): taşma yok, 300ms */
+  --spring-smooth: linear(0, 0.082, 0.243, 0.413, 0.562, 0.682, 0.774, 0.841, 0.89, 0.925, 0.949, 0.965, 0.977, 0.984, 0.99, 0.993, 0.995, 0.997, 0.998, 0.999, 1);
+  /* snappy = Spring(0.2, 0.15): %0.6 taşma, 280ms */
+  --spring-snappy: linear(0, 0.041, 0.138, 0.26, 0.388, 0.509, 0.618, 0.71, 0.786, 0.847, 0.895, 0.93, 0.956, 0.975, 0.988, 0.996, 1.002, 1.005, 1.006, 1.006, 1.006, 1.005, 1.005, 1.004, 1.003, 1.002, 1.002, 1.001, 1);
+  /* bouncy = Spring(0.18, 0.3): %4.6 taşma, 300ms. Yalnız ≤ 24px öğede. */
+  --spring-bouncy: linear(0, 0.059, 0.195, 0.362, 0.53, 0.68, 0.803, 0.897, 0.964, 1.008, 1.033, 1.044, 1.046, 1.042, 1.035, 1.027, 1.02, 1.013, 1.008, 1.004, 1.001, 0.999, 0.998, 0.998, 0.998, 0.998, 0.998, 0.999, 1);
+
+  /* Açılır düğme okları (native select); renk temaya göre. */
+  --chevrons: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236c6c70' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 15 5 5 5-5'/%3E%3Cpath d='m7 9 5-5 5 5'/%3E%3C/svg%3E");
+
+  /*
+   * ESKİ ADLAR (geçiş): yeni değerlere bağlı, ekranlar kırılmasın diye duruyor.
+   * Yeni kodda kullanma; karşılıkları DESIGN.md "Kalkan adlar" tablosunda.
+   * faint bilerek text-2'ye bağlı: eski kodda bilgi taşıyan metinde kullanılıyor (≥ 4.5:1 kalsın).
+   */
+  --bg: var(--bg-window);
+  --surface: var(--bg-content);
+  --surface-2: var(--fill-3);
+  --surface-3: var(--fill-1);
+  --canvas: var(--bg-canvas);
+  --line: var(--separator);
+  --line-strong: var(--separator-strong);
+  --text: var(--text-1);
+  --muted: var(--text-2);
+  --faint: var(--text-2);
+  --accent-line: color-mix(in srgb, var(--accent) 35%, var(--bg-content));
+  --ease-out-soft: var(--ease-out);
+  --ease-spring: var(--spring-snappy);
 }
 
 [data-theme='dark'] {
-  --bg: #121211;
-  --surface: #1a1a19;
-  --surface-2: #222220;
-  --surface-3: #2b2b29;
-  --canvas: #0d0d0c;
-  --line: #2b2b29;
-  --line-strong: #3b3b38;
-  --text: #ecebe7;
-  --muted: #a3a29b;
-  --faint: #929189; /* bg 5.9:1, surface 5.5:1, surface-2 5.0:1 */
-  --accent: color-mix(in oklab, var(--accent-base) 62%, white);
-  --accent-hover: color-mix(in oklab, var(--accent-base) 50%, white);
-  --accent-fg: #0f0f0e;
-  --accent-soft: color-mix(in oklab, var(--accent-base) 22%, var(--surface));
-  --accent-line: color-mix(in oklab, var(--accent-base) 50%, var(--surface));
-  --danger: #f2877d;
-  --danger-soft: #3a1d1a;
-  --warn: #f0b860;
-  --warn-soft: #33270f;
-  --ok: #6ccf97;
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
-  --shadow-md: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.35);
-  --shadow-lg: 0 2px 6px rgb(0 0 0 / 0.4), 0 24px 64px rgb(0 0 0 / 0.55);
-
   color-scheme: dark;
+
+  --bg-window: #1c1c1e;
+  --bg-canvas: #141416;
+  --bg-content: #2c2c2e;
+  --bg-elevated: #2c2c2e;
+
+  --fill-1: rgb(120 120 128 / 0.36);
+  --fill-2: rgb(120 120 128 / 0.32);
+  --fill-3: rgb(118 118 128 / 0.24);
+  --fill-4: rgb(116 116 128 / 0.18);
+
+  --text-1: #f5f5f7;
+  --text-2: #aeaeb2;
+  --text-3: #98989d;
+
+  --separator: rgb(255 255 255 / 0.08);
+  --separator-strong: #48484a;
+  --ring-elevated: rgb(255 255 255 / 0.12);
+
+  --accent: var(--accent-dark, #2cc7b5);
+  --accent-fg: #00201c;
+  --accent-hover: color-mix(in srgb, var(--accent) 88%, white);
+  --accent-pressed: color-mix(in srgb, var(--accent) 76%, white);
+  --accent-soft: color-mix(in srgb, var(--accent) 14%, transparent);
+
+  --danger: #ff6165;
+  --warn: #ffa056;
+  --ok: #4ad968;
+  --suggest: #ffd600;
+  --danger-soft: color-mix(in srgb, var(--danger) 14%, transparent);
+  --warn-soft: color-mix(in srgb, var(--warn) 14%, transparent);
+  --ok-soft: color-mix(in srgb, var(--ok) 14%, transparent);
+  --suggest-soft: color-mix(in srgb, var(--suggest) 18%, transparent);
+
+  /* Koyuda derinliği yüzeyin açılması taşır; grup gölgesizdir. */
+  --shadow-1: 0 0 #0000;
+  --shadow-2: 0 0 0 1px rgb(255 255 255 / 0.1), 0 2px 6px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.4);
+  --shadow-3: 0 0 0 1px rgb(255 255 255 / 0.12), 0 4px 12px rgb(0 0 0 / 0.4), 0 16px 40px rgb(0 0 0 / 0.55);
+  --shadow-4: 0 0 0 1px rgb(255 255 255 / 0.12), 0 12px 32px rgb(0 0 0 / 0.5), 0 32px 80px rgb(0 0 0 / 0.65);
+  --shadow-page: 0 0 0 1px rgb(255 255 255 / 0.06), 0 12px 32px rgb(0 0 0 / 0.5);
+  --shadow-thumb: 0 0 0 1px rgb(255 255 255 / 0.06), 0 2px 8px rgb(0 0 0 / 0.4);
+
+  --material: rgb(28 28 30 / 0.85);
+  --overlay: rgb(0 0 0 / 0.55);
+  --segment-thumb: #636366;
+
+  --chevrons: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23aeaeb2' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 15 5 5 5-5'/%3E%3Cpath d='m7 9 5-5 5 5'/%3E%3C/svg%3E");
 }
 
+/* Artırılmış kontrast: ayırıcı ve alan kenarı koyulaşır. */
+@media (prefers-contrast: more) {
+  :root {
+    --separator: var(--control-border);
+    --separator-strong: #6c6c70;
+  }
+  [data-theme='dark'] {
+    --separator-strong: #8e8e93;
+  }
+}
+
+/* Renkler ve gölgeler: değer temaya göre değiştiği için inline (utility doğrudan var() okur). */
 @theme inline {
-  --color-bg: var(--bg);
-  --color-surface: var(--surface);
-  --color-surface-2: var(--surface-2);
-  --color-surface-3: var(--surface-3);
-  --color-canvas: var(--canvas);
-  --color-line: var(--line);
-  --color-line-strong: var(--line-strong);
-  --color-text: var(--text);
-  --color-muted: var(--muted);
-  --color-faint: var(--faint);
+  --color-window: var(--bg-window);
+  --color-canvas: var(--bg-canvas);
+  --color-content: var(--bg-content);
+  --color-elevated: var(--bg-elevated);
+  --color-paper: var(--bg-paper);
+  --color-fill-1: var(--fill-1);
+  --color-fill-2: var(--fill-2);
+  --color-fill-3: var(--fill-3);
+  --color-fill-4: var(--fill-4);
+  --color-fg: var(--text-1);
+  --color-fg-2: var(--text-2);
+  --color-fg-3: var(--text-3);
+  --color-separator: var(--separator);
+  --color-separator-strong: var(--separator-strong);
+  --color-control: var(--control-border);
   --color-accent: var(--accent);
-  --color-accent-hover: var(--accent-hover);
   --color-accent-fg: var(--accent-fg);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-pressed: var(--accent-pressed);
   --color-accent-soft: var(--accent-soft);
-  --color-accent-line: var(--accent-line);
+  --color-focus-ring: var(--focus-ring);
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
   --color-warn: var(--warn);
   --color-warn-soft: var(--warn-soft);
   --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-suggest: var(--suggest);
+  --color-suggest-soft: var(--suggest-soft);
 
-  --font-sans: 'Instrument Sans Variable', ui-sans-serif, system-ui, sans-serif;
+  /* Eski adlar (geçiş) */
+  --color-bg: var(--bg-window);
+  --color-surface: var(--bg-content);
+  --color-surface-2: var(--fill-3);
+  --color-surface-3: var(--fill-1);
+  --color-line: var(--separator);
+  --color-line-strong: var(--separator-strong);
+  --color-text: var(--text-1);
+  --color-muted: var(--text-2);
+  --color-faint: var(--text-2);
+  --color-accent-line: var(--accent-line);
 
-  --shadow-sm: var(--shadow-sm);
-  --shadow-md: var(--shadow-md);
-  --shadow-lg: var(--shadow-lg);
+  --shadow-1: var(--shadow-1);
+  --shadow-2: var(--shadow-2);
+  --shadow-3: var(--shadow-3);
+  --shadow-4: var(--shadow-4);
+  --shadow-page: var(--shadow-page);
+  --shadow-thumb: var(--shadow-thumb);
+  /* Eski adlar (geçiş) */
+  --shadow-sm: var(--shadow-1);
+  --shadow-md: var(--shadow-2);
+  --shadow-lg: var(--shadow-3);
 
-  --ease-out-soft: cubic-bezier(0.2, 0.7, 0.2, 1);
-  --ease-spring: cubic-bezier(0.34, 1.3, 0.64, 1);
+  --ease-out: var(--ease-out);
+  --ease-in-out: var(--ease-in-out);
+  --ease-sheet: var(--ease-sheet);
+  --ease-spring-smooth: var(--spring-smooth);
+  --ease-spring-snappy: var(--spring-snappy);
+  --ease-spring-bouncy: var(--spring-bouncy);
+  /* Eski adlar (geçiş) */
+  --ease-out-soft: var(--ease-out);
+  --ease-spring: var(--spring-snappy);
+}
+
+/*
+ * Yazı, yarıçap: inline değil; utility var() ile okur, telefonda değişkenler değişir.
+ * Metin rolleri macOS metin stilleri (HIG). Rol dışı boyut (text-[13.5px]) yazma.
+ */
+@theme {
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Inter Variable', 'Segoe UI', system-ui, sans-serif;
+
+  --text-title-lg: 1.625rem;
+  --text-title-lg--line-height: 2rem;
+  --text-title-lg--font-weight: 700;
+  --text-title-lg--letter-spacing: -0.01em;
+  --text-title-1: 1.375rem;
+  --text-title-1--line-height: 1.75rem;
+  --text-title-1--font-weight: 700;
+  --text-title-1--letter-spacing: -0.01em;
+  --text-title-2: 1.0625rem;
+  --text-title-2--line-height: 1.375rem;
+  --text-title-2--font-weight: 600;
+  --text-title-3: 0.9375rem;
+  --text-title-3--line-height: 1.25rem;
+  --text-title-3--font-weight: 600;
+  --text-headline: 0.8125rem;
+  --text-headline--line-height: 1.125rem;
+  --text-headline--font-weight: 600;
+  --text-body: 0.8125rem;
+  --text-body--line-height: 1.125rem;
+  --text-body-user: 0.875rem;
+  --text-body-user--line-height: 1.3125rem;
+  --text-callout: 0.75rem;
+  --text-callout--line-height: 1rem;
+  --text-caption: 0.6875rem;
+  --text-caption--line-height: 0.875rem;
+  --text-caption--font-weight: 500;
+  /* Eski Tailwind boyutları rollere bağlandı (geçiş): text-sm = body, text-xs = callout, text-2xl = title-lg boyu. */
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.125rem;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1rem;
+  --text-2xl: 1.625rem;
+  --text-2xl--line-height: 2rem;
+
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-3xl: 20px;
+}
+
+@media (pointer: coarse) and (max-width: 599.98px) {
+  :root {
+    --text-body: 1rem;
+    --text-body--line-height: 1.375rem;
+    --text-body-user: 1rem;
+    --text-body-user--line-height: 1.5rem;
+    --text-callout: 0.8125rem;
+    --text-callout--line-height: 1.125rem;
+  }
 }
 
 @layer base {
   html {
-    font-size: 14px;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
   body {
-    background: var(--bg);
-    color: var(--text);
+    background: var(--bg-window);
+    color: var(--text-1);
     font-family: var(--font-sans);
-    font-feature-settings: 'ss01' on;
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
     -webkit-font-smoothing: antialiased;
-    text-rendering: optimizeLegibility;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   ::selection {
-    background: color-mix(in oklab, var(--accent-base) 22%, transparent);
+    background: color-mix(in srgb, var(--accent) 24%, transparent);
   }
 
   :focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
+    outline: 3px solid var(--focus-ring);
+    outline-offset: 1px;
+    /* Yapışkan çubuğun altında kalmasın. */
+    scroll-margin-block: 64px;
+  }
+
+  ::placeholder {
+    color: var(--text-2);
+    opacity: 1;
   }
 
   button {
@@ -128,13 +342,83 @@
   button:disabled {
     cursor: not-allowed;
   }
+
+  kbd {
+    font-family: inherit;
+  }
 }
 
-/* Sayfa geçişi: CV listesinden editöre geçerken kısa çapraz geçiş. */
+/* ---------- Malzeme: YALNIZ üst çubuk, inspector başlığı, prompt çubuğu, yüzen zoom hapı ---------- */
+.material {
+  background: var(--material);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .material {
+    background: var(--bg-window);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .material {
+    background: var(--bg-window);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .material {
+    background: var(--bg-window);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* Kaydırma kenarı: çizgi yalnız içerik çubuğun altına girince belirir (data-scrolled). */
+.scroll-edge-bottom,
+.scroll-edge-top {
+  transition: border-color var(--dur-fast) ease;
+}
+
+.scroll-edge-bottom {
+  border-bottom: 1px solid transparent;
+}
+
+.scroll-edge-top {
+  border-top: 1px solid transparent;
+}
+
+.scroll-edge-bottom[data-scrolled],
+.scroll-edge-top[data-scrolled] {
+  border-color: var(--separator);
+}
+
+/* ---------- Gruplu liste: ayırıcıyı grup koyar; metnin x'inden sağ kenara, ilk satırın üstünde yok ---------- */
+.group-rows > * + * {
+  position: relative;
+}
+
+.group-rows > * + *::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: var(--sep-inset, var(--row-px, 12px));
+  height: 1px;
+  background: var(--separator);
+  pointer-events: none;
+}
+
+/* ---------- Hareket ---------- */
+
+/* Sayfa geçişi ve tema değişimi: kısa çapraz geçiş. */
 ::view-transition-old(root),
 ::view-transition-new(root) {
-  animation-duration: 180ms;
-  animation-timing-function: var(--ease-out-soft);
+  animation-duration: var(--dur-base);
+  animation-timing-function: var(--ease-out);
 }
 
 @keyframes fade-in {
@@ -143,85 +427,277 @@
   }
 }
 
-@keyframes rise-in {
-  from {
+@keyframes fade-out {
+  to {
     opacity: 0;
-    transform: translateY(6px);
   }
 }
 
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+  }
+}
+
+/* Menü, popover, açılır liste: tetikleyiciden büyür. */
 @keyframes pop-in {
   from {
     opacity: 0;
-    transform: translateY(4px) scale(0.98);
+    scale: 0.96;
   }
 }
 
 @keyframes pop-out {
   to {
     opacity: 0;
-    transform: translateY(4px) scale(0.98);
+    scale: 0.96;
+  }
+}
+
+@keyframes dialog-scale {
+  from {
+    scale: 0.97;
+  }
+}
+
+@keyframes dialog-out {
+  to {
+    opacity: 0;
+    scale: 0.97;
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    translate: 0 100%;
+  }
+}
+
+@keyframes sheet-out {
+  to {
+    translate: 0 100%;
+  }
+}
+
+@keyframes toast-in {
+  from {
+    translate: 0 100%;
   }
 }
 
 @keyframes flash {
   0% {
-    box-shadow: 0 0 0 0 var(--accent-line);
     background: var(--accent-soft);
   }
   100% {
-    box-shadow: 0 0 0 0 transparent;
+    background: transparent;
   }
 }
 
 @keyframes save-tick {
   from {
-    transform: scale(0.6);
+    scale: 0.6;
     opacity: 0;
   }
 }
 
+@keyframes check-in {
+  from {
+    scale: 0.6;
+  }
+}
+
 .animate-fade-in {
-  animation: fade-in 160ms var(--ease-out-soft);
+  animation: fade-in var(--dur-fast) var(--ease-out);
 }
 
 .animate-rise-in {
-  animation: rise-in 220ms var(--ease-out-soft);
+  animation: rise-in var(--dur-base) var(--ease-out);
 }
 
+/* Önizlemeden gelen kayıt işareti: 600ms'de söner. */
 .animate-flash {
-  animation: flash 1100ms var(--ease-out-soft);
+  animation: flash 600ms var(--ease-out);
 }
 
-/* Radix içerikleri için açılış/kapanış */
+.animate-save-tick {
+  animation:
+    save-tick var(--dur-slow) var(--spring-bouncy),
+    fade-in var(--dur-fast) var(--ease-out);
+}
+
+/* Radix içerikleri (menü, popover, açılır liste) */
+.pop {
+  transform-origin: var(
+    --radix-dropdown-menu-content-transform-origin,
+    var(
+      --radix-popover-content-transform-origin,
+      var(--radix-select-content-transform-origin, var(--radix-context-menu-content-transform-origin, center))
+    )
+  );
+}
+
 .pop[data-state='open'] {
-  animation: pop-in 160ms var(--ease-out-soft);
+  animation: pop-in var(--dur-base) var(--ease-out);
 }
 
 .pop[data-state='closed'] {
-  animation: pop-out 120ms ease-in forwards;
+  animation: pop-out var(--dur-exit) var(--ease-out) forwards;
+}
+
+/* İpucu: yalnız opaklık; komşu ipucuna geçişte (instant-open) animasyon yok. */
+.tip[data-state='delayed-open'] {
+  animation: fade-in var(--dur-fast) var(--ease-out);
 }
 
 .overlay[data-state='open'] {
-  animation: fade-in 160ms var(--ease-out-soft);
+  animation: fade-in var(--dur-base) var(--ease-out);
 }
 
 .overlay[data-state='closed'] {
-  animation: fade-in 120ms ease-in reverse forwards;
+  animation: fade-out var(--dur-exit) var(--ease-out) forwards;
 }
 
-/* TipTap düzenleyici */
+/* Dialog merkezden; ölçek yayla, opaklık eğriyle. */
+.dialog[data-state='open'] {
+  animation:
+    dialog-scale var(--dur-slow) var(--spring-smooth),
+    fade-in var(--dur-base) var(--ease-out);
+}
+
+.dialog[data-state='closed'] {
+  animation: dialog-out var(--dur-exit) var(--ease-out) forwards;
+}
+
+/* Alt sayfa (telefonda dialog, Sheet): alttan gelir, aynı yoldan gider. */
+.sheet[data-state='open'] {
+  animation: sheet-in var(--dur-slow) var(--spring-smooth);
+}
+
+.sheet[data-state='closed'] {
+  animation: sheet-out 160ms var(--ease-out) forwards;
+}
+
+@media (max-width: 639.98px) {
+  .dialog[data-state='open'] {
+    animation: sheet-in var(--dur-slow) var(--spring-smooth);
+  }
+  .dialog[data-state='closed'] {
+    animation: sheet-out 160ms var(--ease-out) forwards;
+  }
+}
+
+.toast-enter {
+  animation:
+    toast-in var(--dur-slow) var(--spring-smooth),
+    fade-in var(--dur-base) var(--ease-out);
+}
+
+/* Basış geri bildirimi: hemen (100ms), bırakınca 160ms. */
+.press {
+  transition-property: background-color, color, box-shadow, scale, opacity;
+  transition-duration: var(--dur-fast), var(--dur-fast), var(--dur-fast), 160ms, var(--dur-fast);
+  transition-timing-function: ease, ease, ease, var(--ease-out), ease;
+}
+
+.press:not(:disabled):active {
+  scale: 0.97;
+  transition-duration: var(--dur-press);
+}
+
+.press-sm:not(:disabled):active {
+  scale: 0.94;
+}
+
+.press-wide:not(:disabled):active {
+  scale: 0.99;
+}
+
+/*
+ * Azaltılmış hareket: hareket kapanmaz, yumuşar. Kayma/ölçek/yay kalkar, kısa opaklık kalır.
+ * Aynı adlı @keyframes burada yalnız opaklıkla yeniden tanımlanır; geçişlerde transform/scale/translate
+ * canlandırılmaz (anında olur).
+ */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes rise-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes pop-out {
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes dialog-scale {
+    from {
+      opacity: 1;
+    }
+  }
+  @keyframes dialog-out {
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes sheet-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes sheet-out {
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes toast-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes save-tick {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes check-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  *,
+  *::before,
+  *::after {
+    transition-property: color, background-color, border-color, outline-color, fill, stroke, opacity, box-shadow !important;
+    scroll-behavior: auto !important;
+  }
+
+  .press:not(:disabled):active,
+  .press-sm:not(:disabled):active,
+  .press-wide:not(:disabled):active {
+    scale: none;
+  }
+}
+
+/* ---------- TipTap düzenleyici (kullanıcının yazdığı metin: body-user 14/21) ---------- */
 .rich-editor .ProseMirror {
   outline: none;
-  min-height: 4.5rem;
-  padding: 0.5rem 0.75rem;
-  line-height: 1.5;
+  min-height: 5.25rem;
+  padding: 0.75rem;
+  font-size: var(--text-body-user);
+  line-height: var(--text-body-user--line-height);
 }
 
 .rich-editor .ProseMirror p + p,
 .rich-editor .ProseMirror p + ul,
 .rich-editor .ProseMirror ul + p {
-  margin-top: 0.35rem;
+  margin-top: 0.375rem;
 }
 
 .rich-editor .ProseMirror ul {
@@ -230,7 +706,7 @@
 }
 
 .rich-editor .ProseMirror li + li {
-  margin-top: 0.15rem;
+  margin-top: 0.125rem;
 }
 
 .rich-editor .ProseMirror a {
@@ -241,23 +717,10 @@
 
 .rich-editor .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
-  color: var(--faint);
+  color: var(--text-2);
   float: left;
   height: 0;
   pointer-events: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after,
-  ::view-transition-group(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) {
-    animation-duration: 1ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 1ms !important;
-  }
 }
 
 /*

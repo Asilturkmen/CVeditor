@@ -1,0 +1,99 @@
+/*
+ * Çizgi (`cizgi`): docs/sablonlar/SET-14.md Şablon 6. Sayfanın tepesinde ince vurgu şeridi (her sayfada);
+ * bölüm başlıkları renkli ve sağlarına ince çizgi uzanır (Awesome-CV). Tek sütun.
+ * Her kural `.tpl-cizgi` ile başlar. Sözleşme ve ortak varsayılanlar: base.css başı. Gövde boyu,
+ * satır aralığı ve boşluklar templateMeta.ts `scale` ile gelir (CSS'te yeniden çarpma).
+ * İLK SÜRÜM (T0): iskelet ve ölçüler şartnameden; şablon ekibi cilalayacak.
+ */
+
+/* Üst şerit: her sayfada tekrar eder (zemin, metinsiz) */
+.tpl-cizgi .page {
+  background: linear-gradient(var(--accent) 0 2mm, var(--paper) 0);
+}
+
+/* ---------- Başlık: ad solda, daire fotoğraf sağda ---------- */
+
+.tpl-cizgi .cv-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  /* Fotoğrafın üst kenarı başlığın iç boşluğuna (adın satır kutusunun üstüne) oturur */
+  align-items: start;
+  gap: 0;
+  padding: var(--pad-y) var(--pad-x) 5mm;
+}
+
+.tpl-cizgi .cv-identity {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.tpl-cizgi .cv-photo {
+  grid-column: 2;
+  grid-row: 1;
+  width: 26mm;
+  height: 26mm;
+  margin-left: 6mm;
+  border-radius: 50%;
+}
+
+.tpl-cizgi .cv-name {
+  --name-size: 2.4em;
+  --name-room: 140mm;
+  --name-char: 0.6;
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+}
+
+.tpl-cizgi .cv-headline {
+  margin-top: 1mm;
+  font-size: 1.12em;
+  font-weight: 600;
+  color: var(--accent-ink);
+}
+
+.tpl-cizgi .cv-contact {
+  margin-top: 2.2mm;
+  color: var(--muted);
+}
+
+.tpl-cizgi.align-center .cv-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.tpl-cizgi.align-center .cv-photo {
+  margin: 0 0 3.5mm;
+}
+
+/* ---------- Bölüm başlığı: renkli, sağına uzanan ince çizgi ---------- */
+
+.tpl-cizgi .section-title {
+  display: flex;
+  align-items: center;
+  gap: 3mm;
+  font-size: 1.12em;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--accent-ink);
+}
+
+.tpl-cizgi .section-title > span {
+  flex: none;
+  max-width: 85%;
+}
+
+.tpl-cizgi .section-title::after {
+  content: '';
+  flex: 1;
+  border-top: 0.25mm solid var(--accent-light);
+}
+
+/* ---------- Kayıtlar ---------- */
+
+.tpl-cizgi .rich li::marker {
+  color: var(--accent);
+}

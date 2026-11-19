@@ -1,0 +1,26 @@
+# Derleme bağlamına girmeyenler (imaj kendi bağımlılıklarını kurar ve kendisi derler)
+node_modules
+dist
+dist-server
+dist-ssr
+test-results
+playwright-report
+blob-report
+src/paraglide
+.git
+.github
+.vscode
+.idea
+.claude
+*.log
+
+# Sırlar ve kişisel dosyalar imaja asla girmez (ortam değişkenleri çalışma anında verilir)
+.env
+.env.*
+!.env.example
+CLAUDE.local.md
+*.pem
+*.key
+secrets/
+*.cveditor.json
+cveditor-yedek-*.json

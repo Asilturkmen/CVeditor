@@ -1,14 +1,18 @@
 import { DEFAULT_SIDE_TYPES } from '@/cv/sample'
 import type { Cv, FontId, Section, TemplateSettings } from '@/cv/schema'
-import afisCss from './styles/afis.css?raw'
 import bantCss from './styles/bant.css?raw'
-import cerceveCss from './styles/cerceve.css?raw'
+import blokCss from './styles/blok.css?raw'
 import cizelgeCss from './styles/cizelge.css?raw'
-import ciftCss from './styles/cift.css?raw'
-import geceCss from './styles/gece.css?raw'
+import cizgiCss from './styles/cizgi.css?raw'
+import dengeCss from './styles/denge.css?raw'
+import dergiCss from './styles/dergi.css?raw'
+import ikiliCss from './styles/ikili.css?raw'
 import isvicreCss from './styles/isvicre.css?raw'
-import mansetCss from './styles/manset.css?raw'
 import panelCss from './styles/panel.css?raw'
+import portreCss from './styles/portre.css?raw'
+import teknikCss from './styles/teknik.css?raw'
+import yalinCss from './styles/yalin.css?raw'
+import yoneticiCss from './styles/yonetici.css?raw'
 import zarifCss from './styles/zarif.css?raw'
 import { DEFAULT_TEMPLATE_ID, TEMPLATE_META, type BodyFontKey, type ColorSet, type TemplateId, type TemplateMeta } from './templateMeta'
 
@@ -34,16 +38,20 @@ const fontKeysMatch: Same<BodyFontKey, FontId> = true
 void fontKeysMatch
 
 const CSS: Record<TemplateId, string> = {
+  yalin: yalinCss,
   zarif: zarifCss,
+  ikili: ikiliCss,
   panel: panelCss,
+  teknik: teknikCss,
+  cizgi: cizgiCss,
   bant: bantCss,
-  manset: mansetCss,
-  gece: geceCss,
-  isvicre: isvicreCss,
   cizelge: cizelgeCss,
-  cift: ciftCss,
-  afis: afisCss,
-  cerceve: cerceveCss,
+  isvicre: isvicreCss,
+  yonetici: yoneticiCss,
+  portre: portreCss,
+  denge: dengeCss,
+  dergi: dergiCss,
+  blok: blokCss,
 }
 
 function define(meta: TemplateMeta & { id: TemplateId }): TemplateDef {
@@ -76,7 +84,7 @@ export function isTemplateId(id: string): id is TemplateId {
   return Object.hasOwn(TEMPLATES, id)
 }
 
-/** Bilinmeyen kimlik (eski ya da bozuk kayıt) varsayılan şablona (Zarif) düşer. */
+/** Bilinmeyen kimlik (eski ya da bozuk kayıt) varsayılan şablona (Yalın) düşer. */
 export function getTemplate(id: string): TemplateDef {
   return isTemplateId(id) ? TEMPLATES[id] : TEMPLATES[DEFAULT_TEMPLATE_ID]
 }

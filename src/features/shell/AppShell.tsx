@@ -1,8 +1,14 @@
 import { Link, Outlet, useRouterState } from '@tanstack/react-router'
-import { Info, Moon, Settings, Sun } from 'lucide-react'
-import { useLayoutEffect, useRef, useState } from 'react'
+import { Moon, Settings, Sun } from 'lucide-react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/Button'
+import { buttonClass } from '@/components/ui/buttonClass'
+import { IconButton } from '@/components/ui/IconButton'
+import { NavPills, navPillClass } from '@/components/ui/NavPills'
+import { FloatingNotice } from '@/components/ui/Notice'
+import { Toolbar } from '@/components/ui/Toolbar'
 import { Tooltip } from '@/components/ui/Tooltip'
+import { useScrollEdge } from '@/components/ui/useScrollEdge'
 import { cn } from '@/lib/cn'
 import { isChromium, isSafari } from '@/lib/persistence'
 import { usePrefs } from '@/lib/prefs'
@@ -15,68 +21,31 @@ const TABS = [
   { to: '/inceleme', label: () => m.rv_nav() },
 ] as const
 
-function NavTabs() {
-  const pathname = useRouterState({ select: (s) => s.location.pathname })
-  const refs = useRef(new Map<string, HTMLAnchorElement>())
-  const [bar, setBar] = useState<{ left: number; width: number } | null>(null)
-  const active = TABS.find((t) => pathname.startsWith(t.to))?.to ?? null
-
-  useLayoutEffect(() => {
-    const el = active ? refs.current.get(active) : null
-    setBar(el ? { left: el.offsetLeft, width: el.offsetWidth } : null)
-  }, [active])
-
-  return (
-    <nav className="relative flex h-full items-stretch gap-1" aria-label={m.nav_label()}>
-      {TABS.map((tab) => (
-        <Link
-          key={tab.to}
-          to={tab.to}
-          ref={(el) => {
-            if (el) refs.current.set(tab.to, el)
-          }}
-          className={cn(
-            'flex items-center px-2 text-sm sm:px-3 font-medium transition-colors duration-150',
-            active === tab.to ? 'text-text' : 'text-muted hover:text-text',
-          )}
-        >
-          {tab.label()}
-        </Link>
-      ))}
-      {bar && (
-        <span
-          aria-hidden
-          className="absolute bottom-0 h-0.5 rounded-full bg-accent transition-[left,width] duration-250 ease-[var(--ease-out-soft)]"
-          style={{ left: bar.left + 10, width: bar.width - 20 }}
-        />
-      )}
-    </nav>
-  )
-}
-
+/** Tema anahtarı (ay/güneş). Galeri sayfalarının üst çubuğunda ve editörde. */
 export function ThemeToggle() {
   const theme = usePrefs((s) => s.theme)
   const setTheme = usePrefs((s) => s.setTheme)
   const dark = theme === 'dark'
+  const label = dark ? m.theme_to_light() : m.theme_to_dark()
   return (
-    <Tooltip content={dark ? m.theme_to_light() : m.theme_to_dark()}>
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label={dark ? m.theme_to_light() : m.theme_to_dark()}
-        onClick={() => setTheme(dark ? 'light' : 'dark')}
-      >
-        <span key={theme} className="animate-[pop-in_220ms_var(--ease-out-soft)]">
+    <IconButton
+      label={label}
+      onClick={() => setTheme(dark ? 'light' : 'dark')}
+      icon={
+        <span key={theme} className="inline-flex animate-[pop-in_200ms_var(--ease-out)]">
           {dark ? <Sun /> : <Moon />}
         </span>
-      </Button>
-    </Tooltip>
+      }
+    />
   )
 }
 
 const BROWSER_NOTE_KEY = 'cveditor:browserNoteDismissed'
 
-/** Chromium dışı tarayıcıda bir kez gösterilen sakin not (önizleme = PDF garantisi Chromium'da). */
+/**
+ * Chromium dışı tarayıcıda bir kez gösterilen sakin not (önizleme = PDF garantisi Chromium'da).
+ * Renkli bant değil: içeriğin başında tek uyarı kapsülü, "Tamam" ile kalıcı kapanır.
+ */
 function BrowserNote() {
   const [hidden, setHidden] = useState(() => {
     try {
@@ -89,16 +58,13 @@ function BrowserNote() {
   // Safari ayrıca 7 gün ziyaret edilmeyen sitenin verisini silebilir (ITP): yedek hatırlatması.
   const safari = isSafari()
   return (
-    <div className="border-b border-warn/25 bg-warn-soft">
-      <div className="mx-auto flex max-w-[1240px] items-center gap-3 px-6 py-2 text-[13px]">
-        <Info className="size-4 shrink-0 text-warn" />
-        <p className="flex-1">
-          {m.browser_note()}
-          {safari && <span className="mt-0.5 block font-medium">{m.browser_note_safari()}</span>}
-        </p>
+    <FloatingNotice
+      tone="warn"
+      className="mb-6 max-w-[720px] rounded-xl"
+      action={
         <Button
           size="sm"
-          variant="ghost"
+          variant="plain"
           onClick={() => {
             try {
               localStorage.setItem(BROWSER_NOTE_KEY, '1')
@@ -110,40 +76,64 @@ function BrowserNote() {
         >
           {m.common_ok()}
         </Button>
-      </div>
-    </div>
+      }
+    >
+      {m.browser_note()}
+      {safari && <span className="mt-1 block">{m.browser_note_safari()}</span>}
+    </FloatingNotice>
   )
 }
 
+/**
+ * Galeri sayfalarının kabuğu (CV'lerim, Şablonlar, İnceleme, Ayarlar): 52px malzemeli yapışkan üst çubuk,
+ * içerik kabıyla aynı genişlik ve sol kenar (1240, yatay 24; telefonda 16). Solda yazı logosu, 24px
+ * sonra hap sekmeler; sağda tema ve Ayarlar (4px ara). Dar ekranda sekmeler ikinci satıra iner
+ * (DOM sırası aynı kalır: logo, gezinme, eylemler).
+ */
 export function AppShell() {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
+  const scrolled = useScrollEdge()
+  const settingsActive = pathname.startsWith('/ayarlar')
   return (
-    <div className="min-h-dvh">
-      <BrowserNote />
-      <header className="sticky top-0 z-30 border-b border-line bg-bg">
-        <div className="mx-auto flex h-14 max-w-[1240px] items-stretch gap-3 px-4 sm:gap-6 sm:px-6">
-          <Link to="/" className="flex items-center" aria-label={m.app_name()}>
+    <div className="min-h-dvh bg-window">
+      <Toolbar scrolled={scrolled} className="sticky top-0 pt-[env(safe-area-inset-top)]">
+        <div
+          className={cn(
+            'mx-auto grid w-full max-w-[1240px] items-center gap-x-6 px-6 max-sm:px-4',
+            'grid-cols-[auto_1fr_auto] [grid-template-areas:"brand_nav_actions"]',
+            'max-sm:grid-cols-[1fr_auto] max-sm:gap-y-1 max-sm:pb-2 max-sm:[grid-template-areas:"brand_actions""nav_nav"]',
+          )}
+        >
+          <Link
+            to="/"
+            className="flex h-13 items-center rounded-md [grid-area:brand] max-sm:h-11"
+            aria-label={m.app_name()}
+          >
             <Wordmark />
           </Link>
-          <NavTabs />
-          <div className="ml-auto flex items-center gap-1">
+          <NavPills aria-label={m.nav_label()} className="min-w-0 [grid-area:nav] max-sm:-ml-3">
+            {TABS.map((tab) => (
+              <Link key={tab.to} to={tab.to} className={navPillClass}>
+                {tab.label()}
+              </Link>
+            ))}
+          </NavPills>
+          <div className="flex items-center gap-1 [grid-area:actions]">
             <ThemeToggle />
             <Tooltip content={m.nav_settings()}>
               <Link
                 to="/ayarlar"
                 aria-label={m.nav_settings()}
-                className={cn(
-                  'inline-flex size-9 items-center justify-center rounded-lg transition-colors',
-                  pathname.startsWith('/ayarlar') ? 'bg-surface-2 text-text' : 'text-muted hover:bg-surface-2 hover:text-text',
-                )}
+                className={buttonClass({ variant: 'ghost', size: 'icon', className: cn(settingsActive && 'bg-fill-2') })}
               >
-                <Settings className="size-4" />
+                <Settings />
               </Link>
             </Tooltip>
           </div>
         </div>
-      </header>
-      <main className="mx-auto max-w-[1240px] px-4 pt-8 sm:px-6 pb-24">
+      </Toolbar>
+      <main className="mx-auto max-w-[1240px] px-6 pt-8 pb-12 max-sm:px-4 max-sm:pt-6">
+        <BrowserNote />
         <Outlet />
       </main>
     </div>

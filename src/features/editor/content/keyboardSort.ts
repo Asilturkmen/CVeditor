@@ -9,7 +9,7 @@ import {
   type KeyboardCoordinateGetter,
   type UniqueIdentifier,
 } from '@dnd-kit/core'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 
 /**
  * Kaydırılan panelde klavyeyle sıralama.
@@ -112,12 +112,31 @@ function createSortKeyboard() {
   return { coordinateGetter, collisionDetection, reset: () => (target.current = null) }
 }
 
-/** Fare/dokunma ve klavye sensörleri + klavyeye uygun çarpışma. Her DndContext için ayrı. */
+const POINTER_OPTIONS = { activationConstraint: { distance: 4 } }
+
+/**
+ * Fare/dokunma ve klavye sensörleri + klavyeye uygun çarpışma. Her DndContext için ayrı.
+ * Dönen nesne ve sensörler çizimden çizime AYNI kalır: `useSensor` seçenek nesnesini kimliğiyle
+ * karşılaştırır; her çizimde yeni nesne verilirse DndContext'in bağlamı değişir ve bağlı her
+ * sıralanabilir satır (memo'lu olsa da) her tuşta yeniden çizilir.
+ */
 export function useSortDnd() {
-  const [{ coordinateGetter, collisionDetection, reset }] = useState(createSortKeyboard)
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(KeyboardSensor, { coordinateGetter, scrollBehavior: 'auto' }),
+  const [state] = useState(() => {
+    const k = createSortKeyboard()
+    return { ...k, keyboardOptions: { coordinateGetter: k.coordinateGetter, scrollBehavior: 'auto' as const } }
+  })
+  const sensors = useSensors(useSensor(PointerSensor, POINTER_OPTIONS), useSensor(KeyboardSensor, state.keyboardOptions))
+  return useMemo(
+    () => ({ sensors, collisionDetection: state.collisionDetection, reset: state.reset }),
+    [sensors, state],
   )
-  return { sensors, collisionDetection, reset }
+}
+
+/**
+ * Kimlik listesi: içerik aynı kaldıkça aynı dizi döner (SortableContext `items` kimliğiyle
+ * karşılaştırır; kayıt yazılırken bölümün dizisi yenilenir ama kimlikler değişmez).
+ */
+export function useStableIds(ids: string[]): string[] {
+  const key = ids.join('')
+  return useMemo(() => (key ? key.split('') : []), [key])
 }

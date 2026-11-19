@@ -85,14 +85,15 @@ test('Escape klavyeyle başlatılan taşımayı iptal eder', async ({ page }) =>
 
 test('bölüm içindeki kayıtlar klavyeyle sıralanır', async ({ page }) => {
   await createCv(page, { start: 'sample' })
-  const experience = page.getByRole('region', { name: 'Deneyim' })
-  const positions = () => experience.getByLabel('Pozisyon').evaluateAll((els) => els.map((el) => (el as HTMLInputElement).value))
+  const experience = page.getByRole('region', { name: 'Deneyim', exact: true })
+  // Kayıtlar anahatta kapalı satır: sıra satırdaki adlardan okunur.
+  const positions = () => experience.locator('[id^="item-"] [data-row-title]').allInnerTexts()
   const before = await positions()
   expect(before.length).toBeGreaterThan(1)
 
   const handle = experience.getByRole('button', { name: 'Sürükleyerek sırala', exact: true }).first()
-  // Duyurudaki ad kart başlığıyla aynı ("Pozisyon — Şirket").
-  const label = (await experience.locator('[id^="item-"]').first().locator('span[title]').first().getAttribute('title'))!
+  // Duyurudaki ad satırın adıyla aynı ("Pozisyon — Şirket").
+  const label = (await experience.locator('[id^="item-"]').first().getAttribute('data-label'))!
   await handle.focus()
   await pickUp(page, label)
   await moveTo(page, 'ArrowDown', label, 2)

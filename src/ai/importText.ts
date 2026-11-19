@@ -1,5 +1,15 @@
 import type { CvLanguage } from '@/cv/schema'
-import { buildContactMasks, createMasker, EMAIL_RE, phonesIn, type ReferenceMaskSource } from './mask'
+import {
+  bounded,
+  buildContactMasks,
+  createMasker,
+  EMAIL_RE,
+  hasUnknownPlaceholder,
+  loosePattern,
+  phonesIn,
+  PLACEHOLDER_RE,
+  type ReferenceMaskSource,
+} from './mask'
 import { CITIES, COUNTRIES, fold } from './places'
 import type { ImportResult } from './types'
 
@@ -163,7 +173,7 @@ export function detectLanguage(text: string): DetectedLanguage {
 
 // ---------------------------------------------------------------- Maskeleme
 
-export type ContactPlaceholderKind = 'EMAIL' | 'PHONE' | 'LINKEDIN' | 'GITHUB' | 'WEBSITE' | 'LOCATION'
+export type ContactPlaceholderKind = 'EMAIL' | 'PHONE' | 'LINKEDIN' | 'GITHUB' | 'WEBSITE' | 'LOCATION' | 'RAW'
 
 export interface MaskedText {
   text: string
@@ -171,13 +181,18 @@ export interface MaskedText {
   map: Record<string, string>
 }
 
+/** PDF metninde zaten duran ⟦…⟧ ya da tek ayraç (gerçek yer tutucularla karışmasın diye kaçışlanır) */
+const LITERAL_RE = /⟦[^⟦⟧\n]{0,40}⟧|[⟦⟧]/g
+
 /**
- * Sağlayıcıya gitmeden önce: bütün e-postalar, telefonlar, LinkedIn/GitHub
- * bağlantıları (referanslarınki dahil) ve kişisel web sitesi/konum yer
- * tutucuya döner. Aynı değer aynı yer tutucuyu alır; işlem kayıpsızdır.
+ * Sağlayıcıya gitmeden önce ilk adım: bütün e-postalar, telefonlar,
+ * LinkedIn/GitHub bağlantıları (referanslarınki dahil) ve kişisel web
+ * sitesi/konum yer tutucuya döner. Aynı değer aynı yer tutucuyu alır; işlem
+ * kayıpsızdır. Web sitesi ve konum sözcük sınırıyla aranır ("Rize" konumu
+ * "summarize" içinde eşleşmez). İkinci adım `maskPersonal`'dır; ikisini
+ * birlikte `maskPdfText` (pdfMask.ts) çağırır.
  */
 export function maskContacts(input: string, contacts: ExtractedContacts = {}): MaskedText {
-  let text = joinWrappedUrls(input)
   const map: Record<string, string> = {}
   const byValue = new Map<string, string>()
   const counters: Partial<Record<ContactPlaceholderKind, number>> = {}
@@ -192,47 +207,63 @@ export function maskContacts(input: string, contacts: ExtractedContacts = {}): M
     map[ph] = value
     return ph
   }
+  /** Yalnız yer tutucuların dışında kalan metinde değiştirir. */
+  const outside = (text: string, fn: (part: string) => string) =>
+    text
+      .split(/(⟦[A-Z]+(?:_\d+)?⟧)/)
+      .map((part, i) => (i % 2 === 1 ? part : fn(part)))
+      .join('')
+
+  let text = joinWrappedUrls(input).replace(LITERAL_RE, (token) => placeholder('RAW', token))
   // Ana değerler önce: kişinin kendi e-postası ⟦EMAIL⟧ olsun
   if (contacts.email) placeholder('EMAIL', contacts.email)
   if (contacts.phone) placeholder('PHONE', contacts.phone)
 
-  text = text.replace(LINKEDIN_RE, (v) => placeholder('LINKEDIN', cleanUrl(v)) + v.slice(cleanUrl(v).length))
-  text = text.replace(GITHUB_RE, (v) => placeholder('GITHUB', cleanUrl(v)) + v.slice(cleanUrl(v).length))
-  text = text.replace(EMAIL_RE, (v) => placeholder('EMAIL', v))
-  for (const phone of phonesIn(text)) text = text.split(phone).join(placeholder('PHONE', phone))
-  for (const [kind, value] of [
-    ['WEBSITE', contacts.website],
-    ['LOCATION', contacts.location],
-  ] as const) {
-    if (!value || value.length < 4) continue
-    const re = new RegExp(`(?:https?://)?(?:www\\.)?${escapeRe(value)}`, 'gi')
-    if (re.test(text)) text = text.replace(re, (v) => placeholder(kind, v))
+  text = outside(text, (part) => part.replace(LINKEDIN_RE, (v) => placeholder('LINKEDIN', cleanUrl(v)) + v.slice(cleanUrl(v).length)))
+  text = outside(text, (part) => part.replace(GITHUB_RE, (v) => placeholder('GITHUB', cleanUrl(v)) + v.slice(cleanUrl(v).length)))
+  text = outside(text, (part) => part.replace(EMAIL_RE, (v) => placeholder('EMAIL', v)))
+  for (const phone of phonesIn(text)) text = outside(text, (part) => part.split(phone).join(placeholder('PHONE', phone)))
+  if (contacts.website && contacts.website.length >= 4) {
+    const re = new RegExp(`(?<![\\p{L}\\p{N}@._-])(?:https?://)?(?:www\\.)?${escapeRe(contacts.website)}(?![\\p{L}\\p{N}_-])`, 'giu')
+    text = outside(text, (part) => part.replace(re, (v) => placeholder('WEBSITE', v)))
+  }
+  if (contacts.location && contacts.location.length >= 4) {
+    // Kısa tek sözcüklü yer adı ("Rize", "Ordu") yalnız büyük harfle başlıyorsa: sıradan sözcük maskelenmez.
+    const short = !/\s/.test(contacts.location) && contacts.location.replace(/[^\p{L}]/gu, '').length <= 4
+    const re = new RegExp(bounded(loosePattern(contacts.location, { ascii: true })), 'giu')
+    text = outside(text, (part) => part.replace(re, (v) => (short && !/^\p{Lu}/u.test(v) ? v : placeholder('LOCATION', v))))
   }
   return { text, map }
 }
 
 /**
- * Yerelde tahmin edilen ad (PDF'teki en büyük satır ya da kurallı ayrıştırıcının
- * bulduğu ad) metnin her yerinde ⟦NAME⟧ ile maskelenir; Türkçe büyük/küçük harf
- * farkına dayanıklıdır ("Ayşe Yılmaz" = "AYŞE YILMAZ"). Her yazım ayrı yer
- * tutucu alır (⟦NAME_2⟧), geri koyma kayıpsızdır.
+ * Yerelde tahmin edilen ad metnin her yerinde ⟦NAME⟧ ile maskelenir; Türkçe
+ * büyük/küçük harf farkına dayanıklıdır ("Ayşe Yılmaz" = "AYŞE YILMAZ"). Her
+ * yazım ayrı yer tutucu alır (⟦NAME_2⟧), geri koyma kayıpsızdır.
  */
 export function maskName(masked: MaskedText, name: string | null | undefined): MaskedText {
   return maskPersonal(masked, { name })
 }
 
 /**
- * `maskContacts`'tan sonra ikinci adım: ad, konum ve referans kişilerin adı
- * düzenlemedeki kurallarla (mask.ts) maskelenir: ad parçaları ve bağlantıdaki
- * bitişik ad, konumun parçaları ("İstanbul ofisinde"), Türkçe büyük/küçük ve
- * harfsiz yazım. Önceki adımın yer tutucuları korunur, çakışmaz.
+ * `maskContacts`'tan sonra ikinci adım: ad (ve zayıf ad adayları), konum ve
+ * referans kişilerin adı düzenlemedeki kurallarla (mask.ts) maskelenir: ad
+ * parçaları ve bağlantıdaki bitişik ad, konumun parçaları ("İstanbul
+ * ofisinde"), Türkçe büyük/küçük ve aksansız yazım. Ayrıca genel desenler
+ * (kimlik no, doğum tarihi, sokak adresi, kullanıcı adı, "[at]" e-postası)
+ * burada uygulanır; ad bulunamasa da çalışır. Önceki adımın yer tutucuları
+ * korunur, çakışmaz.
  */
 export function maskPersonal(
   masked: MaskedText,
-  source: { name?: string | null; location?: string; references?: ReferenceMaskSource[] },
+  source: { name?: string | null; extraNames?: string[]; location?: string; references?: ReferenceMaskSource[] },
 ): MaskedText {
-  if (!source.name?.trim() && !source.location?.trim() && !source.references?.length) return masked
-  const masks = buildContactMasks({ fullName: source.name ?? '', location: source.location, references: source.references })
+  const masks = buildContactMasks({
+    fullName: source.name ?? '',
+    extraNames: source.extraNames,
+    location: source.location,
+    references: source.references,
+  })
   const masker = createMasker(masks, { reserved: Object.keys(masked.map) })
   const text = masker.mask(masked.text)
   return { text, map: { ...masked.map, ...masker.map() } }
@@ -242,36 +273,57 @@ function escapeRe(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-const PLACEHOLDER_RE = /⟦[A-Z]+(?:_\d+)?⟧/g
-
-/** İçe aktarma: bilinmeyen (uydurma) yer tutucu silinir; alan boş kalır. */
+/** İçe aktarma: bilinen yer tutucular geri konur; bilinmeyen (uydurma) yer tutucu silinir. */
 export function unmaskText(text: string, map: Record<string, string>): string {
   return text.replace(PLACEHOLDER_RE, (ph) => map[ph] ?? '')
 }
 
-/** Bilinen yer tutucuları geri koyar; bilinmeyen olduğu gibi kalır (çağıran `hasPlaceholder` ile yakalayıp atar). */
+/** Bilinen yer tutucuları geri koyar; bilinmeyen olduğu gibi kalır (çağıran önce `hasUnknownPlaceholder` ile denetler). */
 export function restoreText(text: string, map: Record<string, string>): string {
   return text.replace(PLACEHOLDER_RE, (ph) => map[ph] ?? ph)
 }
 
-/** Sağlayıcı yanıtındaki bütün metinlerde yer tutucuları yerelde asıl değerlere çevirir. */
-export function unmaskImportResult(result: ImportResult, map: Record<string, string>): ImportResult {
-  const un = (v: string | undefined) => (v == null ? v : unmaskText(v, map).trim())
-  const personal = Object.fromEntries(
-    Object.entries(result.personal).map(([k, v]) => [k, un(v as string | undefined)]),
-  ) as ImportResult['personal']
-  return {
-    personal,
-    sections: result.sections.map((section) => ({
-      ...section,
-      title: section.title == null ? section.title : un(section.title),
-      items: section.items.map((item) => ({
-        ...item,
-        fields: Object.fromEntries(Object.entries(item.fields).map(([k, v]) => [k, un(v) ?? ''])),
-        bullets: item.bullets?.map((b) => un(b) ?? ''),
-      })),
-    })),
+export interface UnmaskedImport {
+  result: ImportResult
+  /** Tanınmayan ya da bozulmuş yer tutucu içerdiği için boş bırakılan değer sayısı */
+  dropped: number
+}
+
+/**
+ * Sağlayıcı yanıtındaki bütün metinlerde yer tutucuları yerelde asıl
+ * değerlere çevirir. Tanınmayan ya da bozulmuş yer tutucu ("⟦İSİM⟧",
+ * "[EMAIL]", "⟦EMAIL", gönderilmemiş ⟦PHONE_9⟧) içeren değer CV'ye yazılmaz:
+ * alan boş kalır, madde atılır ve `dropped` sayılır.
+ */
+export function unmaskImport(result: ImportResult, map: Record<string, string>): UnmaskedImport {
+  const known = new Set(Object.keys(map))
+  let dropped = 0
+  const un = (v: string) => {
+    if (hasUnknownPlaceholder(v, known)) {
+      dropped++
+      return ''
+    }
+    return restoreText(v, map).trim()
   }
+  const opt = (v: string | undefined) => (v == null ? v : un(v))
+  const personal = Object.fromEntries(
+    Object.entries(result.personal).map(([k, v]) => [k, opt(v as string | undefined)]),
+  ) as ImportResult['personal']
+  const sections = result.sections.map((section) => ({
+    ...section,
+    title: section.title == null ? section.title : un(section.title),
+    items: section.items.map((item) => ({
+      ...item,
+      fields: Object.fromEntries(Object.entries(item.fields).map(([k, v]) => [k, un(v)])),
+      bullets: item.bullets?.map(un).filter(Boolean),
+    })),
+  }))
+  return { result: { personal, sections }, dropped }
+}
+
+/** `unmaskImport`'un yalnız sonucu. */
+export function unmaskImportResult(result: ImportResult, map: Record<string, string>): ImportResult {
+  return unmaskImport(result, map).result
 }
 
 /**

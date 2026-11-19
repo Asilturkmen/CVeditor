@@ -49,7 +49,13 @@ export function mix(a: Rgb | string, b: Rgb | string, t: number): Rgb {
   return [0, 1, 2].map((i) => x[i] + (y[i] - x[i]) * t) as Rgb
 }
 
-export const isDark = (color: Rgb | string) => luminance(color) < 0.18
+/**
+ * Zemin "koyu" mu: üstünde beyaz metin mi okunur? Tek kaynak `onColor`'dır; `ensureContrast`'ın
+ * yönü de buradan gelir. Ayrı bir parlaklık eşiği (eski 0.18) `onColor`'ın beyazı seçtiği
+ * sınırla (≈ 0.1833) örtüşmüyordu: aradaki bantta (ör. #e03131) `--on-accent` beyaz,
+ * yumuşatılmış hâlleri siyah çıkıyordu.
+ */
+export const isDark = (color: Rgb | string) => onColor(color) === '#ffffff'
 
 /** Renkli zeminin üstündeki metin rengi: beyaz ya da koyu, hangisi daha okunursa (her zaman ≥ 4.5:1). */
 export function onColor(bg: Rgb | string): string {
@@ -63,6 +69,7 @@ export function onColor(bg: Rgb | string): string {
 /**
  * `fg` metni `bg` üstünde en az `min` kontrastla okunana kadar zeminin tersine
  * (açık zeminde siyaha, koyu zeminde beyaza) doğru kaydırır. Zaten okunuyorsa aynen döner.
+ * Yön `onColor(bg)` ile aynıdır (bkz. `isDark`): aynı zeminin bütün metin renkleri aynı kutupta kalır.
  */
 export function ensureContrast(fg: Rgb | string, bg: Rgb | string, min = MIN_TEXT_CONTRAST): string {
   const start = typeof fg === 'string' ? parseHex(fg) : fg
@@ -104,6 +111,15 @@ export function ensureBackgroundFor(bg: Rgb | string, texts: (Rgb | string)[], m
   return color
 }
 
+/**
+ * Renkli zeminin üstündeki üç metin tonu: tam (`onColor`), biraz (`dim`) ve daha çok (`muted`)
+ * zemine yaklaştırılmış. Üçü de ≥ 4.5:1 ve aynı kutuptadır (hepsi açık ya da hepsi koyu).
+ */
+export function onTones(bg: Rgb | string, dim: number, muted: number): { on: string; dim: string; muted: string } {
+  const on = onColor(bg)
+  return { on, dim: ensureContrast(mix(on, bg, dim), bg), muted: ensureContrast(mix(on, bg, muted), bg) }
+}
+
 export interface ColorInput {
   accent: string
   /** Zemin rengi; şablon zemin kullanmıyorsa vurgu */
@@ -119,7 +135,8 @@ export interface ColorInput {
 export function colorVariables(input: ColorInput): Record<`--${string}`, string> {
   const accent = parseHex(input.accent)
   const base = parseHex(input.base)
-  const onBase = onColor(base)
+  const baseTones = onTones(base, 0.1, 0.32)
+  const onBase = baseTones.on
   const paper = input.paper === 'base' ? base : parseHex(input.paper)
   const darkPaper = isDark(paper)
 
@@ -129,7 +146,7 @@ export function colorVariables(input: ColorInput): Record<`--${string}`, string>
   const muted = ensureContrast(input.paper === 'base' || !input.muted ? mix(onBase, base, 0.38) : input.muted, paper)
   const rule = input.paper === 'base' || !input.rule ? toHex(mix(paper, onBase, 0.24)) : input.rule
   const accentInk = ensureContrast(accent, paper)
-  const onAccent = onColor(accent)
+  const accentTones = onTones(accent, 0.12, 0.22)
 
   // Vurgunun açık tonu metin zemini olabilir (Bant'ın yan kartı): üstündeki metin, soluk metin ve
   // vurgu metni okunur kalana kadar kâğıda doğru açılır (metin renkleri değişmez).
@@ -145,9 +162,9 @@ export function colorVariables(input: ColorInput): Record<`--${string}`, string>
     '--muted': muted,
     '--rule': rule,
     '--accent': toHex(accent),
-    '--on-accent': onAccent,
-    '--on-accent-dim': ensureContrast(mix(onAccent, accent, 0.12), accent),
-    '--on-accent-muted': ensureContrast(mix(onAccent, accent, 0.22), accent),
+    '--on-accent': accentTones.on,
+    '--on-accent-dim': accentTones.dim,
+    '--on-accent-muted': accentTones.muted,
     '--accent-ink': accentInk,
     '--accent-mark': ensureBackground(accent, ink),
     '--accent-soft': accentSoft,
@@ -155,8 +172,8 @@ export function colorVariables(input: ColorInput): Record<`--${string}`, string>
     '--accent-dark': toHex(mix(accent, BLACK, 0.3)),
     '--base': toHex(base),
     '--on-base': onBase,
-    '--on-base-dim': ensureContrast(mix(onBase, base, 0.1), base),
-    '--on-base-muted': ensureContrast(mix(onBase, base, 0.32), base),
+    '--on-base-dim': baseTones.dim,
+    '--on-base-muted': baseTones.muted,
     '--base-soft': toHex(baseSoft),
     '--base-ink': baseInk,
     '--base-ink-muted': ensureContrast(mix(baseInk, baseSoft, 0.3), baseSoft),

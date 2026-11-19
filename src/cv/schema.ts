@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { isSafePhoto } from './photo'
 
 /**
  * CV veri modeli. Tek gerçek kaynak budur: şablonlar bu veriyi çizer,
@@ -7,7 +8,7 @@ import { z } from 'zod'
  *
  * Şema değişirse CURRENT_SCHEMA_VERSION artırılır ve migrate.ts'e göç eklenir.
  */
-export const CURRENT_SCHEMA_VERSION = 2
+export const CURRENT_SCHEMA_VERSION = 3
 
 export const CV_LANGUAGES = ['tr', 'en'] as const
 export const LanguageSchema = z.enum(CV_LANGUAGES)
@@ -169,8 +170,11 @@ export const PersonalSchema = z.object({
   website: z.string(),
   linkedin: z.string(),
   github: z.string(),
-  /** Küçültülmüş JPEG data URL; yoksa null */
-  photo: z.string().nullable(),
+  /**
+   * Küçültülmüş JPEG data URL; yoksa null. Yalnız gömülü görsel olabilir (uzak adres dışarıya istek
+   * attırır); eski kayıttaki ya da yedekteki güvensiz değer okurken null'a çevrilir (migrate.ts).
+   */
+  photo: z.string().refine(isSafePhoto).nullable(),
 })
 export type Personal = z.infer<typeof PersonalSchema>
 
@@ -185,6 +189,7 @@ export const FONT_IDS = [
   'archivo',
   'manrope',
   'space-grotesk',
+  'libre-franklin',
 ] as const
 export const FontIdSchema = z.enum(FONT_IDS)
 export type FontId = z.infer<typeof FontIdSchema>
@@ -195,7 +200,7 @@ export const TemplateSettingsSchema = z.object({
   accentColor: HexColor,
   /**
    * Zemin rengi: renk bloğu vurgudan ayrı bir renk taşıyan şablonlarda (Panel'in yan
-   * sütunu, Gece'nin sayfası, Çift Ton'un koyu yarısı). null → şablonun varsayılanı.
+   * sütunu). null → şablonun varsayılanı.
    * Zemin kullanmayan şablon bunu yok sayar. (Şema 2)
    */
   baseColor: HexColor.nullable(),

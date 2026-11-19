@@ -1,0 +1,204 @@
+/*
+ * Teknik (`teknik`): docs/sablonlar/SET-14.md Şablon 5. Yoğun, tek sayfalık, siyah-beyaz (Jake's Resume);
+ * her bölümün altında tam çizgi, kayıtlar dört köşeli (başlık | tarih / kurum | yer). Ad solda,
+ * iletişim sağda; fotoğraf (varsa) en sağda dikey dikdörtgen. Tek sütun.
+ * Her kural `.tpl-teknik` ile başlar. Sözleşme ve ortak varsayılanlar: base.css başı. Gövde boyu,
+ * satır aralığı ve boşluklar templateMeta.ts `scale` ile gelir (CSS'te yeniden çarpma).
+ *
+ * Ölçüler (orta boy, normal aralık): gövde 9.5 pt / 1.3; ad 20 pt; bölüm başlığı 9.5 pt büyük harf
+ * 700 + 0.25 mm siyah tam çizgi; kenar 13 × 12 mm; blok 2 mm, bölüm 4 mm.
+ */
+
+/* ---------- Başlık: ad | iletişim | fotoğraf ---------- */
+
+.tpl-teknik .cv-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0;
+  padding: var(--pad-y) var(--pad-x) 3.5mm;
+}
+
+.tpl-teknik .cv-photo {
+  grid-column: 2;
+  grid-row: 1;
+  width: 20mm;
+  height: 25mm;
+  margin-left: 6mm;
+  border-radius: 1mm;
+}
+
+/*
+ * Fotoğrafsız: ad ve unvan solda, iletişim sağda (en çok iki satır, sağa yaslı). Adın sütunu adın
+ * kendi genişliği kadar (en çok yarım sayfa); geri kalanı iletişimin.
+ */
+.tpl-teknik .cv-identity {
+  grid-column: 1;
+  grid-row: 1;
+  display: grid;
+  grid-template-columns: fit-content(50%) minmax(0, 1fr);
+  column-gap: 8mm;
+  align-items: end;
+}
+
+.tpl-teknik .cv-name {
+  --name-size: 2.1em;
+  --name-room: 78mm;
+  --name-char: 0.6;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: 0;
+}
+
+.tpl-teknik .cv-headline {
+  margin-top: 0.8mm;
+  font-size: 1em;
+  font-style: italic;
+  line-height: 1.25;
+  color: var(--ink);
+}
+
+.tpl-teknik .cv-contact {
+  margin-top: 0;
+  font-size: 0.92em;
+  line-height: 1.45;
+  text-align: right;
+  color: var(--ink);
+}
+
+.tpl-teknik .cv-contact .sep {
+  color: var(--muted);
+}
+
+/*
+ * Sağa yaslı iletişimde satır sonundaki gizli ayırıcı (K3) yer kapladığı için satırlar sağ kenara
+ * oturmaz. Çözüm: son öğeye aynı genişlikte görünmez bir ayırıcı eklenir (metin değil, PDF'e girmez)
+ * ve liste o kadar sağa kaydırılır: her satırın görünen son harfi sayfa kenar boşluğunda biter.
+ */
+.tpl-teknik .cv-contact li:last-child::after {
+  content: ' ·';
+  padding-right: 1.2mm;
+  visibility: hidden;
+}
+
+.tpl-teknik .cv-contact {
+  margin-right: calc(-0.54em - 1.2mm);
+}
+
+/* Fotoğraflı: ad, unvan ve iletişim alt alta solda; fotoğraf sağda (iletişim iki satıra sığsın) */
+.tpl-teknik .cv-header.has-photo {
+  align-items: start;
+}
+
+.tpl-teknik .has-photo .cv-identity {
+  display: block;
+}
+
+.tpl-teknik .has-photo .cv-contact {
+  margin-top: 1.8mm;
+  margin-right: 0;
+  text-align: left;
+}
+
+.tpl-teknik .has-photo .cv-contact li:last-child::after {
+  content: none;
+}
+
+/* Ortalı hâl (tam Jake's): ad ortada, iletişim altında ortalı */
+.tpl-teknik.align-center .cv-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.tpl-teknik.align-center .cv-photo {
+  margin: 0 0 3mm;
+}
+
+.tpl-teknik.align-center .cv-identity {
+  display: block;
+}
+
+/* Ortalı: aynı görünmez ayırıcı payı listeyi soldan o kadar içeri alarak dengelenir, satırlar dengeli */
+.tpl-teknik.align-center .cv-contact {
+  margin-top: 1.4mm;
+  margin-right: 0;
+  padding-left: calc(0.54em + 1.2mm);
+  text-align: center;
+  text-wrap: balance;
+}
+
+.tpl-teknik.align-center .cv-contact li:last-child::after {
+  content: ' ·';
+}
+
+/* ---------- Bölüm başlığı: büyük harf + siyah tam çizgi ---------- */
+
+.tpl-teknik .section-title {
+  padding-bottom: 0.6mm;
+  border-bottom: 0.25mm solid var(--ink);
+  font-size: 1em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--accent-ink);
+}
+
+.tpl-teknik .section-title + * {
+  margin-top: calc(1.4mm - var(--block-gap));
+}
+
+/* ---------- Kayıt: dört köşe ---------- */
+
+.tpl-teknik .entry-title strong {
+  font-weight: 700;
+}
+
+.tpl-teknik .entry-date {
+  font-size: 0.95em;
+  color: var(--ink);
+}
+
+/* 2. satır: kurum solda; yer (ve varsa not) sağda. 2. parçanın baştaki ayırıcısı gizli. */
+.tpl-teknik .entry-sub {
+  display: flex;
+  font-style: italic;
+  color: var(--ink);
+}
+
+.tpl-teknik .entry-sub .part:first-child {
+  flex: 1;
+  min-width: 0;
+  font-weight: 400;
+}
+
+.tpl-teknik .entry-sub .part:nth-child(2) {
+  margin-left: 4mm;
+  text-align: right;
+}
+
+.tpl-teknik .entry-sub .part:nth-child(2) > .sep {
+  display: none;
+}
+
+.tpl-teknik .entry-body {
+  margin-top: 0.8mm;
+}
+
+.tpl-teknik .rich ul {
+  padding-left: 3.6mm;
+}
+
+.tpl-teknik .rich li::marker {
+  font-size: 0.75em;
+  color: var(--ink);
+}
+
+.tpl-teknik .rich li + li {
+  margin-top: 0.3mm;
+}
+
+.tpl-teknik .entry-skills + .entry-skills,
+.tpl-teknik .entry-languages + .entry-languages {
+  margin-top: calc(0.3mm - var(--block-gap));
+}

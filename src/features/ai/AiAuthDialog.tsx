@@ -1,9 +1,11 @@
-import { Loader2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { getAiProvider } from '@/ai/provider'
 import { Button } from '@/components/ui/Button'
+import { controlOnContentClass } from '@/components/ui/controlClass'
 import { Dialog } from '@/components/ui/Dialog'
 import { Field, Input } from '@/components/ui/Field'
+import { InlineNotice } from '@/components/ui/Notice'
+import { useChanged } from '@/lib/useChanged'
 import { m } from '@/paraglide/messages'
 import { useAiAuth } from './aiAuth'
 import { aiErrorCode, aiErrorMessage, isAiAbort } from './aiErrorMessage'
@@ -11,7 +13,9 @@ import { aiErrorCode, aiErrorMessage, isAiAbort } from './aiErrorMessage'
 /**
  * Sayfa içi parola penceresi. Kökte bir kez durur; bir yapay zekâ çağrısı
  * 'unauthorized' ile dönünce aiAuth.ts açar. Parola sunucuya verilir
- * (karşılığında HttpOnly çerez), burada ya da tarayıcıda saklanmaz.
+ * (karşılığında HttpOnly çerez), burada ya da tarayıcıda saklanmaz. Pencereyi
+ * bekleyen istek kalmayınca (bileşen kalktı, istek durduruldu) aiAuth.ts
+ * pencereyi kendisi kapatır; süren parola denetimi de bırakılır.
  */
 export function AiAuthDialog() {
   const open = useAiAuth((s) => s.open)
@@ -22,6 +26,18 @@ export function AiAuthDialog() {
   const request = useRef<AbortController | null>(null)
 
   useEffect(() => () => request.current?.abort(), [])
+
+  // Pencere dışarıdan kapandıysa (bekleyen istek kalmadı) yazılan parola ve süren denetim bırakılır.
+  if (useChanged(open, false) && !open) {
+    setPassword('')
+    setBusy(false)
+    setError(null)
+  }
+  useEffect(() => {
+    if (open) return
+    request.current?.abort()
+    request.current = null
+  }, [open])
 
   /** Pencereyi kapatır; bir sonraki açılış boş alanla başlar. */
   const close = (ok: boolean) => {
@@ -62,14 +78,12 @@ export function AiAuthDialog() {
       onOpenChange={(next) => !next && cancel()}
       title={m.ai_auth_title()}
       description={m.ai_auth_desc()}
-      className="w-[min(92vw,420px)]"
       footer={
         <>
-          <Button variant="ghost" onClick={cancel}>
+          <Button size="lg" onClick={cancel}>
             {m.common_cancel()}
           </Button>
-          <Button variant="primary" type="submit" form="ai-auth-form" disabled={!password || busy}>
-            {busy && <Loader2 className="animate-spin" />}
+          <Button size="lg" variant="primary" type="submit" form="ai-auth-form" loading={busy} disabled={!password}>
             {busy ? m.ai_auth_checking() : m.ai_auth_submit()}
           </Button>
         </>
@@ -94,14 +108,15 @@ export function AiAuthDialog() {
               readOnly={busy}
               aria-invalid={error ? true : undefined}
               aria-describedby={error ? 'ai-auth-error' : undefined}
+              className={controlOnContentClass}
               onChange={(e) => setPassword(e.target.value)}
             />
           )}
         </Field>
         {error && (
-          <p id="ai-auth-error" role="alert" className="rounded-lg bg-danger-soft px-3 py-2 text-[13px] text-danger animate-fade-in">
-            {error}
-          </p>
+          <div id="ai-auth-error" role="alert" className="animate-fade-in">
+            <InlineNotice tone="danger">{error}</InlineNotice>
+          </div>
         )}
       </form>
     </Dialog>

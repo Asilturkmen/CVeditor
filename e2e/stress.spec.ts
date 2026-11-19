@@ -104,7 +104,7 @@ async function checkRound(page: Page, label: string, round: Round) {
   expect(report.nameLines.join(' ')).toBe(round.name)
 
   const text = flowText(await pdfText(await renderPreviewPdf(page)))
-  // Şablon adı CSS ile büyük harf yazabilir (Afiş, Gece); PDF'e de öyle geçer.
+  // Şablon adı CSS ile büyük harf yazabilir (İkili, Denge, Blok); PDF'e de öyle geçer.
   const shown = [round.name, round.name.toLocaleUpperCase('tr')]
   expect(
     shown.some((n) => text.includes(n)),

@@ -1,24 +1,30 @@
-import { ArrowUp, Check, ChevronDown, Loader2, Square, X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
-import { buildEditPayload } from '@/ai/payload'
+import { ArrowUp, Check, ChevronDown, Square, X } from 'lucide-react'
+import { useEffect, useId, useRef, useState } from 'react'
+import { buildEditPayload, contactFieldsForPrompt } from '@/ai/payload'
 import { operationsToSuggestions } from '@/ai/ops'
 import { getAiProvider } from '@/ai/provider'
+import { AI_LIMITS } from '@/ai/types'
 import { parseEditResult } from '@/ai/validate'
 import { sectionTitle } from '@/cv/locale'
 import type { AnyItem, Cv } from '@/cv/schema'
+import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
+import { Checkbox } from '@/components/ui/Checkbox'
+import { IconButton } from '@/components/ui/IconButton'
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from '@/components/ui/Menu'
+import { Spinner } from '@/components/ui/Spinner'
 import { toast } from '@/components/ui/toast'
-import { Tooltip } from '@/components/ui/Tooltip'
-import { applySuggestions, isSuggestionFresh } from '@/editor/actions'
-import { pendingMarkerCss, suggestionTargetId, useEditorUi, type AiScope, type Suggestion } from '@/editor/ui'
+import { Toolbar } from '@/components/ui/Toolbar'
+import { isSuggestionFresh } from '@/editor/actions'
+import { suggestionTargetId, useEditorUi, type AiScope, type Suggestion } from '@/editor/ui'
 import { cn } from '@/lib/cn'
 import { m } from '@/paraglide/messages'
 import { withAiAuth } from '@/features/ai/aiAuth'
 import { aiErrorMessage, isAiAbort } from '@/features/ai/aiErrorMessage'
-import { AiPayloadDialog, DemoBadge, WhatIsSentButton } from '@/features/ai/AiPayloadDialog'
+import { AiPayloadDialog } from '@/features/ai/AiPayloadDialog'
 import { ITEM_FIELDS } from '../content/fieldDefs'
 import { itemLabel } from '../labels'
+import { acceptSuggestions, firstChangedLine, rejectSuggestions } from './suggestionLogic'
 
 function scopeLabel(cv: Cv, scope: AiScope): string {
   if (scope.kind === 'all') return m.ai_scope_all()
@@ -40,7 +46,7 @@ const PERSONAL_LABELS: Record<string, () => string> = {
   github: m.f_github,
 }
 
-/** Önerinin listede görünen başlığı (bölüm · kayıt) ve alt satırı (tür / alan + açıklama). */
+/** Önerinin listede görünen başlığı (bölüm · kayıt) ve türü (alan adı / yeni kayıt / kaldırılacak). */
 function describe(cv: Cv, s: Suggestion): { title: string; kind: string } {
   if (s.kind === 'field' && s.target === 'personal') {
     return { title: m.editor_personal_title(), kind: PERSONAL_LABELS[s.field]?.() ?? s.field }
@@ -59,106 +65,78 @@ function describe(cv: Cv, s: Suggestion): { title: string; kind: string } {
 }
 
 const DOT: Record<Suggestion['kind'], string> = {
-  field: 'bg-[#e7c34a]',
+  field: 'bg-suggest',
   addItem: 'bg-ok',
   removeItem: 'bg-danger',
 }
 
 /**
- * Sağ paneldeki kartlarda bekleyen öneri işareti: kartın solundaki boşlukta
- * küçük nokta. Kartların id'si (item-…, personal-card) üzerinden; panel
- * bileşenlerine dokunmadan.
+ * Önerilerin listesi (prompt kutusunun yerini alır): başlık, "Örnek" rozeti, toplu Reddet/Kabul; her
+ * satırda hedef, tür, açıklama ve değişen ilk satır (eski → yeni). Satıra tıklamak kaydı açar ve fark
+ * kaydın içinde, alanın altında okunur; yazılı "Reddet / Kabul et" orada.
  */
-function PendingMarkers({ suggestions }: { suggestions: Suggestion[] }) {
-  const css = pendingMarkerCss(suggestions)
-  return css ? <style>{css}</style> : null
-}
-
-/** Önerilerin gözden geçirilmesi: tek tek ya da toplu kabul/ret. */
 function SuggestionReview({ cv, demo }: { cv: Cv; demo: boolean }) {
   const suggestions = useEditorUi((s) => s.suggestions)
-  const remove = useEditorUi((s) => s.removeSuggestions)
   const focusItem = useEditorUi((s) => s.focusItem)
   const highlightItem = useEditorUi((s) => s.highlightItem)
   const revealSuggestion = useEditorUi((s) => s.revealSuggestion)
-  const flashItems = useEditorUi((s) => s.flashItems)
+  const setTab = useEditorUi((s) => s.setTab)
 
-  const accept = (list: Suggestion[]) => {
-    const applied = applySuggestions(list)
-    remove(list.map((s) => s.id))
-    highlightItem(null)
-    if (applied < list.length) toast({ message: m.ai_stale_skipped({ count: list.length - applied }) })
-    if (applied > 0) {
-      toast({ message: m.ai_accepted({ count: applied }) })
-      flashItems(list.filter((s) => s.kind !== 'removeItem').map(suggestionTargetId))
-    }
-  }
-  const reject = (list: Suggestion[]) => {
-    remove(list.map((s) => s.id))
-    highlightItem(null)
-  }
   const show = (s: Suggestion) => {
     revealSuggestion(s.id)
-    const target = suggestionTargetId(s)
-    // Yeni kaydın panelde kartı yok; yalnız önizlemede gösterilir.
-    if (s.kind !== 'addItem') focusItem(target, true)
+    // Yeni kaydın panelde satırı yok; yalnız önizlemede gösterilir.
+    if (s.kind !== 'addItem') {
+      setTab('content')
+      focusItem(suggestionTargetId(s), true)
+    }
   }
 
   return (
-    <div className="flex max-h-[46vh] flex-col animate-rise-in">
-      <PendingMarkers suggestions={suggestions} />
-      <div className="flex items-center gap-2 px-4 pt-3 pb-2">
-        <p className="flex-1 text-[13px] font-semibold">
+    <div className="flex max-h-[46vh] flex-col overflow-hidden rounded-xl bg-content shadow-1 animate-rise-in">
+      <div className="flex min-h-11 flex-wrap items-center gap-2 py-2 pr-2 pl-3">
+        <p className="flex flex-1 items-center gap-2 text-headline text-fg">
           {m.ai_review_title({ count: suggestions.length })}
-          {demo && <DemoBadge className="ml-2" />}
+          {demo && <Badge tone="warn">{m.badge_sample()}</Badge>}
         </p>
-        <Button size="sm" variant="ghost" onClick={() => reject(suggestions)}>
-          {m.ai_reject_all()}
-        </Button>
-        <Button size="sm" variant="primary" onClick={() => accept(suggestions)}>
+        <Button onClick={() => rejectSuggestions(suggestions)}>{m.ai_reject_all()}</Button>
+        <Button variant="primary" onClick={() => acceptSuggestions(suggestions)}>
           <Check />
           {m.ai_accept_all()}
         </Button>
       </div>
-      <ul className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+      <ul className="group-rows min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-separator [--row-px:12px]">
         {suggestions.map((s) => {
           const { title, kind } = describe(cv, s)
+          const line = s.kind === 'field' ? firstChangedLine(s) : null
           return (
             <li
               key={s.id}
-              className="group flex items-start gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-surface-2"
+              className="flex items-start gap-1 py-1 pr-2 pl-1 transition-colors hover:bg-fill-4"
               onMouseEnter={() => highlightItem(suggestionTargetId(s))}
               onMouseLeave={() => highlightItem(null)}
             >
-              <span className={cn('mt-1.5 size-2 shrink-0 rounded-full', DOT[s.kind])} aria-hidden />
-              <button type="button" className="min-w-0 flex-1 text-left" onClick={() => show(s)}>
-                <span className="block truncate text-[13px] font-medium">{title}</span>
-                <span className="block text-xs text-muted">
-                  {kind && (
-                    <span className={cn('font-medium', s.kind === 'removeItem' ? 'text-danger' : s.kind === 'addItem' ? 'text-ok' : 'text-text')}>
-                      {kind}
+              <button type="button" className="flex min-w-0 flex-1 items-start gap-2 rounded-md px-2 py-1.5 text-left outline-offset-[-3px]" onClick={() => show(s)}>
+                <span className={cn('mt-[5px] size-2 shrink-0 rounded-full', DOT[s.kind])} aria-hidden />
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="text-body font-medium break-words text-fg">{title}</span>
+                  <span className="text-callout break-words text-fg-2">
+                    {kind && <span className={cn('font-medium', s.kind === 'removeItem' ? 'text-danger' : s.kind === 'addItem' ? 'text-ok' : 'text-fg')}>{kind}</span>}
+                    {kind && s.note && ' · '}
+                    {s.note}
+                  </span>
+                  {line && (line.before || line.after) && (
+                    <span className="mt-0.5 text-callout break-words text-fg">
+                      {line.before && <del className="text-fg-2 decoration-danger/70">{line.before}</del>}
+                      {line.before && line.after && <span aria-hidden className="text-fg-3"> → </span>}
+                      {line.after && <ins className="rounded-xs bg-suggest-soft no-underline">{line.after}</ins>}
                     </span>
                   )}
-                  {kind && s.note && ' · '}
-                  {s.note}
                 </span>
               </button>
-              <Tooltip content={m.ai_reject()}>
-                <Button size="icon-sm" variant="ghost" aria-label={m.ai_reject()} onClick={() => reject([s])}>
-                  <X />
-                </Button>
-              </Tooltip>
-              <Tooltip content={m.ai_accept()}>
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  className="text-ok hover:text-ok"
-                  aria-label={m.ai_accept()}
-                  onClick={() => accept([s])}
-                >
-                  <Check />
-                </Button>
-              </Tooltip>
+              <div className="flex shrink-0 items-center gap-1 pt-1">
+                <IconButton label={m.ai_reject()} icon={<X />} onClick={() => rejectSuggestions([s])} />
+                <IconButton label={m.ai_accept()} icon={<Check />} className="text-ok" onClick={() => acceptSuggestions([s])} />
+              </div>
             </li>
           )
         })}
@@ -168,21 +146,28 @@ function SuggestionReview({ cv, demo }: { cv: Cv; demo: boolean }) {
 }
 
 /**
- * Sağ altta sabit prompt kutusu. Kapsam varsayılanı Tüm CV; istenirse bölüm
- * ya da tek kayda daraltılır. İstek ai/ katmanından geçer: payload (yalnız
- * kapsam, maskeli) → sağlayıcı → doğrulama → öneriler.
+ * Prompt çubuğu: panelin altında, iki sekmede de. Boşta tek satır ([Tüm CV ⌄] Ne değişsin? … Ne
+ * gönderilir? [↑]); odakta ya da yazı varken büyür (en çok 5 satır), not, "Enter gönderir", iletişim
+ * seçimi ve açık kayıtta "Yalnız bu kayıt" çipi görünür. İstek ai/ katmanından geçer: payload (yalnız
+ * kapsam, maskeli) → sağlayıcı → doğrulama → öneriler. CV formu (`data-cv-form`) dışında: Ctrl+Z
+ * burada yalnız metni geri alır.
  */
-export function PromptBox({ cv }: { cv: Cv }) {
+export function PromptBox({ cv, scrolled }: { cv: Cv; scrolled?: boolean }) {
   const scope = useEditorUi((s) => s.aiScope)
   const setScope = useEditorUi((s) => s.setAiScope)
   const suggestions = useEditorUi((s) => s.suggestions)
   const setSuggestions = useEditorUi((s) => s.setSuggestions)
   const lastFocusedItemId = useEditorUi((s) => s.lastFocusedItemId)
+  const openRowId = useEditorUi((s) => (s.expandAll ? null : s.openRowId))
   const provider = getAiProvider()
   const [prompt, setPrompt] = useState('')
+  // İletişim bilgileri yalnız açık seçimle gider (varsayılan kapalı); istekteki anahtar kelime yalnız ipucu.
+  const [sendContact, setSendContact] = useState(false)
   const [busy, setBusy] = useState(false)
   const [showPayload, setShowPayload] = useState(false)
+  const [focused, setFocused] = useState(false)
   const request = useRef<AbortController | null>(null)
+  const noteId = useId()
 
   useEffect(() => () => request.current?.abort(), [])
 
@@ -203,30 +188,39 @@ export function PromptBox({ cv }: { cv: Cv }) {
     if (missing) setScope({ kind: 'all' })
   }, [cv.sections, scope, setScope])
 
-  const focusedSection = lastFocusedItemId
-    ? cv.sections.find((s) => (s.items as AnyItem[]).some((i) => i.id === lastFocusedItemId))
-    : undefined
-  const focusedItem = focusedSection
-    ? (focusedSection.items as AnyItem[]).find((i) => i.id === lastFocusedItemId)
-    : undefined
+  const findItem = (id: string | null) => {
+    if (!id) return null
+    const section = cv.sections.find((s) => s.type !== 'summary' && (s.items as AnyItem[]).some((i) => i.id === id))
+    const item = section && (section.items as AnyItem[]).find((i) => i.id === id)
+    return section && item ? { section, item } : null
+  }
+  // Menüde "Seçili kayıt": en son odaklanılan kayıt (odak panelden çıkınca da kalır).
+  const focused_ = findItem(lastFocusedItemId)
+  // Çip: açık kayıt (anahatta tek açık satır), yoksa son odaklanılan.
+  const current = findItem(openRowId) ?? focused_
+  const currentScoped = !!current && scope.kind === 'item' && scope.itemId === current.item.id
 
   const submit = async () => {
     if (!prompt.trim() || busy) return
     // Öneriler isteğin gönderildiği andaki CV'ye göre kurulur; arada değişen alanın önerisi bayat sayılır.
     const snapshot = cv
-    const { payload, unmask } = buildEditPayload(snapshot, scope, prompt)
+    const { payload, restore } = buildEditPayload(snapshot, scope, prompt, { contact: sendContact })
     const controller = new AbortController()
     request.current = controller
     setBusy(true)
     try {
       const result = parseEditResult(await withAiAuth(() => provider.edit(payload, controller.signal), controller.signal))
       if (controller.signal.aborted) return
-      const { suggestions: list, dropped } = operationsToSuggestions(snapshot, result, unmask, payload)
+      const { suggestions: list, dropped } = operationsToSuggestions(snapshot, result, restore, payload)
       if (dropped > 0) toast({ message: m.ai2_dropped({ count: dropped }) })
+      if (result.overflow > 0) toast({ message: m.ai2_overflow({ count: result.overflow, max: AI_LIMITS.operations }) })
+      // Modelin kısa açıklaması (yer tutucuları yerelde geri konmuş; geri konamıyorsa gösterilmez)
+      const note = result.message ? restore(result.message)?.trim().slice(0, 300) : undefined
       if (list.length === 0) {
-        toast({ message: provider.isDemo ? m.ai_no_suggestions_demo() : m.ai_no_suggestions() })
+        toast({ message: note || (provider.isDemo ? m.ai_no_suggestions_demo() : m.ai_no_suggestions()) })
         return
       }
+      if (note) toast({ message: note })
       setSuggestions(list)
       setPrompt('')
     } catch (error) {
@@ -245,22 +239,108 @@ export function PromptBox({ cv }: { cv: Cv }) {
     setBusy(false)
   }
 
+  const contactHint = contactFieldsForPrompt(prompt).length > 0
+  // Büyük hâl: odakta, yazı varken ya da istek sürerken.
+  const expanded = focused || prompt.length > 0 || busy
+
+  const payloadDialog = (
+    <AiPayloadDialog
+      open={showPayload}
+      onClose={() => setShowPayload(false)}
+      build={() => buildEditPayload(cv, scope, prompt, { contact: sendContact }).payload}
+      description={m.ai2_payload_desc()}
+      rules={
+        <>
+          {m.ai2_payload_rules()}
+          <span className="mt-1.5 block font-medium text-fg" data-testid="ai-contact-state">
+            {sendContact ? m.ai_contact_state_on() : m.ai_contact_state_off()}
+          </span>
+        </>
+      }
+      demo={provider.isDemo}
+    />
+  )
+
   if (suggestions.length > 0) {
     return (
-      <div className="border-t border-line bg-surface shadow-[0_-8px_24px_rgb(0_0_0/0.04)]">
+      <Toolbar as="div" edge="top" scrolled={scrolled} className="block shrink-0 px-3 pt-2 pb-3">
         <SuggestionReview cv={cv} demo={provider.isDemo} />
-      </div>
+      </Toolbar>
     )
   }
 
+  const whatIsSent = (
+    <button
+      type="button"
+      onClick={() => setShowPayload(true)}
+      className="press shrink-0 rounded-sm px-1 text-callout font-medium text-fg underline decoration-fg-3 underline-offset-2 hover:decoration-fg"
+    >
+      {m.ai2_what_is_sent()}
+    </button>
+  )
+
   return (
-    <div className="border-t border-line bg-surface px-3 pt-2.5 pb-3">
+    <Toolbar
+      as="div"
+      edge="top"
+      scrolled={scrolled}
+      className="block shrink-0 px-3 py-2"
+      onFocus={() => setFocused(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false)
+      }}
+    >
       <div
         className={cn(
-          'rounded-xl border border-line bg-bg transition-[border-color,box-shadow] duration-150',
-          'focus-within:border-accent focus-within:ring-3 focus-within:ring-accent/15',
+          'flex flex-wrap items-center gap-x-1 gap-y-1 rounded-xl bg-content px-1.5 shadow-1 transition-shadow duration-150',
+          'focus-within:shadow-[0_0_0_1px_var(--accent),0_0_0_4px_color-mix(in_srgb,var(--accent)_20%,transparent)]',
+          expanded ? 'pt-1.5 pb-1.5' : 'min-h-9',
         )}
       >
+        <Menu>
+          <MenuTrigger asChild>
+            <button
+              type="button"
+              className="press inline-flex h-6 max-w-full min-w-0 items-center gap-1 rounded-sm px-1.5 text-left text-callout font-medium text-fg hover:bg-fill-4 data-[state=open]:bg-fill-4"
+              aria-label={m.ai_scope_label()}
+            >
+              <span className="min-w-0 break-words">{scopeLabel(cv, scope)}</span>
+              <ChevronDown aria-hidden className="size-3.5 shrink-0 text-fg-2" />
+            </button>
+          </MenuTrigger>
+          <MenuContent align="start" side="top">
+            <MenuLabel>{m.ai_scope_label()}</MenuLabel>
+            <MenuItem onSelect={() => setScope({ kind: 'all' })}>{m.ai_scope_all()}</MenuItem>
+            {focused_ && (
+              <MenuItem onSelect={() => setScope({ kind: 'item', sectionId: focused_.section.id, itemId: focused_.item.id })}>
+                {m.ai_scope_selected({ name: itemLabel(focused_.section.type, focused_.item) || m.editor_untitled() })}
+              </MenuItem>
+            )}
+            <MenuSeparator />
+            <MenuLabel>{m.ai_scope_sections()}</MenuLabel>
+            {cv.sections.map((s) => (
+              <MenuItem key={s.id} onSelect={() => setScope({ kind: 'section', sectionId: s.id })}>
+                {sectionTitle(cv.language, s.type, s.title)}
+              </MenuItem>
+            ))}
+          </MenuContent>
+        </Menu>
+        {expanded && current && (
+          <button
+            type="button"
+            aria-pressed={currentScoped}
+            onClick={() =>
+              setScope(currentScoped ? { kind: 'all' } : { kind: 'item', sectionId: current.section.id, itemId: current.item.id })
+            }
+            className={cn(
+              'press inline-flex h-6 items-center rounded-full px-2.5 text-callout font-medium transition-colors',
+              currentScoped ? 'bg-accent-soft text-fg' : 'bg-fill-3 text-fg hover:bg-fill-2',
+            )}
+          >
+            {m.ai_scope_this_item()}
+          </button>
+        )}
+        {provider.isDemo && <Badge tone="warn">{m.badge_sample()}</Badge>}
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
@@ -270,74 +350,58 @@ export function PromptBox({ cv }: { cv: Cv }) {
               void submit()
             }
           }}
-          rows={2}
+          rows={1}
           disabled={busy}
-          placeholder={m.ai_placeholder()}
+          placeholder={expanded ? m.ai_placeholder() : m.ai_placeholder_short()}
           aria-label={m.ai_label()}
-          className="block w-full resize-none bg-transparent px-3 pt-2.5 text-sm leading-relaxed placeholder:text-faint focus:outline-none"
+          aria-describedby={noteId}
+          className={cn(
+            'block min-w-0 resize-none bg-transparent px-1.5 text-body-user text-fg placeholder:text-fg-2 focus:outline-none',
+            '[field-sizing:content] max-h-[calc(5*21px+12px)] overflow-y-auto',
+            // Boşta tek satır: yer tutucu sarmaz (kısa metin; sığmazsa kaydırılır, satır büyümez).
+            expanded ? '-order-1 basis-full py-1.5' : 'h-8 flex-1 overflow-hidden py-[5px] whitespace-nowrap',
+          )}
         />
-        <div className="flex items-center gap-2 px-2 pb-2">
-          <Menu>
-            <MenuTrigger asChild>
-              <button
-                type="button"
-                className="inline-flex h-7 max-w-[70%] items-center gap-1 rounded-md px-2 text-xs font-medium text-muted transition-colors hover:bg-surface-2 hover:text-text"
-                aria-label={m.ai_scope_label()}
-              >
-                <span className="text-faint">{m.ai_scope_prefix()}</span>
-                <span className="truncate text-text">{scopeLabel(cv, scope)}</span>
-                <ChevronDown className="size-3.5 shrink-0" />
-              </button>
-            </MenuTrigger>
-            <MenuContent align="start">
-              <MenuItem onSelect={() => setScope({ kind: 'all' })}>{m.ai_scope_all()}</MenuItem>
-              {focusedSection && focusedItem && focusedSection.type !== 'summary' && (
-                <MenuItem
-                  onSelect={() => setScope({ kind: 'item', sectionId: focusedSection.id, itemId: focusedItem.id })}
-                >
-                  {m.ai_scope_selected({ name: itemLabel(focusedSection.type, focusedItem) || m.editor_untitled() })}
-                </MenuItem>
-              )}
-              <MenuSeparator />
-              <MenuLabel>{m.ai_scope_sections()}</MenuLabel>
-              {cv.sections.map((s) => (
-                <MenuItem key={s.id} onSelect={() => setScope({ kind: 'section', sectionId: s.id })}>
-                  {sectionTitle(cv.language, s.type, s.title)}
-                </MenuItem>
-              ))}
-            </MenuContent>
-          </Menu>
-          <span className="ml-auto inline-flex items-center gap-1.5 text-[11px] text-faint" role="status">
-            {busy && <Loader2 className="size-3 animate-spin" />}
+        {expanded && (
+          <span className="ml-auto inline-flex items-center gap-1.5 px-1 text-callout text-fg" role="status">
+            {busy && <Spinner size={12} />}
             {busy ? m.ai_working() : m.ai_enter_hint()}
           </span>
-          {busy ? (
-            <Tooltip content={m.ai_stop()}>
-              <Button size="icon-sm" variant="secondary" aria-label={m.ai_stop()} onClick={cancel}>
-                <Square className="!size-3 fill-current" />
-              </Button>
-            </Tooltip>
-          ) : (
-            <Tooltip content={m.ai_send()}>
-              <Button size="icon-sm" variant="primary" aria-label={m.ai_send()} disabled={!prompt.trim()} onClick={() => void submit()}>
-                <ArrowUp />
-              </Button>
-            </Tooltip>
-          )}
-        </div>
+        )}
+        {whatIsSent}
+        {busy ? (
+          <IconButton label={m.ai_stop()} variant="secondary" icon={<Square className="!size-3 fill-current" />} onClick={cancel} className="rounded-full" />
+        ) : (
+          <IconButton
+            label={m.ai_send()}
+            variant="primary"
+            icon={<ArrowUp />}
+            disabled={!prompt.trim()}
+            onClick={() => void submit()}
+            className="rounded-full"
+          />
+        )}
       </div>
-      <p className="mt-1.5 flex items-center gap-1.5 px-1 text-[11.5px] text-faint">
-        <span className="min-w-0 flex-1">{provider.isDemo ? m.ai_preview_note() : m.ai2_live_note()}</span>
-        <WhatIsSentButton onClick={() => setShowPayload(true)} />
-      </p>
-      <AiPayloadDialog
-        open={showPayload}
-        onClose={() => setShowPayload(false)}
-        build={() => buildEditPayload(cv, scope, prompt).payload}
-        description={m.ai2_payload_desc()}
-        rules={m.ai2_payload_rules()}
-        demo={provider.isDemo}
-      />
-    </div>
+      {expanded && (
+        <div className="mt-2 flex flex-col gap-1.5 px-1 animate-rise-in">
+          <Checkbox
+            checked={sendContact}
+            disabled={busy}
+            onCheckedChange={setSendContact}
+            label={m.ai_contact_toggle()}
+            className="text-callout [&_label]:text-callout"
+          />
+          {!sendContact && contactHint && (
+            <p className="text-callout text-fg" data-testid="ai-contact-hint">
+              {m.ai_contact_hint()}
+            </p>
+          )}
+          <p id={noteId} className="text-callout text-fg">
+            {provider.isDemo ? m.ai_preview_note() : m.ai2_live_note()}
+          </p>
+        </div>
+      )}
+      {payloadDialog}
+    </Toolbar>
   )
 }

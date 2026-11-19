@@ -1,5 +1,7 @@
 # CVeditör: 10 şablon, birbirinden gerçekten farklı (görsel araştırma)
 
+> **Not:** Bu belge eski 10 şablonlu sete aittir; güncel şartname `docs/sablonlar/SET-14.md`.
+
 Tüm yollar bu klasöre göre:
 `C:\Users\turkm\AppData\Local\Temp\claude\C--Users-turkm-GitHub-CVeditor\26c0ee33-58f7-4c0d-8923-9bac36633104\scratchpad\visual\`
 

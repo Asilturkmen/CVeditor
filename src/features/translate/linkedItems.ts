@@ -1,5 +1,5 @@
 import type { AnyItem, Cv, SectionType } from '@/cv/schema'
-import { db } from '@/db/db'
+import { updateStoredCv } from '@/db/repo'
 
 /**
  * Hedef CV'de aynı çeviri grubundan kayıt (bağlı kayıt) varsa yeri. Bir CV'de
@@ -19,18 +19,21 @@ export function findLinkedItem(cv: Cv, type: SectionType, translationGroupId: st
 /**
  * Bağlı kaydı yeni içerikle değiştirir; kaydın kendi id'si, gizliliği ve
  * çeviri bağı korunur. Hedef CV'nin adını döndürür.
+ *
+ * Okuma ve yazma tek işlemdedir ve sürüm (`updatedAt`) `nextTimestamp` ile
+ * ilerler (`updateStoredCv`): hedef CV başka sekmede açıksa o sekmenin
+ * kaydıyla yarışmaz; bekleyen değişikliği yoksa güncel hâli yükler, varsa
+ * çakışma bildirir (sessizce ezmez).
  */
 export async function replaceLinkedItem(targetCvId: string, type: SectionType, item: AnyItem): Promise<string> {
-  const target = await db.cvs.get(targetCvId)
-  if (!target) throw new Error('CV bulunamadı')
-  const linked = findLinkedItem(target, type, item.translationGroupId)
-  if (!linked) throw new Error('Bağlı kayıt bulunamadı')
-  const section = target.sections.find((s) => s.id === linked.sectionId)!
-  const items = section.items as AnyItem[]
-  const index = items.findIndex((i) => i.id === linked.itemId)
-  const existing = items[index]
-  items[index] = { ...structuredClone(item), id: existing.id, hidden: existing.hidden, translationGroupId: existing.translationGroupId } as AnyItem
-  target.updatedAt = new Date().toISOString()
-  await db.cvs.put(target)
-  return target.name
+  return updateStoredCv(targetCvId, (target) => {
+    const linked = findLinkedItem(target, type, item.translationGroupId)
+    if (!linked) throw new Error('Bağlı kayıt bulunamadı')
+    const section = target.sections.find((s) => s.id === linked.sectionId)!
+    const items = section.items as AnyItem[]
+    const index = items.findIndex((i) => i.id === linked.itemId)
+    const existing = items[index]
+    items[index] = { ...structuredClone(item), id: existing.id, hidden: existing.hidden, translationGroupId: existing.translationGroupId } as AnyItem
+    return target.name
+  })
 }

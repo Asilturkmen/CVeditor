@@ -3,15 +3,20 @@ import { createCv, patchCv, preview } from './helpers.ts'
 import { flowText, pdfText, renderPreviewPdf, settledPageCount } from './pdf.ts'
 
 /**
- * Canlı önizleme her ekranda 1. sayfayı bütünüyle gösterir (Sığdır = min(enine, boyuna)),
+ * Canlı önizleme her ekranda 1. sayfayı bütünüyle gösterir (Sayfaya sığdır = min(enine, boyuna)),
  * kısayollar önizlemede de çalışır, tarayıcı menüsünden yazdırma yalnız CV'yi basar.
+ * Tuval: alt ortada yüzen hap (sayfa ‹ 1 / 2 › · − % + · Sığdır menüsü); sol ray (Şablonlar | Sayfalar).
  */
 
-/** 1. sayfanın kaydırma alanına göre boşlukları (px). Negatif = taşıyor. */
+/**
+ * 1. sayfanın görünen alana göre boşlukları (px). Negatif = taşıyor. Görünen alan: tuvalin üstünden
+ * alttaki yüzen hapın üst kenarına kadar (hap sayfanın üstüne binmez); alt boşluk sayfa ile hap arası.
+ */
 async function pageOneMargins(page: Page) {
   return page.evaluate(() => {
     const scroller = document.querySelector<HTMLElement>('[data-preview-scroll]')!
     const iframe = scroller.querySelector('iframe')!
+    const pill = document.querySelector<HTMLElement>('[data-canvas-pill]')!
     const s = scroller.getBoundingClientRect()
     const f = iframe.getBoundingClientRect()
     const scale = f.width / iframe.offsetWidth
@@ -23,10 +28,13 @@ async function pageOneMargins(page: Page) {
     const innerLeft = s.left + gutter
     return {
       top: top - s.top,
-      bottom: s.top + scroller.clientHeight - bottom,
+      bottom: pill.getBoundingClientRect().top - bottom,
       left: f.left - innerLeft,
       right: innerLeft + scroller.clientWidth - f.right,
       scrollTop: scroller.scrollTop,
+      /** Sayfanın ve hapın yatay ortası tuvalin ortasıyla aynı (px fark) */
+      pillOffCenter: Math.abs(pill.getBoundingClientRect().left + pill.getBoundingClientRect().width / 2 - (s.left + s.width / 2)),
+      pageOffCenter: Math.abs(f.left + f.width / 2 - (s.left + s.width / 2)),
     }
   })
 }
@@ -52,8 +60,17 @@ for (const size of [
     expect(await settledPageCount(page)).toBeGreaterThan(1)
     await expectPageOneFits(page)
     const m = await pageOneMargins(page)
-    // Üst ve alt boşluk dengeli (yalnız yuvarlama farkı).
+    // Üst boşluk ile sayfa-hap arası dengeli (yalnız yuvarlama farkı); sayfa ve hap tuvalin ortasında.
     expect(Math.abs(m.top - m.bottom)).toBeLessThan(4)
+    expect(m.pillOffCenter).toBeLessThan(2)
+    expect(m.pageOffCenter).toBeLessThan(2)
+    // Sol ray açılınca sayfa kalan alanda yine sığar ve ortalanır.
+    await page.getByRole('button', { name: 'Şablonlar' }).click()
+    await expect(page.locator('[data-rail="templates"]')).toBeVisible()
+    await expectPageOneFits(page)
+    const withRail = await pageOneMargins(page)
+    expect(Math.abs(withRail.top - withRail.bottom)).toBeLessThan(4)
+    expect(withRail.pageOffCenter).toBeLessThan(2)
   })
 }
 
@@ -74,14 +91,112 @@ test('bölücü sürüklenince ve pencere değişince yeniden sığar; elle yak�
   await page.setViewportSize({ width: 1366, height: 600 })
   await expectPageOneFits(page)
 
-  // Elle yakınlaştırınca boyut değişimi ölçeği ezmez; Sığdır geri getirir.
+  // Elle yakınlaştırınca boyut değişimi ölçeği ezmez; Sığdır menüsündeki "Sayfaya sığdır" geri getirir.
   await page.getByRole('button', { name: 'Yakınlaştır' }).click()
   const manual = await zoomLabel(page).innerText()
   await page.setViewportSize({ width: 1440, height: 900 })
   await expect(zoomLabel(page)).toHaveText(manual)
   await page.getByRole('button', { name: 'Sığdır' }).click()
-  await expect(page.getByRole('button', { name: 'Sığdır' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('menuitemradio', { name: 'Sayfaya sığdır' })).not.toBeChecked()
+  await page.getByRole('menuitemradio', { name: 'Sayfaya sığdır' }).click()
   await expectPageOneFits(page)
+  await page.getByRole('button', { name: 'Sığdır' }).click()
+  await expect(page.getByRole('menuitemradio', { name: 'Sayfaya sığdır' })).toBeChecked()
+  await page.keyboard.press('Escape')
+})
+
+test('Genişliğe sığdır: sayfa tuvalin enini doldurur, seçim yenileyince hatırlanır; Ctrl+0 sayfaya sığdırır', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 })
+  await createCv(page, { start: 'sample' })
+  await expectPageOneFits(page)
+  const fitted = Number((await zoomLabel(page).innerText()).replace('%', ''))
+  await page.getByRole('button', { name: 'Sığdır' }).click()
+  await page.getByRole('menuitemradio', { name: 'Genişliğe sığdır' }).click()
+  await expect.poll(async () => (await pageOneMargins(page)).left).toBeLessThan(40)
+  const m = await pageOneMargins(page)
+  expect(Math.abs(m.left - m.right)).toBeLessThan(2)
+  expect(Number((await zoomLabel(page).innerText()).replace('%', ''))).toBeGreaterThan(fitted)
+  await page.reload()
+  await expect(preview(page).locator('.page').first()).toBeVisible()
+  await expect.poll(async () => (await pageOneMargins(page)).left).toBeLessThan(40)
+  // Ctrl+0: sayfaya sığdır (seçim de hatırlanır).
+  await page.locator('[data-preview-scroll]').click({ position: { x: 5, y: 5 } })
+  await page.keyboard.press('Control+0')
+  await expectPageOneFits(page)
+})
+
+test('sol ray: şablon küçük resmi kendi CV\'mle çizilir, tıklayınca tek geri alma adımıyla uygulanır; süzgeç sütuna göre', async ({ page }) => {
+  await createCv(page, { start: 'sample' })
+  const rail = page.locator('[data-rail="templates"]')
+  await expect(rail).toHaveCount(0)
+  await page.keyboard.press('Control+Backslash')
+  await expect(rail).toBeVisible()
+  const radios = rail.getByRole('radiogroup', { name: 'Şablon', exact: true }).getByRole('radio')
+  const all = await radios.count()
+  expect(all).toBeGreaterThanOrEqual(10)
+  await expect(rail.getByRole('radio', { name: /Zarif/ })).toHaveAttribute('aria-checked', 'true')
+  // Küçük resim örnek kişinin adını gösterir (kendi CV'n).
+  await expect(page.frameLocator('[data-rail] iframe[title="Panel"]').locator('.cv-name')).toHaveText('Deniz Aksoy')
+
+  // Süzgeç: "İki" seçilince yalnız iki sütun destekleyenler (Zarif tek sütun: listede yok).
+  await rail.getByRole('radio', { name: 'İki', exact: true }).click()
+  await expect(rail.getByRole('radio', { name: /Zarif/ })).toHaveCount(0)
+  expect(await radios.count()).toBeLessThan(all)
+  await rail.getByRole('radio', { name: 'Tümü' }).click()
+  await expect(radios).toHaveCount(all)
+
+  await rail.getByRole('radio', { name: /Panel/ }).click()
+  await expect(rail.getByRole('radio', { name: /Panel/ })).toHaveAttribute('aria-checked', 'true')
+  await expect(preview(page).locator('.col-side').first()).toBeVisible()
+  await page.keyboard.press('Control+z')
+  await expect(preview(page).locator('.col-side')).toHaveCount(0)
+  await expect(rail.getByRole('radio', { name: /Zarif/ })).toHaveAttribute('aria-checked', 'true')
+
+  // Kapat düğmesi ve Ctrl+\ rayı kapatır.
+  await rail.getByRole('button', { name: 'Kenar çubuğunu kapat' }).click()
+  await expect(rail).toHaveCount(0)
+})
+
+test('Sayfalar: haptaki gösterge ve sol raydaki küçük resimler sayfalar arasında gezdirir', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 })
+  await createCv(page, { start: 'sample' })
+  const count = await settledPageCount(page)
+  expect(count).toBeGreaterThan(1)
+  const pages = page.getByRole('group', { name: 'Sayfa', exact: true })
+  await expect(pages).toContainText(`1 / ${count}`)
+  await expect(pages.getByRole('button', { name: 'Önceki sayfa' })).toBeDisabled()
+  await pages.getByRole('button', { name: 'Sonraki sayfa' }).click()
+  await expect(pages).toContainText(`2 / ${count}`)
+  await expect.poll(() => page.locator('[data-preview-scroll]').evaluate((el) => el.scrollTop)).toBeGreaterThan(100)
+
+  // Göstergeye tıklayınca ray Sayfalar ile açılır; 1. sayfanın küçük resmi tuvali başa döndürür.
+  await pages.getByRole('button', { name: /Sayfa küçük resimlerini göster/ }).click()
+  const rail = page.locator('[data-rail="pages"]')
+  await expect(rail).toBeVisible()
+  await expect(rail.getByRole('button', { name: /sayfa$/ })).toHaveCount(count)
+  await expect(rail.getByRole('button', { name: '2. sayfa' })).toHaveAttribute('aria-current', 'page')
+  await rail.getByRole('button', { name: '1. sayfa' }).click()
+  await expect.poll(() => page.locator('[data-preview-scroll]').evaluate((el) => el.scrollTop)).toBeLessThan(2)
+  await expect(pages).toContainText(`1 / ${count}`)
+  await expect(rail.getByRole('button', { name: '1. sayfa' })).toHaveAttribute('aria-current', 'page')
+})
+
+test('bildirim tuvalin alt ortasında, hapın üstünde durur (panele binmez)', async ({ page }) => {
+  await createCv(page, { start: 'sample' })
+  await page.keyboard.press('Control+s')
+  const toastEl = page.locator('[data-toast]').first()
+  await expect(toastEl).toBeVisible()
+  // Giriş animasyonu (alttan kayma) bitsin.
+  await page.waitForTimeout(500)
+  const box = await page.evaluate(() => {
+    const t = document.querySelector('[data-toast]')!.getBoundingClientRect()
+    const c = document.querySelector('[data-canvas]')!.getBoundingClientRect()
+    const p = document.querySelector('[data-canvas-pill]')!.getBoundingClientRect()
+    return { toastLeft: t.left, toastRight: t.right, toastBottom: t.bottom, toastMid: t.left + t.width / 2, canvasLeft: c.left, canvasRight: c.right, canvasMid: c.left + c.width / 2, pillTop: p.top }
+  })
+  expect(Math.abs(box.toastMid - box.canvasMid)).toBeLessThan(2)
+  expect(box.toastRight).toBeLessThanOrEqual(box.canvasRight)
+  expect(box.toastBottom).toBeLessThanOrEqual(box.pillTop - 8)
 })
 
 test('odak önizlemedeyken Ctrl+Z ve Ctrl+P editöre gider', async ({ page }) => {

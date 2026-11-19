@@ -1,0 +1,155 @@
+/*
+ * Dergi (`dergi`): docs/sablonlar/SET-14.md Şablon 13. İri yumuşak tırnaklı ad (Fraunces 600, 34 pt),
+ * altında kalın siyah çizgi; bölüm başlıkları italik tırnaklı ve çizgisiz; özet giriş paragrafı.
+ * Gövde Source Serif 4. Tek ya da iki sütun (yan sütun solda zeminsiz, dikey çizgi yok).
+ * Her kural `.tpl-dergi` ile başlar. Sözleşme ve ortak varsayılanlar: base.css başı. Gövde boyu,
+ * satır aralığı ve boşluklar templateMeta.ts `scale` ile gelir (CSS'te yeniden çarpma).
+ *
+ * Ses: tek vurgu (kiremit) yalnız üç yerde: unvan, bölüm başlıkları, madde işaretleri. Geri kalan
+ * siyah-beyaz; hiyerarşiyi boy ve italik taşır, çizgi yalnız başlığın altında (tek kalınlık).
+ */
+
+.tpl-dergi {
+  --side-width: 30%;
+}
+
+/*
+ * ---------- Başlık: ad + unvan + iletişim | fotoğraf; altında kalın çizgi ----------
+ * Fotoğrafın üst kenarı adın büyük harf üst kenarında (Fraunces, satır 1: adın 0.14em'i; ad gövdenin
+ * 3.6 katı: 0.5em gövde), alt kenarı iletişimin son satırıyla aynı yükseklikte: kimlik fotoğraf boyunca
+ * uzar, ad üstte, iletişim altta. Fotoğraf yüksekliği tek satır ad + iki satır iletişimin doğal
+ * yüksekliğine göre seçildi; o hâlde ad ile iletişim arasında fazladan boşluk kalmaz.
+ */
+
+.tpl-dergi .cv-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 0;
+  margin: 0 var(--pad-x) 5mm;
+  padding: var(--pad-y) 0 4mm;
+  border-bottom: 0.9mm solid var(--ink);
+}
+
+#cv-pages.tpl-dergi .cv-header {
+  border-radius: 0;
+}
+
+.tpl-dergi .cv-identity {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.tpl-dergi .cv-photo {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: start;
+  width: 23.5mm;
+  height: 29.4mm;
+  margin: 0.5em 0 0 7mm;
+  border-radius: 0;
+}
+
+/* Gri ton yalnız gerçek fotoğrafta (img; metin taşımaz) */
+.tpl-dergi img.cv-photo {
+  filter: grayscale(1);
+}
+
+.tpl-dergi .cv-name {
+  --name-size: 3.6em;
+  --name-room: 128mm;
+  --name-char: 0.6;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.015em;
+}
+
+.tpl-dergi .cv-name.is-long {
+  --name-size: 2.9em;
+}
+
+.tpl-dergi .cv-headline {
+  margin-top: 2.6mm;
+  font-family: var(--font);
+  font-size: 0.9em;
+  font-weight: 700;
+  line-height: 1.3;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent-ink);
+}
+
+.tpl-dergi .cv-contact {
+  margin-top: 1.6mm;
+  font-size: 0.9em;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.tpl-dergi .cv-contact .sep {
+  padding-right: 1.4mm;
+}
+
+.tpl-dergi.align-center .cv-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.tpl-dergi.align-center .cv-photo {
+  align-self: center;
+  margin: 0 0 4.5mm;
+}
+
+/* ---------- Bölüm başlığı: italik tırnaklı, çizgisiz ---------- */
+
+.tpl-dergi .section-title {
+  font-family: var(--font-display);
+  font-size: 1.25em;
+  font-style: italic;
+  font-weight: 600;
+  line-height: 1.1;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--accent-ink);
+}
+
+.tpl-dergi .section-title + * {
+  margin-top: calc(1.6mm - var(--block-gap));
+}
+
+/* ---------- Özet: giriş paragrafı, bir boy büyük (düz ağırlık) ---------- */
+
+.tpl-dergi .entry-summary {
+  font-size: 1.05em;
+  line-height: calc(var(--lh) * 1.03);
+}
+
+/* ---------- Kayıtlar ---------- */
+
+.tpl-dergi .entry-title strong {
+  font-weight: 700;
+}
+
+.tpl-dergi .entry-date {
+  font-size: 0.9em;
+  font-style: italic;
+}
+
+.tpl-dergi .rich li::marker {
+  color: var(--accent);
+}
+
+/* ---------- İki sütun: aralık 9 mm, çizgi yok ---------- */
+
+.tpl-dergi.cols-2 .col-side {
+  padding-right: 4.5mm;
+}
+
+.tpl-dergi.cols-2 .col-main {
+  padding-left: 4.5mm;
+}

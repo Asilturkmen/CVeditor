@@ -2,38 +2,41 @@
  * Bütün şablonların ortak çizim tabanı. Önizleme (iframe) ve PDF (yazdır /
  * V2'de sunucu Chrome'u) aynı dosyayı kullanır. Şablon CSS'leri yalnız
  * görünümü değiştirir; yapı (sayfa, sütun, blok) burada sabittir.
+ * Şartname: docs/sablonlar/SET-14.md (§3.0 kancalar, §3.0.1 ortak varsayılanlar, §5 kalite çıtası).
  *
  * ŞABLON SÖZLEŞMESİ (styles/<id>.css bunlara dayanır)
  *
- * Kök: #cv-pages.tpl-<id>.cols-<1|2>.align-<left|center> > .page[data-page] > .page-inner(.has-header ilk sayfada)
- *   > header.cv-header + .page-body > .col.col-side? + .col.col-main. Yan sütun DOM'da ana sütundan önce.
- *   Her şablon kuralı `.tpl-<id>` ile başlar. Sayfa sayfa tekrar eden zemin (tam boy renkli sütun,
- *   koyu sayfa, çerçeve) `.tpl-<id> .page { background: … }` ile yapılır; her sayfada tekrar eder.
+ * Kök: #cv-pages.tpl-<id>.cols-<1|2>.align-<left|center>(.side-end) > .page[data-page] > .page-inner(.has-header ilk sayfada)
+ *   > header.cv-header + .page-body > .col.col-side? + .col.col-main. Yan sütun DOM'da ana sütundan önce (solda);
+ *   K2: `side-end` kökünde (templateMeta sidePosition 'end', İkili) sıra tersi: .col-main + .col-side, yan sütun sağda.
+ *   Her şablon kuralı `.tpl-<id>` ile başlar. Sayfa sayfa tekrar eden zemin (tam boy renkli sütun, üst şerit)
+ *   `.tpl-<id> .page { background: … }` ile yapılır; her sayfada tekrar eder.
  *   Örnek: linear-gradient(90deg, var(--base) 0 var(--side-width), var(--paper) 0).
  *   `--side-width` (varsayılan %34) `.tpl-<id>`'de değiştirilebilir; yan sütun genişliği de ondan gelir.
- *   Gövde yazı boyu: `.tpl-<id> { font-size: calc(var(--fs) * 0.9) }` (em'ler buna göre ölçeklenir).
- *   Boşluklar: --pad-x, --pad-y, --block-gap, --section-gap, --lh `.tpl-<id>`'de ezilebilir.
+ *   K4 ölçek: gövde boyu, satır aralığı ve boşluklar şablonun `scale` çarpanlarıyla (templateMeta.ts) zaten
+ *   çarpılmış gelir: `--fs` şablonun gövde boyudur. CSS'te `font-size: calc(var(--fs) * …)` ile yeniden ÇARPMA;
+ *   tek bir öğenin boyu/boşluğu ayrıysa onu em/mm ya da calc(var(--section-gap) * …) ile ver.
  *
  * Değişkenler (renderCv.ts cvVariables; renkler colors.ts, hepsi hex):
- *   --paper --ink --muted --rule        kâğıt ve metin (şablonun kaydından; Gece/Çift Ton'da zeminden türer)
+ *   --paper --ink --muted --rule        kâğıt ve metin (şablonun kaydından; renk takımının vars'ı ezebilir)
  *   --accent                            kullanıcının vurgu rengi (dolgu, çizgi, nokta için)
  *   --accent-ink                        vurgunun METİN hâli: --paper üstünde en az 4.5:1 (metinde bunu kullan)
  *   --on-accent --on-accent-dim --on-accent-muted  vurgu zemininin üstündeki metin (beyaz ya da koyu; biraz ve
  *                                       daha çok yumuşatılmış hâli; hepsi ≥ 4.5:1)
- *   --accent-mark                       koyu metnin altına konan vurgu zemini (üstünde --ink ≥ 4.5:1)
- *   --accent-soft --accent-light        kâğıt üstünde vurgunun açık tonları (%9 / %24; koyu kâğıtta %16 / %32).
+ *   --accent-mark                       koyu metnin altına konan vurgu zemini (üstünde --ink ≥ 4.5:1; Blok'un ad bloğu)
+ *   --accent-soft --accent-light        kâğıt üstünde vurgunun açık tonları (%9 / %24).
  *                                       --accent-soft metin zemini olabilir: üstünde --ink, --muted, --accent-ink ≥ 4.5:1
  *   --accent-dark                       vurgunun koyu tonu
- *   --base --on-base --on-base-dim --on-base-muted  zemin rengi (Panel yan sütunu, Gece sayfası, Çift Ton koyu
- *                                       yarısı) ve üstündeki metin; zemin kullanmayan şablonda --base = --accent
+ *   --base --on-base --on-base-dim --on-base-muted  zemin rengi (Panel yan sütunu) ve üstündeki metin;
+ *                                       zemin kullanmayan şablonda --base = --accent
  *   Metin rengini CSS'te color-mix ile kendin karıştırma: kontrastı denetlenmez. Hazır token'ı kullan
  *   (gerekirse colors.ts'e ekle); renk testleri (colors.test.ts) her şablonun metin/zemin çiftlerini denetler.
- *   --base-soft --base-ink --base-ink-muted  zeminin açık tonu (Çift Ton'un açık yarısı) ve üstündeki metin
+ *   --base-soft --base-ink --base-ink-muted  zeminin açık tonu ve üstündeki metin
  *   --accent-on-base                    vurgunun --base üstünde okunur (≥ 4.5:1) metin hâli
  *   --font                              gövde (Görünüm'de seçilen)
  *   --font-display                      şablonun ad/başlık ailesi (templateMeta fonts.display; seçilmez)
- *   --font-mono                         eş aralıklı aile (İsviçre: IBM Plex Mono; yoksa gövde)
- *   --fs --lh --pad-x --pad-y --block-gap --section-gap
+ *   --font-mono                         eş aralıklı aile (bu sette kullanan yok; gövdeye eşit)
+ *   --fs --lh --pad-x --pad-y --block-gap --section-gap   (K4 ile ölçeklenmiş)
  *   Hazır renk takımı seçiliyken ColorSet.vars türetilen değerin yerine geçer (templateMeta.ts).
  *   Yazı tiplerinde yalnız scripts/copy-fonts.mjs'teki yüzleri kullan (ara ağırlık yok).
  *
@@ -46,9 +49,13 @@
  *                                              ekrandakinden UZUN olmamalı; kutunun yerini grid/flex kendiliğinden
  *                                              kapatsın (yalnız fotoğrafa bağlı boşluğu .cv-photo'ya ver).
  *   img.cv-photo                               gerçek fotoğraf, header'ın ilk çocuğu (sağa almak: grid-column)
- *   .cv-identity > .cv-heading > h1.cv-name > span.cv-name-text   ad (iç span: satır satır vurgu/fosforlu kalem)
+ *   .cv-identity > .cv-heading > h1.cv-name > span.cv-name-text   ad (iç span: satır satır vurgu)
  *                  .cv-heading > p.cv-headline                     unvan
  *                  ul.cv-contact > li (+ span.sep " ·")            iletişim (her li bölünmez)
+ *   ul.cv-contact > li.eol / li.eol-print      K3: satır sonuna düşen öğe (paginate ölçer; eol ekranda, eol-print
+ *                                              baskıda). Ayırıcısı `visibility: hidden` (aşağıda): asılı "·" yok,
+ *                                              PDF metnine girmez. Ayırıcıyı kendin gizleyen şablon (ızgara
+ *                                              iletişim) `.cv-contact .sep { display: none }` der.
  *   h1.cv-name.is-long (> 24 karakter) .has-long-word (12+ harfli kelime)   dev adı küçültmek için
  *   h1.cv-name[style="--name-longest:N"]      en uzun kelimenin harf sayısı. Adın boyu base.css'te
  *     min(--name-size, --name-room / (N × --name-char)): şablon font-size değil bu üç değişkeni verir
@@ -57,15 +64,20 @@
  *   ul.cv-contact > li.is-long                 64+ karakterlik öğe: yalnız o, son çare satır sonunda bölünür
  *   h2.section-title[data-section-type=<tür>] > span                  bölüm başlığı (summary, experience, skills…)
  *   .entry.entry-<tür> > .entry-head(.entry-title > strong, .entry-date) + .entry-sub(.part, .sep) + .entry-body.rich
- *   .entry-line > strong.line-label + span.line-value                  beceri/dil satırı
- *   .line-value > span.kw + span.kw-sep(", ")                         virgüllü anahtar kelimeler (çip için);
- *                                                                      ayırıcı metni gizleme (ATS okur)
+ *   .entry-head.date-first > .entry-date + .entry-title                K1: tarih sütunlu şablon (templateMeta
+ *                                              datePosition 'start', Çizelge); tarih DOM'da önce. Tarihsiz kayıtta
+ *                                              sınıf yok, yalnız .entry-title var (tarih sütunu boş kalsın diye
+ *                                              şablon .entry-title'ı 2. sütuna koyar).
+ *   .entry-line > strong.line-label(> span.line-colon ": ") + span.line-value   beceri/dil satırı
+ *                                              K5: iki nokta ayrı öğe; etiketi blok gösteren yan sütunda gizli
+ *                                              (aşağıda .col-side varsayılanı)
+ *   .line-value > span.kw + span.kw-sep(", ")                         virgüllü anahtar kelimeler; ayırıcı metni gizleme
  *   .entry-languages .line-sep (" — ")                                 dil seviyesi ayırıcısı
  *   .entry.is-split / .is-continued                                    bir sayfadan uzun kaydın parçaları
  *
  * Öneri vurguları (yapay zekâ): .sg-* renkleri metnin durduğu yüzeyden türer. Koyu bölgede
  *   --sg-surface (zemin) ve --sg-ink (metin) ver; ör. `.tpl-panel .col-side { --sg-surface: var(--base);
- *   --sg-ink: var(--on-base) }`. Varsayılan --paper / --ink (Gece ve Çift Ton'un koyu yarısında zaten koyu).
+ *   --sg-ink: var(--on-base) }`. Varsayılan --paper / --ink.
  *
  * ATS: order, *-reverse, metin taşıyan öğede herhangi bir position (relative dahil: konumlu öğe PDF'e
  *   sayfanın geri kalanından sonra çizilir, içerik akışında sona düşer; yalnız .page konumlu), ::before/::after ile harf yasak;
@@ -179,6 +191,17 @@ body {
   padding-left: calc(var(--pad-x) * 0.6);
 }
 
+/* K2: yan sütun sağda (DOM'da ana sütundan sonra); iç kenarlar yer değiştirir */
+.cols-2.side-end .col-main {
+  padding-left: var(--pad-x);
+  padding-right: calc(var(--pad-x) * 0.6);
+}
+
+.cols-2.side-end .col-side {
+  padding-left: calc(var(--pad-x) * 0.6);
+  padding-right: var(--pad-x);
+}
+
 .cv-header {
   padding: var(--pad-y) var(--pad-x) var(--section-gap);
   display: flex;
@@ -198,6 +221,11 @@ body {
 .cv-identity {
   min-width: 0;
   flex: 1;
+}
+
+/* Ortalı başlıkta kimlik tam genişlik (iletişim satırı fotoğraf genişliğine sıkışmasın) */
+.align-center .cv-identity {
+  align-self: stretch;
 }
 
 .cv-photo {
@@ -284,6 +312,21 @@ ul {
   color: color-mix(in srgb, var(--muted) 55%, #fff);
 }
 
+/* K3: satır sonuna düşen öğenin ayırıcısı görünmez (yer kaplar, satır kırılımı değişmez; PDF metnine girmez) */
+.cv-contact li.eol .sep {
+  visibility: hidden;
+}
+
+@media print {
+  .cv-contact li.eol .sep {
+    visibility: visible;
+  }
+
+  .cv-contact li.eol-print .sep {
+    visibility: hidden;
+  }
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -293,8 +336,9 @@ a {
  * Varsayılan bölüm başlığı (sade, büyük harf). Şablon görünümünü kendi CSS'inde ezer;
  * büyük harf kullanmayan şablon text-transform: none der (e2e testleri buna hazır).
  */
+/* --section-gap: bir bölümün son kaydından sonraki başlığa TOPLAM aralık (sütunun blok aralığı dahil) */
 .section-title {
-  margin-top: var(--section-gap);
+  margin-top: calc(var(--section-gap) - var(--block-gap));
   font-size: 0.92em;
   line-height: 1.25;
   font-weight: 700;
@@ -308,6 +352,20 @@ a {
   margin-top: 0;
 }
 
+/*
+ * ORTAK VARSAYILANLAR (SET-14 §3.0.1): şablon ayrıca söylemedikçe geçerli. Şablon CSS'i yalnız
+ * farkı yazar. Bölüm başlığından ilk kayda 1.8 mm; ardışık beceri/dil satırları arası 1.2 mm
+ * (ayrı blok aralığı değil). Kayıt başlığı 600; tarih sağda 0.92em soluk; alt satırın ilk parçası 500.
+ */
+.section-title + * {
+  margin-top: calc(1.8mm - var(--block-gap));
+}
+
+.entry-skills + .entry-skills,
+.entry-languages + .entry-languages {
+  margin-top: calc(1.2mm - var(--block-gap));
+}
+
 .entry-head {
   display: flex;
   justify-content: space-between;
@@ -319,12 +377,33 @@ a {
   min-width: 0;
 }
 
+.entry-title strong {
+  font-weight: 600;
+  color: var(--ink);
+}
+
 .entry-date {
   flex: none;
   white-space: nowrap;
   color: var(--muted);
-  font-size: 0.93em;
+  font-size: 0.92em;
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
+}
+
+/*
+ * K1: tarih sütunu (Çizelge). Tarih DOM'da önce, solda kendi sütununda; uzun aralık iki satıra
+ * inebilir. Şablon `--date-col` ile genişliği, kendi CSS'iyle alt satırın girintisini verir.
+ */
+.entry-head.date-first {
+  display: grid;
+  grid-template-columns: var(--date-col, 28mm) minmax(0, 1fr);
+  justify-content: stretch;
+  column-gap: 4mm;
+}
+
+.entry-head.date-first .entry-date {
+  white-space: normal;
 }
 
 .col-side .entry-head {
@@ -336,9 +415,25 @@ a {
   color: var(--muted);
 }
 
-/* Dar yan sütunda dil seviyesi alt satırda, ayırıcısız */
-.col-side .entry-languages .line-label {
+.entry-sub .part:first-child {
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.line-label {
+  font-weight: 600;
+}
+
+/*
+ * Dar yan sütunda etiket blok (değer alt satırda), K5 iki noktası gizli; dil seviyesi alt satırda,
+ * ayırıcısız. Ayırıcı gizlenince görsel ayrım satır sonuyla korunur.
+ */
+.col-side .line-label {
   display: block;
+}
+
+.col-side .line-colon {
+  display: none;
 }
 
 .col-side .entry-languages .line-sep {
@@ -346,7 +441,7 @@ a {
 }
 
 .entry-body {
-  margin-top: 1mm;
+  margin-top: 1.1mm;
 }
 
 .rich p + p {
@@ -354,12 +449,17 @@ a {
 }
 
 .rich ul {
-  padding-left: 4.2mm;
+  padding-left: 4mm;
   margin: 0;
 }
 
 .rich li {
   padding-left: 0.6mm;
+}
+
+.rich li::marker {
+  font-size: 0.8em;
+  color: var(--muted);
 }
 
 .rich li + li {
@@ -538,6 +638,20 @@ body.interactive .sg-removed.is-focused {
 .overflow-warning {
   outline: 0.6mm dashed #d97706;
   outline-offset: 1mm;
+}
+
+/*
+ * Sayfalama ölçerken (paginate.ts #cv-pages'e data-measuring koyar) animasyon ve geçiş yok:
+ * sg-add-in ve page-in ilk karesinde `transform: translateY(...)` uygular, getBoundingClientRect
+ * de dönüşümü sayar; öneriyle eklenen kayıt olduğundan yukarıda ölçülür, sayfaya "sığar" görünürdü.
+ * Öznitelik ölçüm bitince kalkar, animasyonlar o zaman başlar.
+ */
+#cv-pages[data-measuring],
+#cv-pages[data-measuring] *,
+#cv-pages[data-measuring] *::before,
+#cv-pages[data-measuring] *::after {
+  animation: none !important;
+  transition: none !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

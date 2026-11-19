@@ -55,6 +55,8 @@ function inlineText(html: string): string {
  */
 export function fold(text: string): string {
   return text
+    // Ayrıştırılmış (NFD) yazım önce birleşir: "Ç" = "C" + U+0327 harf dışı sayılıp sözcüğü bölmesin.
+    .normalize('NFC')
     .toLocaleLowerCase('tr')
     .replace(/i̇/g, 'i')
     .replace(/[ıîìí]/g, 'i')

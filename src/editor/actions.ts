@@ -2,7 +2,7 @@ import { current, type Draft } from 'immer'
 import { createItem, createSection, newId } from '@/cv/factory'
 import { DEFAULT_SIDE_TYPES } from '@/cv/sample'
 import type { AnyItem, Cv, Personal, Section, SectionType, TemplateSettings } from '@/cv/schema'
-import { db } from '@/db/db'
+import { updateStoredCv } from '@/db/repo'
 import { getTemplate, settingsForTemplate, TEMPLATES, type ColorSet, type TemplateId } from '@/render/templates'
 import { useEditor } from './store'
 import type { Suggestion } from './ui'
@@ -194,10 +194,28 @@ export function moveSection(from: number, to: number) {
   })
 }
 
-export function setTemplateSetting<K extends keyof TemplateSettings>(key: K, value: TemplateSettings[K]) {
-  update((d) => {
-    d.template[key] = value as Draft<TemplateSettings>[K]
-  }, key === 'accentColor' ? 'template:accent' : undefined)
+/**
+ * Renk seçicisi sürüklenirken her `input` olayı ayrı değişikliktir; birleştirilmezse tek sürükleme
+ * geri alma geçmişini (300 adım) doldurur. Sürüklenebilen bütün renk ayarları tek adımda birleşir.
+ */
+const COALESCED_SETTINGS: Partial<Record<keyof TemplateSettings, string>> = {
+  accentColor: 'template:accentColor',
+  baseColor: 'template:baseColor',
+}
+
+/**
+ * `session`: tek bir etkileşimin kimliği (ör. renk seçicinin bir açılışı). Verilirse o etkileşimdeki
+ * bütün değişiklikler, arada ne kadar duraklansa da tek geri alma adımıdır; verilmezse sürüklenebilen
+ * ayarlar yalnız kısa süre içinde birleşir.
+ */
+export function setTemplateSetting<K extends keyof TemplateSettings>(key: K, value: TemplateSettings[K], session?: string) {
+  const coalesceKey = COALESCED_SETTINGS[key]
+  useEditor.getState().update(
+    (d) => {
+      d.template[key] = value as Draft<TemplateSettings>[K]
+    },
+    coalesceKey && session ? { coalesceKey: `${coalesceKey}#${session}`, coalesceMs: Infinity } : { coalesceKey },
+  )
 }
 
 export function toggleSideSection(sectionId: string) {
@@ -316,18 +334,17 @@ export function applySuggestions(list: Suggestion[]): number {
  * findLinkedItem hep tek ve doğru kaydı bulur.
  */
 export async function copyItemToCv(targetCvId: string, sectionType: SectionType, item: AnyItem): Promise<string> {
-  const target = await db.cvs.get(targetCvId)
-  if (!target) throw new Error('CV bulunamadı')
-  const alreadyLinked = target.sections.some((s) => (s.items as AnyItem[]).some((i) => i.translationGroupId === item.translationGroupId))
-  const copy = { ...structuredClone(item), id: newId(), ...(alreadyLinked ? { translationGroupId: newId() } : {}) } as AnyItem
-  let section = target.sections.find((s) => s.type === sectionType)
-  if (!section) {
-    section = createSection(sectionType)
-    target.sections.push(section)
-    if ((DEFAULT_SIDE_TYPES as readonly string[]).includes(sectionType)) target.template.sideSections.push(section.id)
-  }
-  ;(section.items as AnyItem[]).push(copy)
-  target.updatedAt = new Date().toISOString()
-  await db.cvs.put(target)
-  return target.name
+  // Tek işlem: hedef CV başka bir sekmede açıksa onun kaydıyla yarışmaz; o sekme değişikliği fark eder.
+  return updateStoredCv(targetCvId, (target) => {
+    const alreadyLinked = target.sections.some((s) => (s.items as AnyItem[]).some((i) => i.translationGroupId === item.translationGroupId))
+    const copy = { ...structuredClone(item), id: newId(), ...(alreadyLinked ? { translationGroupId: newId() } : {}) } as AnyItem
+    let section = target.sections.find((s) => s.type === sectionType)
+    if (!section) {
+      section = createSection(sectionType)
+      target.sections.push(section)
+      if ((DEFAULT_SIDE_TYPES as readonly string[]).includes(sectionType)) target.template.sideSections.push(section.id)
+    }
+    ;(section.items as AnyItem[]).push(copy)
+    return target.name
+  })
 }

@@ -13,8 +13,8 @@ describe('veritabanı sürüm değişimi', () => {
 
     // "Yeni kod": aynı veritabanı bir üst sürümle
     const newer = new Dexie(name)
-    newer.version(2).stores({ cvs: 'id, updatedAt, name, language', meta: 'key' })
     newer.version(3).stores({ cvs: 'id, updatedAt, name, language', meta: 'key' })
+    newer.version(4).stores({ cvs: 'id, updatedAt, name, language', meta: 'key' })
     const blocked = vi.fn()
     newer.on('blocked', blocked)
     await newer.open()
@@ -22,7 +22,7 @@ describe('veritabanı sürüm değişimi', () => {
     expect(events).toEqual(['versionchange'])
     expect(current.isOpen()).toBe(false)
     expect(blocked).not.toHaveBeenCalled()
-    expect(newer.verno).toBe(3)
+    expect(newer.verno).toBe(4)
     // Eski bağlantı kendiliğinden yeniden açılıp eski şemayla yazmaz: kayıt hata verir.
     await expect(current.cvs.count()).rejects.toThrow()
 

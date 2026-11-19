@@ -43,6 +43,27 @@ export class CvDatabase extends Dexie {
             }
           }),
       )
+    // Şema 3 (14 şablon, docs/sablonlar/SET-14.md §2.4): Manşet/Çerçeve → Dergi, Gece → Yönetici,
+    // Çift Ton → Panel, Afiş → Blok; renk/yazı tipi/hiza varsayılandaysa yeni şablonunkine geçer.
+    // Dizinler aynı; kayıtlar yerinde yükseltilir (sürüm 1'den gelenleri 2. adım zaten 3'e taşır).
+    this.version(3)
+      .stores({
+        cvs: 'id, updatedAt, name, language',
+        meta: 'key',
+      })
+      .upgrade((tx) =>
+        tx
+          .table('cvs')
+          .toCollection()
+          .modify((row: Record<string, unknown>) => {
+            if (row.schemaVersion !== 2) return
+            try {
+              Object.assign(row, upgradeRawCv(structuredClone(row)))
+            } catch {
+              // bozuk kayıt: dokunma
+            }
+          }),
+      )
   }
 }
 

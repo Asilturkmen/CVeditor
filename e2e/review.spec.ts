@@ -42,13 +42,20 @@ test('kurallar sorunları gösterir, Düzenle editörde kayda odaklanır', async
   await expect(inverted).toContainText('Tarihler ters: Yazılım Stajyeri — Martı Teknoloji')
   await expect(page.getByText('“Kariyer Yolculuğum” başlığını ATS tanımayabilir')).toBeVisible()
   await expect(page.getByText('Standart karşılığı: “Deneyim”.')).toBeVisible()
-  // Geçen kontroller de listelenir; puan yok
+  // Önce yalnız düzeltilecekler: geçen kontroller kapalı bir satırda, açınca listelenir; puan yok
+  await expect(page.getByRole('list', { name: 'Düzeltilecekler' }).locator('[data-severity="ok"]')).toHaveCount(0)
+  await expect(page.locator('[data-severity="ok"]')).toHaveCount(0)
+  const passed = page.getByRole('button', { name: /^Geçen \d+ kontrol$/ })
+  await expect(passed).toHaveAttribute('aria-expanded', 'false')
+  await passed.click()
+  await expect(passed).toHaveAttribute('aria-expanded', 'true')
   await expect(page.locator('[data-severity="ok"]').first()).toBeVisible()
+  await expect(page.getByRole('list', { name: 'İletişim ve bağlantılar' }).locator('[data-severity="ok"]').first()).toBeVisible()
   await expect(page.locator('[data-finding]').filter({ hasText: /%\d|\d+\s?%|puan|skor/i })).toHaveCount(0)
 
-  // Geçenleri gizle: yalnız düzeltilecekler kalır
-  await page.getByRole('switch', { name: 'Geçenleri göster' }).click()
-  await expect(page.locator('[data-severity="ok"]')).toHaveCount(0)
+  // Yeniden kapanır; düzeltilecekler yerinde
+  await passed.click()
+  await expect(passed).toHaveAttribute('aria-expanded', 'false')
   await expect(inverted).toBeVisible()
 
   await inverted.getByRole('button', { name: /Düzenle/ }).click()
@@ -71,7 +78,7 @@ test('editör menüsünden ve üst menüden incelemeye gidilir', async ({ page }
 test('iş ilanı yapıştırınca eksik anahtar kelimeler görünür', async ({ page }) => {
   const { cvId } = await seedBrokenCv(page)
   await page.goto(`/inceleme?cv=${cvId}`)
-  await page.getByRole('button', { name: /İş ilanı/ }).click()
+  // İlan alanı hep açık (sağ sütunda)
   await page.getByLabel('İlan metni').fill(
     ['Frontend Geliştirici arıyoruz', '- React ve TypeScript deneyimi', '- Docker ve Kubernetes bilgisi', '- GraphQL ile API geliştirme'].join('\n'),
   )
@@ -102,8 +109,10 @@ test('PDF yükleyince ATS\'nin gördüğü metin ve bulgular görünür', async 
   await page.locator('input[type=file]').setInputFiles({ name: 'deniz-cv.pdf', mimeType: 'application/pdf', buffer: pdf })
   await expect(page.getByText('deniz-cv.pdf')).toBeVisible()
   // pdfjs ilk kez yüklenirken (yük altında) birkaç saniye sürebilir
-  await expect(page.locator('[data-finding="pdf-email"]')).toContainText('E-posta bulundu: deniz.aksoy@example.com', { timeout: 20_000 })
-  await expect(page.locator('[data-finding="pdf-dates"]')).toContainText('Tarih biçimleri karışık')
+  await expect(page.locator('[data-finding="pdf-dates"]')).toContainText('Tarih biçimleri karışık', { timeout: 20_000 })
+  // Geçen kontroller (e-posta bulundu) kapalı satırda
+  await page.getByRole('button', { name: /^Geçen \d+ kontrol$/ }).click()
+  await expect(page.locator('[data-finding="pdf-email"]')).toContainText('E-posta bulundu: deniz.aksoy@example.com')
 
   await page.getByRole('button', { name: "ATS'nin gördüğü metin" }).click()
   const text = page.getByTestId('ats-text')
@@ -112,6 +121,30 @@ test('PDF yükleyince ATS\'nin gördüğü metin ve bulgular görünür', async 
   await expect(text).toContainText('Müşteri panelini React ve TypeScript ile yeniden yazdım.')
   // PDF'te düzenlenecek kayıt yok
   await expect(page.getByRole('button', { name: /^Düzenle/ })).toHaveCount(0)
+})
+
+test('iki sütunu satır satır karışık basılmış PDF: uyarı ve ham akış sırası', async ({ page, context }) => {
+  // Kasıtlı olarak kötü PDF: içerik akışı sol-sağ-sol-sağ (DOM sırası), sağ sütun yarım satır aşağıda.
+  const rows = Array.from(
+    { length: 10 },
+    (_, i) =>
+      `<p style="position:absolute;margin:0;font-size:12px;left:40px;top:${100 + i * 20}px">Sol sütundaki uzun bir satır ${i}</p>` +
+      `<p style="position:absolute;margin:0;font-size:12px;left:330px;top:${110 + i * 20}px">Sağ sütundaki uzun bir satır ${i}</p>`,
+  ).join('')
+  const printer = await context.newPage()
+  await printer.setContent(`<html lang="tr"><body style="font-family: sans-serif; margin: 0">${rows}</body></html>`)
+  const pdf = await printer.pdf({ format: 'A4' })
+  await printer.close()
+
+  await page.goto('/inceleme')
+  await page.getByRole('radio', { name: 'PDF yükle' }).click()
+  await page.locator('input[type=file]').setInputFiles({ name: 'karisik.pdf', mimeType: 'application/pdf', buffer: pdf })
+  await expect(page.locator('[data-finding="pdf-columns"]')).toContainText('Sütunlar karışıyor', { timeout: 20_000 })
+
+  await page.getByRole('button', { name: "ATS'nin gördüğü metin" }).click()
+  const lines = (await page.getByTestId('ats-text').locator('p.whitespace-pre-wrap').allInnerTexts()).map((l) => l.trim())
+  // Panel PDF'in okunduğu ham sırayı gösterir (sütunlara ayrılmış hâlini değil)
+  expect(lines.slice(0, 4)).toEqual(['Sol sütundaki uzun bir satır 0', 'Sağ sütundaki uzun bir satır 0', 'Sol sütundaki uzun bir satır 1', 'Sağ sütundaki uzun bir satır 1'])
 })
 
 test('PDF olmayan dosya anlaşılır bir sorun olarak görünür', async ({ page }) => {

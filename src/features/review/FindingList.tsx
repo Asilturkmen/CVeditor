@@ -1,6 +1,9 @@
 import { CircleCheck, CircleX, Lightbulb, TriangleAlert } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/Button'
+import { Disclosure } from '@/components/ui/Disclosure'
+import { Group } from '@/components/ui/Group'
+import { InlineNotice } from '@/components/ui/Notice'
 import { cn } from '@/lib/cn'
 import { m } from '@/paraglide/messages'
 import { CATEGORIES, sortFindings, type Category, type Finding, type FindingTarget, type Severity } from '@/review/rules'
@@ -8,7 +11,7 @@ import { CATEGORIES, sortFindings, type Category, type Finding, type FindingTarg
 const SEVERITY: Record<Severity, { label: () => string; counted: (count: number) => string; icon: ReactNode; tone: string }> = {
   problem: { label: () => m.rv_sev_problem(), counted: (count) => m.rv_sev_problem_n({ count }), icon: <CircleX />, tone: 'text-danger' },
   warn: { label: () => m.rv_sev_warn(), counted: (count) => m.rv_sev_warn_n({ count }), icon: <TriangleAlert />, tone: 'text-warn' },
-  info: { label: () => m.rv_sev_info(), counted: (count) => m.rv_sev_info_n({ count }), icon: <Lightbulb />, tone: 'text-muted' },
+  info: { label: () => m.rv_sev_info(), counted: (count) => m.rv_sev_info_n({ count }), icon: <Lightbulb />, tone: 'text-fg-2' },
   ok: { label: () => m.rv_sev_ok(), counted: (count) => m.rv_sev_ok_n({ count }), icon: <CircleCheck />, tone: 'text-ok' },
 }
 
@@ -21,18 +24,20 @@ const CATEGORY_LABELS: Record<Category, () => string> = {
   bicim: () => m.rv_cat_bicim(),
 }
 
-/** Ölçüt değil sayım: kaç kontrol hangi durumda. */
+/** Ölçüt değil sayım: kaç kontrol hangi durumda. Sıfır olan ikincil renkte (opaklıkla soldurma yok). */
 export function SeverityCounts({ findings }: { findings: Finding[] }) {
   const order: Severity[] = ['problem', 'warn', 'info', 'ok']
   return (
-    <ul className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13px]" aria-label={m.rv_results_label()}>
+    <ul className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-body" aria-label={m.rv_results_label()}>
       {order.map((s) => {
         const count = findings.filter((f) => f.severity === s).length
         return (
-          <li key={s} className={cn('flex items-center gap-1.5', count === 0 && 'opacity-55')}>
-            <span className={cn('[&_svg]:size-4', SEVERITY[s].tone)}>{SEVERITY[s].icon}</span>
+          <li key={s} className={cn('flex items-center gap-1.5', count === 0 ? 'text-fg-2' : 'text-fg')}>
+            <span className={cn('[&_svg]:size-4', count === 0 ? 'text-fg-3' : SEVERITY[s].tone)} aria-hidden>
+              {SEVERITY[s].icon}
+            </span>
             <span className="font-semibold tabular-nums">{count}</span>
-            <span className="text-muted">{SEVERITY[s].counted(count)}</span>
+            <span>{SEVERITY[s].counted(count)}</span>
           </li>
         )
       })}
@@ -40,27 +45,43 @@ export function SeverityCounts({ findings }: { findings: Finding[] }) {
   )
 }
 
-function FindingRow({ finding, onEdit }: { finding: Finding; onEdit?: (target: FindingTarget) => void }) {
+/**
+ * Bulgu satırı: solda durum ikonu (şekil + renk), başlık ve nedeni; sağda durum ve kategori adı
+ * (renk tek işaret değil) ve varsa "Düzenle". Geçen kontrollerde kategori yazılmaz (zaten kategori
+ * başlığı altında).
+ */
+function FindingRow({
+  finding,
+  onEdit,
+  showCategory,
+}: {
+  finding: Finding
+  onEdit?: (target: FindingTarget) => void
+  showCategory: boolean
+}) {
   const sev = SEVERITY[finding.severity]
+  const target = finding.target
   return (
-    <li className="flex items-start gap-3 px-4 py-3" data-finding={finding.id} data-severity={finding.severity}>
-      <span className={cn('mt-[3px] shrink-0 [&_svg]:size-4', sev.tone)} aria-hidden>
+    <li className="flex items-start gap-3 px-[var(--row-px)] py-3" data-finding={finding.id} data-severity={finding.severity}>
+      <span className={cn('mt-px shrink-0 [&_svg]:size-4', sev.tone)} aria-hidden>
         {sev.icon}
       </span>
-      <div className="min-w-0 flex-1">
-        <p className="leading-snug">
-          <span className={cn('mr-2 text-[12.5px] font-semibold', sev.tone)}>{sev.label()}</span>
-          <span className="font-medium break-words">{finding.title}</span>
-        </p>
-        <p className="mt-1 text-[13px] leading-relaxed text-muted">{finding.detail}</p>
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+          <p className="min-w-0 text-body font-medium break-words text-fg">{finding.title}</p>
+          <p className="shrink-0 text-callout text-fg-2">
+            {sev.label()}
+            {showCategory && <> · {CATEGORY_LABELS[finding.category]()}</>}
+          </p>
+        </div>
+        <p className="text-callout break-words text-fg-2">{finding.detail}</p>
       </div>
-      {finding.target && onEdit && (
+      {target && onEdit && (
         <Button
-          size="sm"
-          variant="ghost"
-          className="-my-0.5 text-accent hover:text-accent"
+          variant="plain"
+          className="-my-1 -mr-2"
           aria-label={m.rv_edit_label({ title: finding.title })}
-          onClick={() => onEdit(finding.target!)}
+          onClick={() => onEdit(target)}
         >
           {m.rv_edit()}
         </Button>
@@ -69,44 +90,49 @@ function FindingRow({ finding, onEdit }: { finding: Finding; onEdit?: (target: F
   )
 }
 
-/** Kategoriye göre gruplu bulgular; her grupta önce sorunlar, en sonda geçenler. */
-export function FindingGroups({
-  findings,
-  showPassed,
-  onEdit,
-}: {
-  findings: Finding[]
-  showPassed: boolean
-  onEdit?: (target: FindingTarget) => void
-}) {
+/**
+ * Sonuç listesi: önce düzeltilecekler (sorun, uyarı, öneri; önem sırasıyla) tek grupta, sonra
+ * "Geçen N kontrol" kapalı açılır satırı; açılınca geçenler kategori kategori.
+ */
+export function FindingGroups({ findings, onEdit }: { findings: Finding[]; onEdit?: (target: FindingTarget) => void }) {
+  const todo = sortFindings(findings.filter((f) => f.severity !== 'ok'))
+  const passed = findings.filter((f) => f.severity === 'ok')
   return (
     <div className="flex flex-col gap-6">
-      {CATEGORIES.map((category) => {
-        const all = sortFindings(findings.filter((f) => f.category === category))
-        if (!all.length) return null
-        const visible = showPassed ? all : all.filter((f) => f.severity !== 'ok')
-        const passed = all.length - visible.length
-        return (
-          <section key={category} aria-labelledby={`rv-cat-${category}`}>
-            <h2 id={`rv-cat-${category}`} className="mb-2 text-[15px] font-semibold tracking-tight">
-              {CATEGORY_LABELS[category]()}
-            </h2>
-            {visible.length > 0 && (
-              <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
-                {visible.map((f) => (
-                  <FindingRow key={f.id} finding={f} onEdit={onEdit} />
-                ))}
-              </ul>
-            )}
-            {passed > 0 && (
-              <p className={cn('flex items-center gap-1.5 text-[13px] text-muted', visible.length > 0 && 'mt-2')}>
-                <CircleCheck className="size-3.5 text-ok" aria-hidden />
-                {m.rv_group_passed({ count: passed })}
-              </p>
-            )}
-          </section>
-        )
-      })}
+      {todo.length > 0 ? (
+        <Group title={m.rv_todo_title()} count={todo.length} inset="lg">
+          <ul className="group-rows" aria-label={m.rv_todo_title()}>
+            {todo.map((f) => (
+              <FindingRow key={f.id} finding={f} onEdit={onEdit} showCategory />
+            ))}
+          </ul>
+        </Group>
+      ) : (
+        <InlineNotice tone="ok" className="px-4">
+          {m.rv_todo_none()}
+        </InlineNotice>
+      )}
+
+      {passed.length > 0 && (
+        // Özet satırının oku grup başlıklarıyla aynı x'te (16px); açılan içerik tam genişlik (içeriği kırpan kapta negatif boşluk yok).
+        <Disclosure summary={m.rv_passed_summary({ count: passed.length })} className="[&>button]:ml-3">
+          <div className="flex flex-col gap-5 pt-2">
+            {CATEGORIES.map((category) => {
+              const rows = passed.filter((f) => f.category === category)
+              if (!rows.length) return null
+              return (
+                <Group key={category} title={CATEGORY_LABELS[category]()} inset="lg">
+                  <ul className="group-rows" aria-label={CATEGORY_LABELS[category]()}>
+                    {rows.map((f) => (
+                      <FindingRow key={f.id} finding={f} showCategory={false} />
+                    ))}
+                  </ul>
+                </Group>
+              )
+            })}
+          </div>
+        </Disclosure>
+      )}
     </div>
   )
 }

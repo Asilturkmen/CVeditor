@@ -11,10 +11,18 @@
       try {
         var t = localStorage.getItem('cveditor:theme')
         if (t === 'dark') document.documentElement.dataset.theme = 'dark'
-        var a = { petrol: '#1f6f6b', murekkep: '#2b4f81', kiremit: '#a8502d', orman: '#2f6a3c', grafit: '#45443f' }[
-          localStorage.getItem('cveditor:accent')
-        ]
-        if (a) document.documentElement.style.setProperty('--accent-base', a)
+        // src/lib/prefs.ts ACCENTS ile aynı liste: [açık, koyu]
+        var a = {
+          petrol: ['#00786f', '#2cc7b5'],
+          murekkep: ['#0a5fd8', '#5cb8ff'],
+          kiremit: ['#b8500f', '#ffa056'],
+          orman: ['#1b7f3b', '#4ad968'],
+          grafit: ['#48484a', '#d1d1d6'],
+        }[localStorage.getItem('cveditor:accent')]
+        if (a) {
+          document.documentElement.style.setProperty('--accent-light', a[0])
+          document.documentElement.style.setProperty('--accent-dark', a[1])
+        }
       } catch (e) {}
     </script>
   </head>

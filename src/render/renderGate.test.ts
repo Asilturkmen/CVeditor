@@ -80,4 +80,29 @@ describe('çizim sırası (yazdırma en son çizimi bekler)', () => {
     await expect(failing).rejects.toThrow()
     expect(await gate.settled()).toBe(false)
   })
+
+  it('invalidate (bileşen kaldırıldı): süren çizim uyanınca yarıda kalır; yeni çizim normal çalışır', async () => {
+    const gate = createRenderGate()
+    const fonts = deferred()
+    let finished = false
+    const pending = gate.track(
+      (async () => {
+        const token = gate.begin()
+        await fonts.promise
+        if (!gate.isCurrent(token)) return
+        finished = true
+        gate.complete(token)
+      })(),
+    )
+    gate.invalidate()
+    fonts.resolve()
+    await pending
+    expect(finished).toBe(false)
+    expect(await gate.settled()).toBe(false)
+
+    const token = gate.begin()
+    expect(gate.isCurrent(token)).toBe(true)
+    gate.complete(token)
+    expect(await gate.settled()).toBe(true)
+  })
 })

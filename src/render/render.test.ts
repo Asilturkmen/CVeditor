@@ -98,6 +98,44 @@ describe('CV kaynağı (çizim)', () => {
     expect(renderCvSource(cv)).toContain('cv-photo')
   })
 
+  it('fotoğraf yalnız gömülü jpeg/png/webp ise çizilir; değilse fotoğraf yokmuş gibi', () => {
+    const cv = structuredClone(cvWith('zarif'))
+    cv.template.showPhoto = true
+    const draw = (photo: unknown) => {
+      cv.personal.photo = photo as string
+      return parse(renderCvSource(cv, { placeholders: true, photoHint: 'Fotoğraf ekle' }))
+    }
+    for (const safe of ['data:image/jpeg;base64,AAAA', 'data:image/png;base64,iVBORw0KGgo=', 'data:image/webp;base64,UklGRg==']) {
+      const doc = draw(safe)
+      expect(doc.querySelector('img.cv-photo')?.getAttribute('src'), safe).toBe(safe)
+      expect(doc.querySelector('.cv-header')!.classList.contains('has-photo')).toBe(true)
+    }
+    for (const unsafe of [
+      'https://ornek.com/foto.jpg',
+      'http://169.254.169.254/latest/meta-data/',
+      '//ornek.com/foto.png',
+      '/foto.png',
+      'file:///C:/gizli.png',
+      'javascript:alert(1)',
+      'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=',
+      'data:text/html;base64,PGI+eDwvYj4=',
+      'data:image/png;base64,AAAA" onerror="alert(1)',
+      'data:image/png,ham',
+      ' data:image/png;base64,AAAA',
+      42,
+      { src: 'data:image/png;base64,AAAA' },
+    ]) {
+      const doc = draw(unsafe)
+      expect(doc.querySelector('img'), String(unsafe)).toBeNull()
+      // Fotoğraf yüklenmemiş gibi: önizlemede yer tutucu, baskıda hiçbir şey.
+      expect(doc.querySelector('.cv-header')!.classList.contains('photo-ph')).toBe(true)
+      cv.personal.photo = unsafe as string
+      const printed = renderCvSource(cv)
+      expect(printed).not.toContain('cv-photo')
+      expect(printed).toContain('no-photo')
+    }
+  })
+
   it('boş adda yer tutucu yalnız istenirse çizilir', () => {
     const cv = structuredClone(cvWith('zarif'))
     cv.personal.fullName = ''

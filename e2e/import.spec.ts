@@ -1,17 +1,13 @@
 import { readFileSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'
 import { encryptedPdf, enCvPdf, fakePdf, imageOnlyPdf, trCvPdf } from './fixtures/pdfs.ts'
-import { preview } from './helpers.ts'
+import { continueToImport, openTemplate, preview } from './helpers.ts'
 
-/** Şablonlar → Zarif → (dil) → "Eski CV'yi içe aktar" → PDF seçimi ekranı */
+/** Şablonlar → Zarif şablon sayfası → (dil) → "Eski CV'yi içe aktar" → "Devam: PDF seç" → PDF seçimi penceresi */
 async function openImport(page: Page, language: 'Türkçe' | 'İngilizce' = 'Türkçe') {
-  await page.goto('/sablonlar')
-  await page.getByRole('button', { name: /Zarif şablonunu seç/ }).click()
+  await openTemplate(page, 'Zarif')
   await page.getByRole('radio', { name: language }).click()
-  await page.getByRole('button', { name: 'Devam' }).click()
-  await page.getByRole('radio', { name: /Eski CV'yi içe aktar/ }).click()
-  await page.getByRole('button', { name: 'Devam' }).click()
-  await expect(page.getByText("Eski CV'nin PDF'ini seç")).toBeVisible()
+  await continueToImport(page)
 }
 
 const pick = (page: Page, name: string, buffer: Buffer) =>
@@ -38,9 +34,13 @@ test('Türkçe PDF içe aktarılır: dil, iletişim, deneyim kayıtları önizle
   await expect(records.filter({ hasText: 'Frontend Geliştirici — Deneme Yazılım Ltd.' })).toContainText('Haz 2019 – Oca 2022')
 
   // Kaydı açıp alanı düzelt; sertifikayı dışarıda bırak
-  await records.filter({ hasText: 'Deneme Yazılım' }).getByRole('button', { name: 'Alanları göster' }).click()
+  // Kayıt satırı editördeki anahat satırı gibi yerinde açılır
+  const deneme = records.filter({ hasText: 'Deneme Yazılım' })
+  await deneme.getByRole('button', { name: /Deneme Yazılım/ }).click()
+  await expect(deneme.getByRole('button', { name: /Deneme Yazılım/ })).toHaveAttribute('aria-expanded', 'true')
   await page.getByLabel('Konum').last().fill('Ankara, Türkiye')
-  await records.filter({ hasText: 'AWS Certified' }).locator('label').click()
+  await records.filter({ hasText: 'AWS Certified' }).getByRole('checkbox').click()
+  await expect(records.filter({ hasText: 'AWS Certified' }).getByRole('checkbox')).not.toBeChecked()
   await expect(page.getByText('9/10 kayıt seçili')).toBeVisible()
 
   // Ham metin paneli

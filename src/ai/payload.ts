@@ -3,32 +3,46 @@ import { CONTACT_FIELDS, PERSONAL_TEXT_FIELDS, TEXT_FIELDS, type TextField } fro
 import { sectionTitle } from '@/cv/locale'
 import type { AnyItem, Cv, DateRange, Section, YearMonth } from '@/cv/schema'
 import { buildContactMasks, createMasker, maskSourceOf } from './mask'
-import type { AiScope, EditPayload } from './types'
+import type { AiScope, EditPayload, PayloadField } from './types'
 
 export { hasPlaceholder } from './mask'
 
 /**
  * Sağlayıcıya giden düzenleme isteğini kurar. Gizlilik kuralları:
  * - yalnız seçili kapsam (Tüm CV → görünür bölümler; gizli kayıtlar hiç gitmez)
- * - ad soyad hiç gitmez; iletişim alanları (kişinin ve referansların) yalnız
- *   istek iletişimle ilgiliyse
+ * - ad soyad hiç gitmez
+ * - iletişim alanları (e-posta, telefon, konum, site, LinkedIn, GitHub) YALNIZ
+ *   kullanıcı "İletişim bilgilerimi de gönder"i açıkça seçerse gider
+ *   (`options.contact`; varsayılan kapalı). İstekteki anahtar kelime
+ *   ("e-postamı düzelt") yalnız ipucudur (`contactFieldsForPrompt`): arayüz
+ *   kutuyu önerir, kendiliğinden göndermez.
+ * - referans kişilerin e-postası/telefonu (üçüncü kişi) kendiliğinden hiç
+ *   gitmez: yalnız iletişim seçiliyken VE kapsam bir referans bölümü/kaydıysa.
  * - unvan yalnız "Tüm CV" kapsamında gider (yalnız orada değiştirilebilir)
  * - metinlerde geçen ad (parçaları ve bağlantıdaki bitişik biçimi dahil), her
- *   e-posta adresi ve telefon numarası, kişinin bağlantıları, konum ve referans
- *   kişilerin adı / e-postası / telefonu ⟦…⟧ yer tutucusuyla maskelenir
- *   (kurallar mask.ts'te); referansın ad alanı da maskeli gider. `unmask`
- *   yanıttaki yer tutucuları yerelde geri koyar.
- * - istekle açılan iletişim alanı (kişinin ya da referansın) özgün değeriyle
- *   gider ki model onu görüp düzeltebilsin; metinlerdeki geçişleri yine maskeli.
- * - yanıtta yalnız gönderilen yer tutucular geri konur; model metinde geçmeyen
- *   bir yer tutucu uydurursa (ör. ⟦PHONE⟧) o değer atılır. İstisna: istekle
- *   açılan kişisel iletişim alanının yer tutucusu (ör. "e-postamı ekle" →
- *   ⟦EMAIL⟧) kişisel bilgideki değerle doldurulur; o değer zaten açıkça gitti.
+ *   e-posta adresi ve telefon numarası, kişinin bağlantıları, konum, referans
+ *   kişilerin adı / e-postası / telefonu ve deseni olan kişisel bilgiler
+ *   (adres, doğum tarihi, kimlik no, kullanıcı adı) ⟦…⟧ yer tutucusuyla
+ *   maskelenir (kurallar mask.ts'te); referansın ad alanı da maskeli gider.
+ * - seçilen iletişim alanları özgün değerleriyle gider ki model onları görüp
+ *   düzeltebilsin; metinlerdeki geçişleri yine maskeli.
+ * - yanıtta yalnız gönderilen yer tutucular geri konur (`restore`): model
+ *   metinde geçmeyen bir yer tutucu uydurursa (ör. ⟦PHONE⟧) ya da bozarsa
+ *   ("⟦İSİM⟧", "[EMAIL]") o değer atılır. İstisna: seçilen kişisel iletişim
+ *   alanının yer tutucusu (ör. ⟦EMAIL⟧) kişisel bilgideki değerle doldurulur;
+ *   o değer zaten açıkça gitti.
+ * - her bölümle birlikte yazılabilecek alanlar (`fields`: ad + zengin/düz)
+ *   gider; `add` işlemi yalnız bu adları kullanabilir.
  */
 
 type ContactField = (typeof CONTACT_FIELDS)[number]
 
-/** İstekle açılan iletişim alanının yer tutucusu (metinde geçmese de geri konabilir) */
+export interface EditPayloadOptions {
+  /** Kullanıcı "İletişim bilgilerimi de gönder"i seçti */
+  contact?: boolean
+}
+
+/** Seçilen iletişim alanının yer tutucusu (metinde geçmese de geri konabilir) */
 const FALLBACK_PLACEHOLDER: Record<ContactField, string> = {
   email: '⟦EMAIL⟧',
   phone: '⟦PHONE⟧',
@@ -44,9 +58,11 @@ const E = '(?![\\p{L}\\p{N}])'
 const kw = (source: string) => new RegExp(source.replaceAll('\\b<', B).replaceAll('\\b>', E), 'u')
 
 /**
- * İstekte geçen açık ifadeye göre gönderilecek iletişim alanları (TR/EN).
- * Yalnız açık biçimler sayılır: "web geliştirme", "site reliability",
- * "address the gaps", "mail order", "iletişim becerileri" iletişim değildir.
+ * İstekte geçen açık ifadeye göre ilgili iletişim alanları (TR/EN). YALNIZ
+ * İPUCU: arayüz "İletişim bilgilerimi de gönder" kutusunu önerir; gönderim
+ * kutunun seçimine bağlıdır. Yalnız açık biçimler sayılır: "web geliştirme",
+ * "site reliability", "address the gaps", "mail order", "iletişim becerileri"
+ * iletişim değildir.
  */
 const CONTACT_KEYWORDS: [RegExp, readonly ContactField[]][] = [
   [kw(String.raw`\b<e-?posta|\b<e-?mail|\b<mail adres`), ['email']],
@@ -65,7 +81,7 @@ const CONTACT_KEYWORDS: [RegExp, readonly ContactField[]][] = [
   [kw(String.raw`\b<iletişim (?:bilgi|kısm|alan|satır|bölüm)|\b<contact (?:info|information|details|section)\b>`), CONTACT_FIELDS],
 ]
 
-/** İstek hangi iletişim alanlarıyla ilgili? (boş dizi: hiçbiri) */
+/** İstek hangi iletişim alanlarıyla ilgili görünüyor? (yalnız ipucu; boş dizi: hiçbiri) */
 export function contactFieldsForPrompt(prompt: string): ContactField[] {
   // Türkçe küçültme "LinkedIn"i "linkedın" yapar; iki küçültme birlikte aranır.
   const text = `${prompt.toLocaleLowerCase('tr')}\n${prompt.toLowerCase()}`
@@ -74,9 +90,9 @@ export function contactFieldsForPrompt(prompt: string): ContactField[] {
   return CONTACT_FIELDS.filter((f) => found.has(f))
 }
 
-/** Üçüncü kişi iletişim alanı (referans e-postası/telefonu) bu istekte gönderilir mi? */
-export function sendsContactField(field: TextField, contacts: readonly ContactField[]): boolean {
-  return !field.contact || contacts.includes(field.contact)
+/** Alan bu istekte gönderilir mi? Üçüncü kişi iletişim alanı (referans e-postası/telefonu) yalnız açıkça seçildiyse. */
+export function sendsContactField(field: TextField, referenceContacts: boolean): boolean {
+  return !field.contact || referenceContacts
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -86,14 +102,14 @@ function itemPayload(
   section: Section,
   item: AnyItem,
   mask: (s: string) => string,
-  contacts: readonly ContactField[],
+  referenceContacts: boolean,
 ): { id: string } & Record<string, unknown> {
   const record = item as unknown as Record<string, unknown>
   const out: { id: string } & Record<string, unknown> = { id: item.id }
   for (const f of TEXT_FIELDS[section.type]) {
-    if (!sendsContactField(f, contacts)) continue
+    if (!sendsContactField(f, referenceContacts)) continue
     const value = record[f.key]
-    // İstekle açılan referans e-postası/telefonu özgün değeriyle gider (kişisel iletişim alanları gibi).
+    // Seçilen referans e-postası/telefonu özgün değeriyle gider (kişisel iletişim alanları gibi).
     if (typeof value === 'string') out[f.key] = f.contact ? value : mask(value)
   }
   // Tarihler yalnız bağlam için (değiştirilemez alanlar).
@@ -109,8 +125,16 @@ function itemPayload(
   return out
 }
 
-export function buildEditPayload(cv: Cv, scope: AiScope, prompt: string): { payload: EditPayload; unmask: (s: string) => string } {
-  const contacts = contactFieldsForPrompt(prompt)
+export interface BuiltEditPayload {
+  payload: EditPayload
+  /** Yer tutucuları geri koyar (bilinmeyen olduğu gibi kalır); yalnız gösterim/test için */
+  unmask: (s: string) => string
+  /** Sıkı geri koyma: tanınmayan ya da bozulmuş yer tutucu varsa null (değer atılır) */
+  restore: (s: string) => string | null
+}
+
+export function buildEditPayload(cv: Cv, scope: AiScope, prompt: string, options: EditPayloadOptions = {}): BuiltEditPayload {
+  const contacts: readonly ContactField[] = options.contact ? CONTACT_FIELDS : []
   const masker = createMasker(buildContactMasks(maskSourceOf(cv)), { fallback: contacts.map((f) => FALLBACK_PLACEHOLDER[f]) })
   const { mask } = masker
 
@@ -125,11 +149,17 @@ export function buildEditPayload(cv: Cv, scope: AiScope, prompt: string): { payl
       // Kullanıcı bölümü ya da kaydı kendisi seçti: gizli olsa da gönderilir.
       items = scope.kind === 'item' ? items.filter((i) => i.id === scope.itemId) : items.filter((i) => !i.hidden)
     }
+    // Referansın iletişimi: iletişim seçili ve kullanıcı referans bölümünü/kaydını kapsam olarak seçti.
+    const referenceContacts = !!options.contact && scope.kind !== 'all' && section.type === 'references'
+    const fields: PayloadField[] = TEXT_FIELDS[section.type]
+      .filter((f) => sendsContactField(f, referenceContacts))
+      .map((f) => ({ key: f.key, rich: f.rich }))
     sections.push({
       id: section.id,
       type: section.type,
       title: mask(sectionTitle(cv.language, section.type, section.title)),
-      items: items.map((i) => itemPayload(section, i, mask, contacts)),
+      fields,
+      items: items.map((i) => itemPayload(section, i, mask, referenceContacts)),
     })
   }
 
@@ -147,5 +177,5 @@ export function buildEditPayload(cv: Cv, scope: AiScope, prompt: string): { payl
     sections,
     placeholders: masker.placeholders(),
   }
-  return { payload, unmask: masker.unmask }
+  return { payload, unmask: masker.unmask, restore: masker.restore }
 }

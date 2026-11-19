@@ -74,7 +74,6 @@ test('kaynak değişince yapay zekâ sonuçları ekranda kalmaz: başka CV, ayn�
   const list = card.getByRole('list', { name: 'Yapay zekâ yorumları' })
   await card.getByRole('button', { name: 'Yorum iste' }).click()
   await expect(list).toBeVisible({ timeout: 5000 })
-  await page.getByRole('button', { name: /İş ilanı/ }).click()
   await page.getByLabel('İlan metni').fill('PostgreSQL ve Go bilen, JS ile React uygulamaları geliştiren bir yazılımcı arıyoruz.')
   const kw = page.getByTestId('keyword-ai')
   await kw.getByRole('button', { name: 'Anlamına göre karşılaştır' }).click()
@@ -104,7 +103,6 @@ test('kaynak değişince yapay zekâ sonuçları ekranda kalmaz: başka CV, ayn�
 test('"Ne gönderilir?" ilanın son hâlini gösterir (gönderilecek olanla aynı)', async ({ page }) => {
   const cvId = await seedCv(page)
   await page.goto(`/inceleme?cv=${cvId}`)
-  await page.getByRole('button', { name: /İş ilanı/ }).click()
   const ad = page.getByLabel('İlan metni')
   await ad.fill('Kubernetes bilen bir yazılımcı arıyoruz.')
   await ad.pressSequentially(' Rust da bilmeli.', { delay: 0 })
@@ -135,7 +133,6 @@ test('yorum isteği Durdur ile iptal edilir', async ({ page }) => {
 test('ilanla anlamına göre karşılaştırma eş anlamlıları ayrıca gösterir', async ({ page }) => {
   const cvId = await seedCv(page)
   await page.goto(`/inceleme?cv=${cvId}`)
-  await page.getByRole('button', { name: /İş ilanı/ }).click()
   await page.getByLabel('İlan metni').fill('PostgreSQL ve Go bilen, JS ile React uygulamaları geliştiren bir yazılımcı arıyoruz. PostgreSQL deneyimi şart.')
   const kw = page.getByTestId('keyword-ai')
   await expect(kw.getByRole('heading', { name: 'Anlamına göre karşılaştırma' })).toBeVisible()

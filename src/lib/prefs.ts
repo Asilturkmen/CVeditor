@@ -5,12 +5,16 @@ import { create } from 'zustand'
  * uygulanabilsin diye localStorage'da durur (index.html ilk boyamadan önce okur).
  */
 
+/**
+ * Vurgu seçenekleri: açık ve koyu tema için ayrı değer (koyu, açıktan türetilmez).
+ * Kural: beyaz yazıyla ≥ 4.5:1 ve gri pencerede metin olarak ≥ 4.5:1. index.html ilk boyama haritası aynı liste.
+ */
 export const ACCENTS = [
-  { id: 'petrol', color: '#1f6f6b' },
-  { id: 'murekkep', color: '#2b4f81' },
-  { id: 'kiremit', color: '#a8502d' },
-  { id: 'orman', color: '#2f6a3c' },
-  { id: 'grafit', color: '#45443f' },
+  { id: 'petrol', color: '#00786f', dark: '#2cc7b5' },
+  { id: 'murekkep', color: '#0a5fd8', dark: '#5cb8ff' },
+  { id: 'kiremit', color: '#b8500f', dark: '#ffa056' },
+  { id: 'orman', color: '#1b7f3b', dark: '#4ad968' },
+  { id: 'grafit', color: '#48484a', dark: '#d1d1d6' },
 ] as const
 
 export type AccentId = (typeof ACCENTS)[number]['id']
@@ -38,8 +42,9 @@ function write(key: string, value: string) {
 function apply(theme: Theme, accent: AccentId) {
   const root = document.documentElement
   root.dataset.theme = theme
-  const color = ACCENTS.find((a) => a.id === accent)?.color ?? ACCENTS[0].color
-  root.style.setProperty('--accent-base', color)
+  const option = ACCENTS.find((a) => a.id === accent) ?? ACCENTS[0]
+  root.style.setProperty('--accent-light', option.color)
+  root.style.setProperty('--accent-dark', option.dark)
 }
 
 interface PrefsState {

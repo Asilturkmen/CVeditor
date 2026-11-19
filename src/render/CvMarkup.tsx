@@ -2,10 +2,11 @@ import { cloneElement, Fragment, type CSSProperties, type ReactElement, type Rea
 import { formatDateRange, formatYearMonth } from '@/cv/dates'
 import { isItemEmpty } from '@/cv/factory'
 import { NAME_PLACEHOLDER, sectionTitle } from '@/cv/locale'
+import { isSafePhoto } from '@/cv/photo'
 import type { AnyItem, Cv, CvLanguage, Section } from '@/cv/schema'
 import { diffHtml, diffText } from './diff'
 import { displayUrl, isRichTextEmpty, sanitizeDiffHtml, sanitizeRichText, toHref } from './richtext'
-import { nameMetrics } from './nameMetrics'
+import { displayName, nameMetrics } from './nameMetrics'
 import { getTemplate, supportedColumns } from './templates'
 import { visibleSections } from './visibleSections'
 
@@ -40,6 +41,8 @@ export interface SuggestionMap {
 interface Ctx {
   lang: CvLanguage
   suggestions?: SuggestionMap
+  /** K1 (templateMeta datePosition 'start'): kayıt başlığında tarih DOM'da başlıktan önce */
+  dateFirst?: boolean
 }
 
 function Text({ ctx, target, field, value }: { ctx: Ctx; target: string; field: string; value: string }) {
@@ -118,7 +121,20 @@ function UrlField({ ctx, target, field, value }: { ctx: Ctx; target: string; fie
   return hasSuggestion(ctx, target, field) ? <Text ctx={ctx} target={target} field={field} value={value} /> : <Link value={value} />
 }
 
-function EntryHead({ title, date }: { title: ReactNode; date: string }) {
+/**
+ * Kayıt başlığı: başlık + tarih. Tarih sütunlu şablonda (K1, `ctx.dateFirst`) tarih DOM'da önce gelir:
+ * `.entry-head.date-first > .entry-date + .entry-title`. Böylece tarih solda dururken okuma sırası
+ * görünen sırayla aynıdır (CSS ile yer değiştirme yok). Tarihsiz kayıt iki düzende de aynıdır.
+ */
+function EntryHead({ ctx, title, date }: { ctx: Ctx; title: ReactNode; date: string }) {
+  if (ctx.dateFirst && date) {
+    return (
+      <div className="entry-head date-first">
+        <div className="entry-date">{date}</div>
+        <div className="entry-title">{title}</div>
+      </div>
+    )
+  }
   return (
     <div className="entry-head">
       <div className="entry-title">{title}</div>
@@ -155,7 +171,7 @@ function ItemBlock({ section, item, ctx }: { section: Section; item: AnyItem; ct
       const it = item as Extract<Section, { type: 'experience' }>['items'][number]
       return (
         <div {...entryAttrs(section, item, 'experience')}>
-          <EntryHead title={<strong>{t('position', it.position)}</strong>} date={formatDateRange(it.dates, lang)} />
+          <EntryHead ctx={ctx} title={<strong>{t('position', it.position)}</strong>} date={formatDateRange(it.dates, lang)} />
           {(it.company || it.location) && (
             <Sub>
               <Joined parts={[v('company', it.company), v('location', it.location)]} />
@@ -179,7 +195,7 @@ function ItemBlock({ section, item, ctx }: { section: Section; item: AnyItem; ct
       )
       return (
         <div {...entryAttrs(section, item, 'education')}>
-          <EntryHead title={<strong>{t('school', it.school)}</strong>} date={formatDateRange(it.dates, lang)} />
+          <EntryHead ctx={ctx} title={<strong>{t('school', it.school)}</strong>} date={formatDateRange(it.dates, lang)} />
           {(degree || it.location || it.grade) && (
             <Sub>
               <Joined parts={[degree, v('location', it.location), v('grade', it.grade)]} />
@@ -194,6 +210,7 @@ function ItemBlock({ section, item, ctx }: { section: Section; item: AnyItem; ct
       return (
         <div {...entryAttrs(section, item, 'projects')}>
           <EntryHead
+            ctx={ctx}
             title={
               <Joined parts={[<strong key="n">{t('name', it.name)}</strong>, v('role', it.role)]} />
             }
@@ -213,7 +230,13 @@ function ItemBlock({ section, item, ctx }: { section: Section; item: AnyItem; ct
       return (
         <div {...entryAttrs(section, item, 'skills')}>
           <div className="entry-line">
-            {it.name && <strong className="line-label">{t('name', it.name)}: </strong>}
+            {/* K5: iki nokta ayrı öğe; etiketi blok gösteren yan sütun onu gizleyebilir (metin silinmez, öğe gizlenir) */}
+            {it.name && (
+              <strong className="line-label">
+                {t('name', it.name)}
+                <span className="line-colon">: </span>
+              </strong>
+            )}
             <span className="line-value">
               {hasSuggestion(ctx, item.id, 'keywords') ? t('keywords', it.keywords) : <Keywords value={it.keywords} />}
             </span>
@@ -241,7 +264,7 @@ function ItemBlock({ section, item, ctx }: { section: Section; item: AnyItem; ct
       const it = item as Extract<Section, { type: 'certificates' }>['items'][number]
       return (
         <div {...entryAttrs(section, item, 'certificates')}>
-          <EntryHead title={<strong>{t('name', it.name)}</strong>} date={formatYearMonth(it.date, lang)} />
+          <EntryHead ctx={ctx} title={<strong>{t('name', it.name)}</strong>} date={formatYearMonth(it.date, lang)} />
           {(it.issuer || it.url) && (
             <Sub>
               <Joined
@@ -256,7 +279,7 @@ function ItemBlock({ section, item, ctx }: { section: Section; item: AnyItem; ct
       const it = item as Extract<Section, { type: 'awards' }>['items'][number]
       return (
         <div {...entryAttrs(section, item, 'awards')}>
-          <EntryHead title={<strong>{t('title', it.title)}</strong>} date={formatYearMonth(it.date, lang)} />
+          <EntryHead ctx={ctx} title={<strong>{t('title', it.title)}</strong>} date={formatYearMonth(it.date, lang)} />
           {it.issuer && <Sub>{t('issuer', it.issuer)}</Sub>}
           {rich(it.description)}
         </div>
@@ -266,7 +289,7 @@ function ItemBlock({ section, item, ctx }: { section: Section; item: AnyItem; ct
       const it = item as Extract<Section, { type: 'volunteer' }>['items'][number]
       return (
         <div {...entryAttrs(section, item, 'volunteer')}>
-          <EntryHead title={<strong>{t('role', it.role)}</strong>} date={formatDateRange(it.dates, lang)} />
+          <EntryHead ctx={ctx} title={<strong>{t('role', it.role)}</strong>} date={formatDateRange(it.dates, lang)} />
           {(it.organization || it.location) && (
             <Sub>
               <Joined parts={[v('organization', it.organization), v('location', it.location)]} />
@@ -307,7 +330,7 @@ function ItemBlock({ section, item, ctx }: { section: Section; item: AnyItem; ct
       const it = item as Extract<Section, { type: 'custom' }>['items'][number]
       return (
         <div {...entryAttrs(section, item, 'custom')}>
-          <EntryHead title={<strong>{t('title', it.title)}</strong>} date={formatDateRange(it.dates, lang)} />
+          <EntryHead ctx={ctx} title={<strong>{t('title', it.title)}</strong>} date={formatDateRange(it.dates, lang)} />
           {(it.subtitle || it.location || it.url) && (
             <Sub>
               <Joined
@@ -397,11 +420,13 @@ function ContactList({ cv, ctx }: { cv: Cv; ctx: Ctx }) {
 
 function Header({ cv, ctx, placeholders, photoHint }: { cv: Cv; ctx: Ctx; placeholders: boolean; photoHint?: string }) {
   const p = cv.personal
-  const photo = cv.template.showPhoto ? p.photo : null
+  // Yalnız gömülü görsel (data:image/jpeg|png|webp) çizilir; başka her değer (uzak adres, SVG,
+  // bozuk kayıt) fotoğraf yokmuş gibi davranır: önizleme ve sunucudaki PDF dışarıya istek atmaz.
+  const photo = cv.template.showPhoto && isSafePhoto(p.photo) ? p.photo : null
   // Fotoğraf açık ama yüklenmemiş: önizlemede fotoğraf yerinde kesikli kutu. Ekranda düzen
   // fotoğraflı hâldir; baskıda kutu `display:none` olur (base.css), PDF'e ve ATS metnine girmez.
   const photoSlot = !photo && placeholders && cv.template.showPhoto && !!photoHint
-  const name = p.fullName.trim()
+  const name = displayName(p.fullName)
   const headerClass = ['cv-header', photo || photoSlot ? 'has-photo' : 'no-photo', photoSlot && 'photo-ph'].filter(Boolean).join(' ')
   // Boş adda önizleme yer tutucuyu çizer; boy da ona göre.
   const metrics = nameMetrics(name || (placeholders ? NAME_PLACEHOLDER[ctx.lang] : ''))
@@ -452,11 +477,13 @@ export function CvSource({
   /** Fotoğraf yer tutucusunun yazısı ("Fotoğraf ekle"; baskıda gizli) */
   photoHint?: string
 }) {
-  const ctx: Ctx = { lang: cv.language, suggestions }
   // Bilinmeyen şablon (eski/bozuk kayıt) varsayılana, desteklenmeyen sütun sayısı desteklenene
   // düşer: çizim her zaman var olan bir şablonun gerçek düzenidir (cvStyles da aynı şablonu yükler).
   const template = getTemplate(cv.templateId)
+  const ctx: Ctx = { lang: cv.language, suggestions, dateFirst: template.datePosition === 'start' }
   const two = supportedColumns(template, cv.template.columns) === 2
+  // K2: yan sütun sağda (İkili). DOM'da ana akış önce yazılır; paginate sütunları bu sırayla kurar.
+  const sideEnd = two && template.sidePosition === 'end'
   // Boş bölüme önerilen kayıt da görünsün.
   const visible = new Set(visibleSections(cv))
   const sections = cv.sections.filter((s) => visible.has(s) || (!s.hidden && !!suggestions?.added?.get(s.id)?.length))
@@ -464,18 +491,23 @@ export function CvSource({
   const side = sections.filter((s) => sideIds.has(s.id))
   const main = sections.filter((s) => !sideIds.has(s.id))
 
+  const sideFlow = two && (
+    <div data-flow="side">
+      {side.map((s) => (
+        <SectionBlocks key={s.id} section={s} ctx={ctx} />
+      ))}
+    </div>
+  )
+  const className = ['cv', `tpl-${template.id}`, `cols-${two ? 2 : 1}`, `align-${cv.template.headerAlign === 'center' ? 'center' : 'left'}`, sideEnd && 'side-end']
+    .filter(Boolean)
+    .join(' ')
+
   return (
-    <div className={`cv tpl-${template.id} cols-${two ? 2 : 1} align-${cv.template.headerAlign === 'center' ? 'center' : 'left'}`}>
+    <div className={className}>
       <div data-flow="header">
         <Header cv={cv} ctx={ctx} placeholders={placeholders} photoHint={photoHint} />
       </div>
-      {two && (
-        <div data-flow="side">
-          {side.map((s) => (
-            <SectionBlocks key={s.id} section={s} ctx={ctx} />
-          ))}
-        </div>
-      )}
+      {!sideEnd && sideFlow}
       <div data-flow="main">
         {main.map((s) => (
           <SectionBlocks key={s.id} section={s} ctx={ctx} />
@@ -486,6 +518,7 @@ export function CvSource({
           </p>
         )}
       </div>
+      {sideEnd && sideFlow}
     </div>
   )
 }

@@ -3,7 +3,8 @@ import { PERSONAL_TEXT_FIELDS, TEXT_FIELDS } from '@/cv/fields'
 import { SECTION_TITLES } from '@/cv/locale'
 import type { AnyItem, Cv, CvLanguage, SectionType } from '@/cv/schema'
 import { sanitizeRichText } from '@/render/richtext'
-import { buildContactMasks, createMasker, hasPlaceholder, placeholdersIn, type Masker, type MaskSource } from './mask'
+import { buildContactMasks, createMasker, hasUnknownPlaceholder, placeholdersIn, type Masker, type MaskSource } from './mask'
+import { plain } from './ops'
 import { AiError, TranslateResultSchema, type TranslateRequest, type TranslateResult } from './types'
 
 /**
@@ -17,8 +18,18 @@ import { AiError, TranslateResultSchema, type TranslateRequest, type TranslateRe
  * Gizlilik (düzenleme yoluyla aynı): gizli bölüm ve kayıtlar gönderilmez
  * (yeni CV'ye çevrilmeden, olduğu gibi kopyalanır); metinlerde geçen ad,
  * iletişim bilgileri ve konum (verilirse referans kişiler de) ⟦…⟧ ile
- * maskelenir, yanıtta yerelde geri konur. Yer
- * tutucusu geri konamayan alan kaynak metniyle kalır ve işaretlenir.
+ * maskelenir, yanıtta yerelde geri konur. Yer tutucusu geri konamayan alan
+ * kaynak metniyle kalır ve işaretlenir.
+ *
+ * Konum (karar, 2026-11-19): kişinin kendi konumu (ve parçaları) her metinde
+ * ⟦LOCATION⟧ olarak maskeli gider; deneyimin konumu kişinin şehriyle aynıysa
+ * o alan da maskelidir ve model onu çeviremez ("İstanbul, Türkiye" EN CV'de
+ * olduğu gibi kalır). Ev konumunu çeviri için açık göndermek maskeleme
+ * sözünü bozardı; yer adları da çoğunlukla dilden dile aynı yazılır. Bu
+ * yüzden böyle alanlar gönderilmez ya da maskeli gider, sonuçta
+ * `locationKept` ile işaretlenir: onay listesinde "Konum çevrilmedi, kontrol
+ * et" görünür, kullanıcı gerekirse elle düzeltir. Yalnız yer tutucudan oluşan
+ * metin (çevrilecek sözcük yok) hiç gönderilmez.
  *
  * Anahtar biçimi: `${itemId}:${field}`, `personal:${field}`, `section:${id}:title`.
  */
@@ -42,6 +53,8 @@ export interface TranslatedEntry extends TranslationEntry {
   missing: boolean
   /** Yanıttaki kişisel bilgi yer tutucuları geri konamadı (kaybolmuş ya da uydurulmuş); kaynak metin kaldı */
   unrestored: boolean
+  /** Kişinin konumu maskeli gittiği için çevrilmeden kaldı (ya da hiç gönderilmedi); kullanıcı kontrol etmeli */
+  locationKept: boolean
 }
 
 export const personalKey = (field: string) => `personal:${field}`
@@ -110,7 +123,13 @@ export interface PreparedTranslation {
   masker: Masker
   /** anahtar → sağlayıcıya giden (maskeli) metin */
   sent: Map<string, string>
+  /** Yalnız yer tutucudan oluşan, gönderilmeyen metinler: anahtar → maskeli metin */
+  local?: Map<string, string>
 }
+
+/** Yer tutucular ve noktalama dışında çevrilecek harf var mı? */
+const hasWords = (masked: string) => /\p{L}/u.test(masked.replace(/⟦[A-Z]+(?:_\d+)?⟧/g, '').replace(/<[^>]*>/g, ''))
+const LOCATION_PLACEHOLDER = /⟦LOCATION(?:_\d+)?⟧/
 
 /**
  * Sağlayıcıya gidecek istek: her metinde kişinin adı, iletişim bilgileri ve
@@ -120,12 +139,18 @@ export interface PreparedTranslation {
 export function buildTranslateRequest(from: CvLanguage, to: CvLanguage, entries: TranslationEntry[], personal: MaskSource): PreparedTranslation {
   const masker = createMasker(buildContactMasks(personal))
   const sent = new Map<string, string>()
-  const items = entries.map((e) => {
+  const local = new Map<string, string>()
+  const items: TranslateRequest['items'] = []
+  for (const e of entries) {
     const text = masker.mask(e.text)
+    if (!hasWords(text)) {
+      local.set(e.key, text)
+      continue
+    }
     sent.set(e.key, text)
-    return { key: e.key, text, rich: e.rich }
-  })
-  return { request: { from, to, items }, masker, sent }
+    items.push({ key: e.key, text, rich: e.rich })
+  }
+  return { request: { from, to, items }, masker, sent, local }
 }
 
 const sameSet = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].every((x) => b.has(x))
@@ -138,19 +163,30 @@ const sameSet = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].
  * metinle kalır ve `unrestored` işaretlenir. Zengin metin, yer tutucular
  * geri konduktan sonra kısıtlı HTML'e süzülür (href içindeki bağlantı kaybolmasın).
  */
-export function mergeTranslations(entries: TranslationEntry[], result: TranslateResult, prepared: Pick<PreparedTranslation, 'masker' | 'sent'>): TranslatedEntry[] {
+export function mergeTranslations(
+  entries: TranslationEntry[],
+  result: TranslateResult,
+  prepared: Pick<PreparedTranslation, 'masker' | 'sent' | 'local'>,
+): TranslatedEntry[] {
   const parsed = TranslateResultSchema.safeParse(result)
   if (!parsed.success) throw new AiError('Çeviri yanıtı beklenen biçimde değil', 'invalid_response')
   const byKey = new Map(parsed.data.items.map((i) => [i.key, i.text]))
+  const known = prepared.masker.known()
   return entries.map((entry) => {
-    const text = byKey.get(entry.key)
-    if (text === undefined) return { ...entry, translated: entry.text, missing: true, unrestored: false }
-    const expected = placeholdersIn(prepared.sent.get(entry.key) ?? entry.text)
-    const restored = prepared.masker.unmask(text)
-    if (!sameSet(expected, placeholdersIn(text)) || hasPlaceholder(restored)) {
-      return { ...entry, translated: entry.text, missing: true, unrestored: true }
+    const kept = prepared.local?.get(entry.key)
+    if (kept !== undefined) {
+      return { ...entry, translated: entry.text, missing: false, unrestored: false, locationKept: LOCATION_PLACEHOLDER.test(kept) }
     }
-    return { ...entry, translated: entry.rich ? sanitizeRichText(restored) : restored, missing: false, unrestored: false }
+    const sent = prepared.sent.get(entry.key) ?? entry.text
+    const locationKept = LOCATION_PLACEHOLDER.test(sent)
+    const text = byKey.get(entry.key)
+    if (text === undefined) return { ...entry, translated: entry.text, missing: true, unrestored: false, locationKept }
+    // Gönderilen ve dönen yer tutucu kümeleri aynı olmalı; bozulmuş yazım ("⟦İSİM⟧", "[EMAIL]") reddedilir.
+    if (!sameSet(placeholdersIn(sent), placeholdersIn(text)) || hasUnknownPlaceholder(text, known)) {
+      return { ...entry, translated: entry.text, missing: true, unrestored: true, locationKept }
+    }
+    const restored = prepared.masker.unmask(text)
+    return { ...entry, translated: entry.rich ? sanitizeRichText(restored) : plain(restored), missing: false, unrestored: false, locationKept }
   })
 }
 

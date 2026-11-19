@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createCv } from '@/cv/factory'
 import { samplePersonal, sampleSections } from '@/cv/sample'
 import { templateSettingsFor } from '@/render/templates'
-import { detectLanguage, extractKeywords, matchJobAd, stem, tokenize } from './keywords'
+import { detectLanguage, extractKeywords, isAdHeading, matchJobAd, stem, stripAdHeadings, tokenize } from './keywords'
 import { cvPlainText } from './text'
 
 const AD_TR = `Frontend Geliştirici arıyoruz
@@ -113,6 +113,61 @@ describe('extractKeywords', () => {
 
   it('boş ilan', () => {
     expect(extractKeywords('   ', 'tr')).toEqual([])
+  })
+})
+
+describe('ilan bölüm başlıkları', () => {
+  const AD_HEADED_TR = `İŞ TANIMI
+Müşteri panelini React ve TypeScript ile geliştireceksin. React bileşenleri yazacaksın.
+ARADIĞIMIZ NİTELİKLER
+- Docker ve Kubernetes bilgisi
+GENEL NİTELİKLER
+- Askerlik hizmetini tamamlamış
+ÜCRET VE YAN HAKLAR
+- Yemek kartı, özel sağlık sigortası
+NELER SUNUYORUZ
+Esnek çalışma saatleri ve uzaktan çalışma imkânı
+HAKKIMIZDA
+Lacivert Yazılım bir ürün şirketidir.`
+
+  const AD_HEADED_EN = `ABOUT US
+Lacivert builds booking software.
+RESPONSIBILITIES
+You will build React components with TypeScript.
+Requirements: Docker, Kubernetes
+WHAT WE OFFER
+Remote work, Private health insurance
+Perks & Benefits:
+Gym membership
+About the role
+You will own the Design System.`
+
+  const headingWords = /^(iş|tanımı|aradığımız|nitelikler|genel|ücret|yan|haklar|neler|sunuyoruz|hakkımızda|about|us|responsibilities|requirements|what|we|offer|perks|benefits|role)$/i
+
+  it('büyük harfli ve bilinen başlıklar ile sözcükleri anahtar kelime olmaz', () => {
+    for (const [ad, lang] of [
+      [AD_HEADED_TR, 'tr'],
+      [AD_HEADED_EN, 'en'],
+    ] as const) {
+      const list = extractKeywords(ad, lang)
+      const all = terms(list)
+      for (const t of all) for (const w of t.split(' ')) expect(w, t).not.toMatch(headingWords)
+      expect(all).toEqual(expect.arrayContaining(['React', 'TypeScript', 'Docker', 'Kubernetes']))
+    }
+  })
+
+  it('isAdHeading: büyük harfli kısa satır başlık; kısaltma ve teknoloji satırı değil', () => {
+    for (const h of ['ÜCRET VE YAN HAKLAR', 'NELER SUNUYORUZ', 'PERKS', 'BENEFITS', 'ARADIĞIMIZ NİTELİKLER', 'İŞ TANIMI', 'WHAT WE OFFER:', 'Hakkımızda', 'Requirements:', '- About us', 'MİNİMUM KOŞULLAR']) {
+      expect(isAdHeading(h), h).toBe(true)
+    }
+    for (const t of ['SQL', 'AWS GCP', 'REACT DEVELOPER', 'React ve TypeScript bilen', 'NODE.JS, DOCKER', 'Yemek kartı']) {
+      expect(isAdHeading(t), t).toBe(false)
+    }
+  })
+
+  it('"Başlık: içerik" satırında yalnız başlık atılır', () => {
+    expect(stripAdHeadings('Requirements: Docker, Kubernetes\nAranan Nitelikler: React')).toBe('Docker, Kubernetes\nReact')
+    expect(stripAdHeadings('Lokasyon: İstanbul')).toBe('Lokasyon: İstanbul')
   })
 })
 

@@ -2,6 +2,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffec
 import type { Cv } from '@/cv/schema'
 import { readingText, type ReadingText } from './atsText'
 import type { SuggestionMap } from './CvMarkup'
+import { drawDocument } from './drawDocument'
 import { fontLoadQueries } from './fonts'
 import { paginate, type PaginateResult } from './paginate'
 import { whenPrintEnds } from './printEnd'
@@ -21,6 +22,10 @@ export interface CvFrameTarget {
 }
 
 export interface CvFrameHandle {
+  /**
+   * Güncel CV'yi çizip iframe'i yazdırır. Çizim yapılamadıysa (son çizim hata verdi, belge
+   * hazır değil) hiçbir şey basmaz ve reddeder: çağıran hatayı kullanıcıya göstermeli.
+   */
   print: (title: string) => Promise<void>
   /** Tarayıcı menüsünden yazdırma için son çizimin kopyası (bkz. printMirror.ts) */
   printMirror: () => HTMLElement | null
@@ -31,6 +36,11 @@ export const OWN_PRINT_ATTR = 'data-cv-own-print'
 
 /** Menü baskısı aynasının son çizimden ne kadar sonra hazırlanacağı (yazarken her tuşta kurulmasın). */
 const MIRROR_DELAY_MS = 250
+
+/** Yazı tipleri en çok bu kadar beklenir; sonra eldekiyle çizilir (takılan istek önizlemeyi dondurmaz). */
+export const FONT_TIMEOUT_MS = 4000
+/** Bir kez zaman aşımına uğradıktan sonraki çizimlerde bekleme: her tuşta 4 sn gecikme olmasın. */
+const FONT_RETRY_TIMEOUT_MS = 300
 
 interface Props {
   cv: Cv
@@ -50,6 +60,8 @@ interface Props {
   /** Değişince eski görünüm yenisinin üstünde solar (şablon/sütun geçişi) */
   crossfadeKey?: string
   onResult?: (result: PaginateResult) => void
+  /** Kendiliğinden (CV değişince) yapılan çizim hata verdi. Verilmezse hata konsola yazılır. */
+  onError?: (error: unknown) => void
   /** Her çizimden sonra basılacak metin, okunma sırasıyla (CV İnceleme) */
   onReadingText?: (text: ReadingText) => void
   onTargetClick?: (target: CvFrameTarget) => void
@@ -80,6 +92,7 @@ export const CvFrame = forwardRef<CvFrameHandle, Props>(function CvFrame(
     flash = null,
     crossfadeKey,
     onResult,
+    onError,
     onReadingText,
     onTargetClick,
     onScaleChange,
@@ -99,12 +112,12 @@ export const CvFrame = forwardRef<CvFrameHandle, Props>(function CvFrame(
   const [containerWidth, setContainerWidth] = useState(0)
   const pageCountRef = useRef(0)
   const [gate] = useState(createRenderGate)
-  const callbacks = useRef({ onResult, onReadingText, onTargetClick })
+  const callbacks = useRef({ onResult, onError, onReadingText, onTargetClick })
   // Vurgu ve parlama yeniden çizim gerektirmez; her çizimden sonra da yeniden uygulanır.
   const marks = useRef({ focusedItemId, flash, flashDone: 0 })
   // Son değerler her işlemeden sonra, aşağıdaki efektlerden (ve rAF'teki çizimden) önce yazılır.
   useLayoutEffect(() => {
-    callbacks.current = { onResult, onReadingText, onTargetClick }
+    callbacks.current = { onResult, onError, onReadingText, onTargetClick }
     marks.current.focusedItemId = focusedItemId
     marks.current.flash = flash
   })
@@ -116,12 +129,19 @@ export const CvFrame = forwardRef<CvFrameHandle, Props>(function CvFrame(
   const mirrorTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   // "PDF al" baskısı sürerken: pencere kapanınca başlığı ve işareti geri alır.
   const endPrint = useRef<(() => void) | null>(null)
+  // Son çizimin hatası (yazdırma bunu çağırana iletir); başarılı çizimde temizlenir.
+  const drawError = useRef<unknown>(null)
+  // Yazı tipleri zaman aşımına uğradıysa: sonraki çizimler kısa bekler, geç gelen yazı tipi yeniden çizdirir.
+  const slowFonts = useRef(false)
+  const [lateFonts, setLateFonts] = useState(0)
   useEffect(
     () => () => {
       clearTimeout(mirrorTimer.current)
       endPrint.current?.()
+      // Yazı tiplerini bekleyen çizim, bileşen kaldırıldıktan sonra belgeye ve depoya (onResult) yazmasın.
+      gate.invalidate()
     },
-    [],
+    [gate],
   )
 
   // İskelet bir kez yazılır; içerik sonradan değişir (titreme olmasın diye).
@@ -146,47 +166,57 @@ export const CvFrame = forwardRef<CvFrameHandle, Props>(function CvFrame(
     if (effectiveScale > 0) onScaleChange?.(effectiveScale)
   }, [effectiveScale, onScaleChange])
 
-  const draw = useCallback(async () => {
+  /** Çizer; belge hazır değilse ya da çizim yarıda bırakıldıysa (daha yenisi başladı, bileşen kalktı) false. */
+  const draw = useCallback(async (): Promise<boolean> => {
     const doc = iframeRef.current?.contentDocument
-    if (!doc || !doc.getElementById('cv-source')) return
+    if (!doc || !doc.getElementById('cv-source')) return false
     const token = gate.begin()
     if (crossfadeKey !== lastCrossfadeKey.current) {
       lastCrossfadeKey.current = crossfadeKey
       snapshotForCrossfade(doc)
     }
-    doc.documentElement.lang = cv.language
     doc.body.classList.toggle('interactive', interactive)
-    const styles = cvStyles(cv)
-    const styleEl = doc.getElementById('cv-styles')!
-    if (styleEl.textContent !== styles) styleEl.textContent = styles
-    doc.getElementById('cv-host')!.textContent = firstPageOnly
-      ? // Yalnız ilk sayfa görünür: iframe bir sayfa yüksekliğinde, gerisi taşar. Sayfaları gizlemek
-        // ölçümü bozardı (gizli sayfada her şey 0 yükseklik).
-        'html,body{overflow:hidden}#cv-pages{gap:0}.overflow-warning{outline:none}'
-      : '#cv-pages{--sheet-gap:24px;--sheet-shadow:0 1px 2px rgba(0,0,0,.06),0 6px 24px rgba(0,0,0,.08)}' +
-        // Kesikli "uzun kayıt" çerçevesi yalnız düzenlenebilir önizlemede (küçük resimde, telefonda değil).
-        (interactive ? '' : '.overflow-warning{outline:none}')
-
-    // Yazı tipleri ölçümden önce yüklenmeli; yoksa satır kırılımı sonradan değişir. Gövde
-    // ailesinin yanında şablonun başlık ve eş aralıklı aileleri de (bütün yüzleriyle) yüklenir.
+    // Gövde ailesinin yanında şablonun başlık ve eş aralıklı aileleri de (bütün yüzleriyle) yüklenir.
     const fonts = Object.values(cvFonts(getTemplate(cv.templateId), cv.template))
-    const sample = 'Aa ğüşıöçĞÜŞİÖÇ'
-    await Promise.all(
-      [...new Set(fonts.flatMap(fontLoadQueries))].map((query) => doc.fonts.load(query, sample).catch(() => [])),
+    // Sıra (stil → yazı tipleri → HTML → sayfalama) sunucudaki PDF ile ortak: drawDocument.ts.
+    const result = await drawDocument(
+      doc,
+      {
+        lang: cv.language,
+        styles: cvStyles(cv),
+        hostStyles: firstPageOnly
+          ? // Yalnız ilk sayfa görünür: iframe bir sayfa yüksekliğinde, gerisi taşar. Sayfaları gizlemek
+            // ölçümü bozardı (gizli sayfada her şey 0 yükseklik).
+            'html,body{overflow:hidden}#cv-pages{gap:0}.overflow-warning{outline:none}'
+          : '#cv-pages{--sheet-gap:24px;--sheet-shadow:0 1px 2px rgba(0,0,0,.06),0 6px 24px rgba(0,0,0,.08)}' +
+            // Kesikli "uzun kayıt" çerçevesi yalnız düzenlenebilir önizlemede (küçük resimde, telefonda değil).
+            (interactive ? '' : '.overflow-warning{outline:none}'),
+        html: renderCvSource(cv, { suggestions, placeholders, emptyHint, photoHint }),
+        fontQueries: fonts.flatMap(fontLoadQueries),
+        fontTimeoutMs: slowFonts.current ? FONT_RETRY_TIMEOUT_MS : FONT_TIMEOUT_MS,
+        previousPageCount: pageCountRef.current,
+      },
+      {
+        paginate,
+        isCurrent: () => gate.isCurrent(token),
+        onLateFonts: () => {
+          slowFonts.current = false
+          setLateFonts((n) => n + 1)
+        },
+      },
     )
-    if (!gate.isCurrent(token)) return
+    // Yarıda bırakıldı: daha yeni bir çizim başladı ya da bileşen kaldırıldı (jeton geçersiz).
+    if (!result || !gate.isCurrent(token)) return false
+    slowFonts.current = result.fontsTimedOut
     // Menü baskısı aynası üst belgede çizilir; şablonun aileleri orada da hazır olsun.
     if (!firstPageOnly) warmMirrorFonts(fonts)
-
-    doc.getElementById('cv-source')!.innerHTML = renderCvSource(cv, { suggestions, placeholders, emptyHint, photoHint })
-    const result = paginate(doc, { previousPageCount: pageCountRef.current })
     pageCountRef.current = result.pageCount
     // CV'deki bağlantılar klavye sırasına girmez (PDF al'dan sonra fazladan durak olmasın).
     doc.querySelectorAll('#cv-pages a').forEach((a) => a.setAttribute('tabindex', '-1'))
     applyMarks(doc, marks.current)
     fadeOutGhost(doc)
-    const pagesEl = doc.getElementById('cv-pages')!
-    setContentHeight(firstPageOnly ? PAGE_HEIGHT_PX : pagesEl.scrollHeight)
+    // Yükseklik sayfalama sırasında, animasyonlar kapalıyken ölçülür (yeni sayfanın belirme kayması katılmaz).
+    setContentHeight(firstPageOnly ? PAGE_HEIGHT_PX : result.contentHeight)
     gate.complete(token)
     const drawn = ++drawCount.current
     if (!firstPageOnly) {
@@ -199,9 +229,21 @@ export const CvFrame = forwardRef<CvFrameHandle, Props>(function CvFrame(
     }
     callbacks.current.onResult?.(result)
     callbacks.current.onReadingText?.(readingText(doc))
+    return true
   }, [cv, suggestions, interactive, placeholders, emptyHint, photoHint, firstPageOnly, crossfadeKey, gate])
 
-  const render = useCallback(() => gate.track(draw()), [draw, gate])
+  const render = useCallback(() => {
+    const run = draw()
+    run.then(
+      (drawn) => {
+        if (drawn) drawError.current = null
+      },
+      (error: unknown) => {
+        drawError.current = error
+      },
+    )
+    return gate.track(run)
+  }, [draw, gate])
 
   // Odak değişince yalnız sınıf güncellenir (yeniden çizim yok). Parlama çizimden sonra
   // uygulanır: kabul CV'yi de değiştirdiğinden eski DOM'a eklenen sınıf hemen kaybolurdu.
@@ -212,9 +254,16 @@ export const CvFrame = forwardRef<CvFrameHandle, Props>(function CvFrame(
 
   useEffect(() => {
     if (!ready) return
-    const frame = requestAnimationFrame(() => void render())
+    const frame = requestAnimationFrame(() => {
+      // Hata yutulmaz: çağırana (onError) iletilir, yoksa konsola yazılır.
+      render().catch((error: unknown) => {
+        if (callbacks.current.onError) callbacks.current.onError(error)
+        else console.error(error)
+      })
+    })
     return () => cancelAnimationFrame(frame)
-  }, [ready, loadCount, render])
+    // lateFonts: zaman aşımından sonra gelen yazı tipi ölçüleri değiştirir, yeniden çizilir.
+  }, [ready, loadCount, render, lateFonts])
 
   // Tıklanan kaydı editöre bildir.
   useEffect(() => {
@@ -267,11 +316,16 @@ export const CvFrame = forwardRef<CvFrameHandle, Props>(function CvFrame(
       async print(printTitle: string) {
         const win = iframeRef.current?.contentWindow
         const doc = iframeRef.current?.contentDocument
-        if (!win || !doc) return
+        if (!win || !doc) throw new Error('CV belgesi hazır değil; yazdırılamadı')
+        // Çizim hata verirse reddi çağırana gider (eski ya da boş belge basılmaz).
         await render()
         // Yazı tipleri yüklenirken daha yeni bir çizim başladıysa bu çizim yarıda kalmıştır:
-        // eski görünüm basılmasın diye en son çizim bitene kadar beklenir.
-        await gate.settled()
+        // eski görünüm basılmasın diye en son çizim bitene kadar beklenir. O da hata verdiyse
+        // ya da belge hiç çizilmediyse (iframe yüklenmedi) basılacak güncel bir şey yoktur.
+        const settled = await gate.settled()
+        if (!settled || drawCount.current === 0) {
+          throw new Error('CV çizilemedi; yazdırma iptal edildi', { cause: drawError.current ?? undefined })
+        }
         // Geçiş kopyası baskıya girmesin (CSS'te de @media print ile gizli).
         doc.getElementById(GHOST_ID)?.remove()
         // Önceki baskının penceresi kapanmış sayılır (geri alma bekliyorsa şimdi yapılır).

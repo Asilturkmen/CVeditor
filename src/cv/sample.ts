@@ -45,8 +45,8 @@ export function sampleSections(language: CvLanguage): Section[] {
     location: tr ? 'İstanbul' : 'Istanbul',
     dates: { start: ym(2023, 6), end: ym(2023, 9), current: false },
     description: tr
-      ? '<ul><li>Rezervasyon akışındaki form doğrulamalarını tek bir şema kütüphanesine taşıdım.</li><li>Uçtan uca testlerle kayıt akışındaki üç gerilemeyi yayından önce yakaladım.</li></ul>'
-      : '<ul><li>Moved booking-flow form validation into a single schema library.</li><li>Caught three regressions in the sign-up flow before release with end-to-end tests.</li></ul>',
+      ? '<ul><li>Rezervasyon akışındaki form doğrulamalarını tek bir şema kütüphanesine taşıdım.</li><li>Uçtan uca testlerle kayıt akışındaki üç gerilemeyi yayından önce yakaladım.</li><li>Ödeme sayfasının mobil görünümünü ekran okuyucularla test edip düzelttim.</li></ul>'
+      : '<ul><li>Moved booking-flow form validation into a single schema library.</li><li>Caught three regressions in the sign-up flow before release with end-to-end tests.</li><li>Tested and fixed the mobile checkout page with screen readers.</li></ul>',
   })
   Object.assign(experience.items[2], {
     position: tr ? 'Serbest Web Geliştirici' : 'Freelance Web Developer',
@@ -54,8 +54,8 @@ export function sampleSections(language: CvLanguage): Section[] {
     location: tr ? 'Uzaktan' : 'Remote',
     dates: { start: ym(2021, 9), end: ym(2023, 5), current: false },
     description: tr
-      ? '<ul><li>Yerel işletmeler için 9 web sitesi tasarlayıp yayına aldım.</li></ul>'
-      : '<ul><li>Designed and launched 9 websites for local businesses.</li></ul>',
+      ? '<ul><li>Yerel işletmeler için 9 web sitesi tasarlayıp yayına aldım.</li><li>Sitelerin bakımını aylık destek anlaşmalarıyla sürdürdüm.</li></ul>'
+      : '<ul><li>Designed and launched 9 websites for local businesses.</li><li>Maintained the sites under monthly support agreements.</li></ul>',
   })
 
   const education = createSection('education', 1)

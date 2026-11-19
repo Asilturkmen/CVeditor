@@ -80,9 +80,14 @@ describe('payload: gizlilik', () => {
     expect(contactFieldsForPrompt('LinkedIn ve GitHub bağlantılarımı kontrol et')).toEqual(['linkedin', 'github'])
     expect(contactFieldsForPrompt('İletişim bilgilerimi gözden geçir')).toEqual(['email', 'phone', 'location', 'website', 'linkedin', 'github'])
     expect(contactFieldsForPrompt('Özeti kısalt')).toEqual([])
-    const { payload } = buildEditPayload(sampleCv(), { kind: 'all' }, 'e-postamı güncelle')
+    // Anahtar kelime yalnız ipucu: kutu seçilmedikçe iletişim gitmez.
+    const hinted = buildEditPayload(sampleCv(), { kind: 'all' }, 'e-postamı güncelle').payload
+    expect(hinted.personal).toEqual({ headline: 'Frontend Geliştirici' })
+    expect(JSON.stringify(hinted)).not.toContain('deniz.aksoy@example.com')
+    // Açık seçim: bütün kişisel iletişim alanları özgün değerleriyle gider.
+    const { payload } = buildEditPayload(sampleCv(), { kind: 'all' }, 'e-postamı güncelle', { contact: true })
     expect(payload.personal.email).toBe('deniz.aksoy@example.com')
-    expect(payload.personal.phone).toBeUndefined()
+    expect(Object.keys(payload.personal).sort()).toEqual(['email', 'github', 'headline', 'linkedin', 'location', 'phone', 'website'])
   })
 
   it('metindeki ad, e-posta, telefon ve bağlantılar maskelenir ve geri konur', () => {
@@ -103,10 +108,11 @@ describe('payload: gizlilik', () => {
     expect(payload.placeholders).not.toContain('⟦WEBSITE⟧')
     // Geri koyma: her yazım özgün hâliyle döner.
     expect(unmask(sent)).toBe(rec(summary).content)
-    // Model metinde geçmeyen bir yer tutucu yazarsa (istek o alanla ilgili değil) geri konmaz: uydurma.
+    // Model metinde geçmeyen bir yer tutucu yazarsa (iletişim gönderilmedi) geri konmaz: uydurma.
     expect(unmask('Site: ⟦WEBSITE⟧')).toBe('Site: ⟦WEBSITE⟧')
-    // İstek web sitesiyle ilgiliyse kişisel bilgideki değer konur (o değer zaten açıkça gitti).
-    expect(buildEditPayload(cv, { kind: 'all' }, 'Web sitemi özete ekle').unmask('Site: ⟦WEBSITE⟧')).toBe('Site: denizaksoy.example.com')
+    expect(buildEditPayload(cv, { kind: 'all' }, 'Web sitemi özete ekle').restore('Site: ⟦WEBSITE⟧')).toBeNull()
+    // İletişim açıkça seçildiyse kişisel bilgideki değer konur (o değer zaten açıkça gitti).
+    expect(buildEditPayload(cv, { kind: 'all' }, 'Web sitemi özete ekle', { contact: true }).restore('Site: ⟦WEBSITE⟧')).toBe('Site: denizaksoy.example.com')
     expect(unmask('⟦BILINMEYEN⟧')).toBe('⟦BILINMEYEN⟧')
     expect(hasPlaceholder(unmask('⟦BILINMEYEN⟧'))).toBe(true)
   })
@@ -168,7 +174,7 @@ describe('payload: gizlilik', () => {
     expect(mail.mask('DENIZ.AKSOY@EXAMPLE.COM')).toBe('⟦EMAIL⟧')
   })
 
-  it('referansın e-posta ve telefonu yalnız istek onlarla ilgiliyse gider; değişikliği de ancak o zaman önerilir', () => {
+  it('referansın e-posta ve telefonu kendiliğinden gitmez: iletişim seçili ve kapsam referans bölümüyse; değişikliği de ancak o zaman önerilir', () => {
     const cv = sampleCv()
     const refs = createSection('references', 1)
     const ref = refs.items[0]
@@ -191,20 +197,25 @@ describe('payload: gizlilik', () => {
         { op: 'add', sectionId: refs.id, afterItemId: null, fields: { name: 'Yeni Kişi', email: 'uydurma@example.com' } },
       ],
     }
-    const blocked = operationsToSuggestions(cv, ops, plain.unmask, plain.payload)
+    const blocked = operationsToSuggestions(cv, ops, plain.restore, plain.payload)
     expect(blocked.dropped).toBe(2)
     expect(blocked.suggestions).toHaveLength(1)
     const added = blocked.suggestions[0]
     if (added.kind !== 'addItem') throw new Error('tür')
     expect(rec(added.item).email).toBe('')
 
-    const asked = buildEditPayload(cv, { kind: 'all' }, 'Referansların e-posta adreslerini kontrol et')
-    const askedRef = asked.payload.sections.find((s) => s.type === 'references')!.items[0]
-    expect(askedRef.email).toBe('ece@example.com')
-    expect(askedRef).not.toHaveProperty('phone')
-    const allowed = operationsToSuggestions(cv, ops, asked.unmask, asked.payload)
-    expect(allowed.suggestions.map((s) => (s.kind === 'field' ? s.field : s.kind))).toEqual(['email', 'addItem'])
-    expect(allowed.dropped).toBe(1)
+    // İletişim seçili ama kapsam Tüm CV: referansın iletişimi yine gitmez.
+    const all = buildEditPayload(cv, { kind: 'all' }, 'Referansların e-posta adreslerini kontrol et', { contact: true })
+    expect(all.payload.sections.find((s) => s.type === 'references')!.items[0]).not.toHaveProperty('email')
+    expect(JSON.stringify(all.payload.sections)).not.toContain('ece@example.com')
+    // İletişim seçili ve kapsam referans bölümü: gider, bölümün alan listesinde de görünür.
+    const asked = buildEditPayload(cv, { kind: 'section', sectionId: refs.id }, 'Referansların e-posta adreslerini kontrol et', { contact: true })
+    const askedSection = asked.payload.sections.find((s) => s.type === 'references')!
+    expect(askedSection.items[0]).toMatchObject({ email: 'ece@example.com', phone: '+90 555 111 22 33' })
+    expect(askedSection.fields.map((f) => f.key)).toEqual(['name', 'position', 'organization', 'email', 'phone'])
+    const allowed = operationsToSuggestions(cv, ops, asked.restore, asked.payload)
+    expect(allowed.suggestions.map((s) => (s.kind === 'field' ? s.field : s.kind))).toEqual(['email', 'phone', 'addItem'])
+    expect(allowed.dropped).toBe(0)
   })
 
   it('kişisel bilgi boşsa maske yok', () => {
@@ -244,10 +255,10 @@ describe('payload: konum ve referans maskesi', () => {
   it('konum istendiğinde kişisel alanda özgün değeriyle gider; model yer tutucuyu yazarsa tam değer konur', () => {
     const cv = sampleCv()
     for (const type of ['experience', 'education']) for (const item of itemsOf(cv, type)) rec(item).location = ''
-    const { payload, unmask } = buildEditPayload(cv, { kind: 'all' }, 'Adresimi güncelle')
+    const { payload, restore } = buildEditPayload(cv, { kind: 'all' }, 'Adresimi güncelle', { contact: true })
     expect(payload.personal.location).toBe('İzmir, Türkiye')
-    expect(unmask('⟦LOCATION⟧')).toBe('İzmir, Türkiye')
-    const ops = operationsToSuggestions(cv, { operations: [{ op: 'set', target: 'personal', field: 'location', value: 'Bornova, ⟦LOCATION⟧' }] }, unmask, payload)
+    expect(restore('⟦LOCATION⟧')).toBe('İzmir, Türkiye')
+    const ops = operationsToSuggestions(cv, { operations: [{ op: 'set', target: 'personal', field: 'location', value: 'Bornova, ⟦LOCATION⟧' }] }, restore, payload)
     expect(ops.suggestions[0]).toMatchObject({ kind: 'field', field: 'location', after: 'Bornova, İzmir, Türkiye' })
   })
 
@@ -286,7 +297,7 @@ describe('payload: konum ve referans maskesi', () => {
     cv.sections.push(refs)
     summaryOf(cv).content =
       '<p>ECE KAYA ve ece kaya ile çalıştım; İPEK IŞIK, IPEK ISIK, ipek ışık, i̇pek işik bana rehberlik etti. Ulaşmak için ece@example.com ya da 0555 111 22 33.</p>'
-    const { payload, unmask } = buildEditPayload(cv, { kind: 'all' }, 'Özeti düzelt')
+    const { payload, unmask, restore } = buildEditPayload(cv, { kind: 'all' }, 'Özeti düzelt')
     const sent = payload.sections.find((s) => s.type === 'summary')!.items[0].content as string
     expect(sent).not.toMatch(/ece|kaya|[iİı]pek|[iİı][sş][iİı]k|111 22 33/i)
     expect(sent).toContain('⟦REFNAME')
@@ -310,7 +321,7 @@ describe('payload: konum ve referans maskesi', () => {
           { op: 'set', target: itemsOf(cv, 'summary')[0].id, field: 'content', value: '<p>⟦REFNAME_9⟧ ile çalıştım.</p>' },
         ],
       },
-      unmask,
+      restore,
       payload,
     )
     expect(result.suggestions).toHaveLength(1)
@@ -344,8 +355,8 @@ describe('doğrulama', () => {
       { operations: 'yok' },
       { operations: [{ op: 'rename', target: 'a' }] },
       { operations: [{ op: 'set', target: 'a', field: 'b', value: 3 }] },
-      { operations: [{ op: 'add', sectionId: 's', fields: {} }] },
-      { operations: Array.from({ length: 41 }, () => ({ op: 'remove', sectionId: 's', itemId: 'i' })) },
+      { operations: [{ op: 'add', sectionId: 's', afterItemId: null, fields: 'x' }] },
+      { operations: [{ op: 'set', target: 'a', field: 'b', value: 'c', reason: 5 }] },
     ]
     for (const raw of bad) {
       expect(() => parseEditResult(raw)).toThrow(AiError)
@@ -366,15 +377,15 @@ describe('doğrulama', () => {
 })
 
 describe('işlemler → öneriler', () => {
-  const run = (cv: Cv, result: EditResult, scope: Parameters<typeof buildEditPayload>[1] = { kind: 'all' }, prompt = 'x') => {
-    const { payload, unmask } = buildEditPayload(cv, scope, prompt)
-    return operationsToSuggestions(cv, result, unmask, payload)
+  const run = (cv: Cv, result: EditResult, scope: Parameters<typeof buildEditPayload>[1] = { kind: 'all' }, prompt = 'x', contact = false) => {
+    const { payload, restore } = buildEditPayload(cv, scope, prompt, { contact })
+    return operationsToSuggestions(cv, result, restore, payload)
   }
 
   it('geçerli alan önerisi: zengin metin süzülür, yer tutucu geri konur', () => {
     const cv = sampleCv()
     const item = itemsOf(cv, 'experience')[0]
-    // İstek e-postayla ilgili: metinde geçmeyen ⟦EMAIL⟧ kişisel bilgideki değerle doldurulur.
+    // İletişim seçili: metinde geçmeyen ⟦EMAIL⟧ kişisel bilgideki değerle doldurulur.
     const { suggestions, dropped } = run(cv, {
       operations: [
         {
@@ -385,7 +396,7 @@ describe('işlemler → öneriler', () => {
           reason: 'Daha net',
         },
       ],
-    }, { kind: 'all' }, 'E-posta adresimi deneyime ekle')
+    }, { kind: 'all' }, 'E-posta adresimi deneyime ekle', true)
     expect(dropped).toBe(0)
     expect(suggestions).toHaveLength(1)
     const s = suggestions[0]
@@ -445,7 +456,9 @@ describe('işlemler → öneriler', () => {
       ],
     }
     expect(run(cv, ops).suggestions.map((s) => s.kind === 'field' && s.field)).toEqual(['headline'])
-    expect(run(cv, ops, { kind: 'all' }, 'e-posta adresimi değiştir').suggestions).toHaveLength(2)
+    // Anahtar kelime tek başına yetmez; açık seçim gerekir.
+    expect(run(cv, ops, { kind: 'all' }, 'e-posta adresimi değiştir').suggestions).toHaveLength(1)
+    expect(run(cv, ops, { kind: 'all' }, 'e-posta adresimi değiştir', true).suggestions).toHaveLength(2)
   })
 
   it('aynı alana ikinci işlem ve aynı kayda ikinci kaldırma atılır', () => {

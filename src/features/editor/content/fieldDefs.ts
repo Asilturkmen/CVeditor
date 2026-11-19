@@ -14,24 +14,24 @@ export interface FieldDef {
 }
 
 /**
- * Bölüm türüne göre kayıt alanları. Alan anahtarları şemadaki adlarla
- * aynıdır; yeni alan eklemek = şema + burası + CvMarkup.
+ * Bölüm türüne göre kayıt alanları, editörde görünme sırasıyla (ad ve kurum, tarih, konum, açıklama).
+ * Alan anahtarları şemadaki adlarla aynıdır; yeni alan eklemek = şema + burası + CvMarkup.
  */
 export const ITEM_FIELDS: Record<Exclude<SectionType, 'summary'>, FieldDef[]> = {
   experience: [
     { key: 'position', kind: 'text', label: () => m.f_position(), placeholder: () => m.ph_position() },
     { key: 'company', kind: 'text', label: () => m.f_company(), placeholder: () => m.ph_company() },
-    { key: 'location', kind: 'text', label: () => m.f_location(), placeholder: () => m.ph_location() },
     { key: 'dates', kind: 'range', label: () => m.f_dates(), wide: true },
+    { key: 'location', kind: 'text', label: () => m.f_location(), placeholder: () => m.ph_location() },
     { key: 'description', kind: 'rich', label: () => m.f_description(), placeholder: () => m.ph_experience_desc(), wide: true },
   ],
   education: [
     { key: 'school', kind: 'text', label: () => m.f_school(), placeholder: () => m.ph_school() },
-    { key: 'degree', kind: 'text', label: () => m.f_degree(), placeholder: () => m.ph_degree() },
     { key: 'field', kind: 'text', label: () => m.f_field(), placeholder: () => m.ph_field() },
-    { key: 'location', kind: 'text', label: () => m.f_location(), placeholder: () => m.ph_location() },
+    { key: 'degree', kind: 'text', label: () => m.f_degree(), placeholder: () => m.ph_degree() },
     { key: 'grade', kind: 'text', label: () => m.f_grade(), placeholder: () => m.ph_grade() },
     { key: 'dates', kind: 'range', label: () => m.f_dates(), wide: true },
+    { key: 'location', kind: 'text', label: () => m.f_location(), placeholder: () => m.ph_location() },
     { key: 'description', kind: 'rich', label: () => m.f_description(), placeholder: () => m.ph_education_desc(), wide: true },
   ],
   projects: [
@@ -64,8 +64,8 @@ export const ITEM_FIELDS: Record<Exclude<SectionType, 'summary'>, FieldDef[]> = 
   volunteer: [
     { key: 'role', kind: 'text', label: () => m.f_role(), placeholder: () => m.ph_volunteer_role() },
     { key: 'organization', kind: 'text', label: () => m.f_organization(), placeholder: () => m.ph_organization() },
-    { key: 'location', kind: 'text', label: () => m.f_location(), placeholder: () => m.ph_location() },
     { key: 'dates', kind: 'range', label: () => m.f_dates(), wide: true },
+    { key: 'location', kind: 'text', label: () => m.f_location(), placeholder: () => m.ph_location() },
     { key: 'description', kind: 'rich', label: () => m.f_description(), placeholder: () => m.ph_volunteer_desc(), wide: true },
   ],
   references: [

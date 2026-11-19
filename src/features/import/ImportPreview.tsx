@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Copy, FileText, FileUp, Info, Loader2, TriangleAlert } from 'lucide-react'
+import { Check, Copy, FileText, FileUp, ShieldCheck } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react'
 import type { ImportedCv } from '@/ai/importConvert'
 import { formatDateRange, formatYearMonth } from '@/cv/dates'
@@ -6,8 +6,13 @@ import { sectionTitle } from '@/cv/locale'
 import { samplePersonal, sampleSections } from '@/cv/sample'
 import type { AnyItem, CvLanguage, Personal, Section } from '@/cv/schema'
 import { Button } from '@/components/ui/Button'
-import { Field, Input } from '@/components/ui/Field'
-import { cn } from '@/lib/cn'
+import { Checkbox } from '@/components/ui/Checkbox'
+import { Disclosure, OutlineRow } from '@/components/ui/Disclosure'
+import { DropZone } from '@/components/ui/EmptyState'
+import { BareInput } from '@/components/ui/Field'
+import { FormRow, Group } from '@/components/ui/Group'
+import { InlineNotice } from '@/components/ui/Notice'
+import { Spinner } from '@/components/ui/Spinner'
 import { m } from '@/paraglide/messages'
 import { ITEM_FIELDS } from '@/features/editor/content/fieldDefs'
 import { itemLabel } from '@/features/editor/labels'
@@ -15,7 +20,8 @@ import { MAX_PDF_PAGES } from '@/ai/pdfText'
 import { getAiProvider } from '@/ai/provider'
 import { AiError } from '@/ai/types'
 import { aiErrorMessage } from '@/features/ai/aiErrorMessage'
-import { importErrorCode, readCvPdf, type ImportErrorCode, type ImportOutcome } from './runImport'
+import { NameMissingNote } from '@/features/ai/AiPayloadDialog'
+import { importErrorCode, prepareCvImport, sendCvImport, type ImportErrorCode, type ImportOutcome, type PreparedImport } from './runImport'
 
 export interface ImportSelection {
   personal: Personal
@@ -25,6 +31,8 @@ export interface ImportSelection {
 type Phase =
   | { kind: 'idle' }
   | { kind: 'reading'; fileName: string; step: 'pdf' | 'parse' }
+  /** Gerçek sağlayıcı: maskeli metin gösterilir, kullanıcı "Gönder" demeden hiçbir şey gitmez */
+  | { kind: 'confirm'; prepared: PreparedImport }
   /** detail: yapay zekâ hatasının iletisi (ağ, hız sınırı, parola…) */
   | { kind: 'error'; code: ImportErrorCode; detail?: string }
   | { kind: 'ready'; outcome: ImportOutcome | null }
@@ -39,21 +47,42 @@ const ERRORS: Record<ImportErrorCode, { title: () => string; body: () => string 
   parse: { title: () => m.imp_err_parse_title(), body: () => m.imp_err_parse_body() },
 }
 
+function failure(error: unknown): Phase {
+  console.warn('[içe aktarma]', error)
+  return error instanceof AiError
+    ? { kind: 'error', code: 'parse', detail: aiErrorMessage(error, m.imp_err_parse_body()) }
+    : { kind: 'error', code: importErrorCode(error) }
+}
+
 const languageName = (lang: CvLanguage) => (lang === 'tr' ? m.lang_tr() : m.lang_en())
 
 /**
- * Eski CV'yi içe aktarma: PDF'in metin katmanı tarayıcıda okunur, sağlayıcı
- * (şimdilik kurallı ayrıştırıcı) kayıtlara böler. Tahmin doğrudan
- * kaydedilmez: kullanıcı kayıt kayıt seçer, gerekirse alanları düzeltir.
+ * Grupların zemini: beyaz dialogda (`content`) gri dolgulu blok, gri sayfada (`window`) beyaz grup.
+ * Her iki durumda da kutu içinde kutu yok; satırlar arası ayırıcıyı grup koyar.
+ */
+type Surface = 'content' | 'window'
+const groupBody = (surface: Surface) => (surface === 'content' ? 'bg-fill-4 shadow-none' : undefined)
+
+/**
+ * Eski CV'yi içe aktarma: PDF'in metin katmanı tarayıcıda okunur ve maskelenir
+ * (CV İnceleme ile aynı işlev), sağlayıcı kayıtlara böler. Gerçek sağlayıcıda
+ * göndermeden önce onay adımı vardır: gidecek metnin tamamı gösterilir, ad
+ * bulunamadıysa uyarılır; "Gönder" denmeden hiçbir şey gitmez. Örnek sağlayıcı
+ * hiçbir yere göndermediği için doğrudan çalışır. Tahmin doğrudan kaydedilmez:
+ * kullanıcı kayıt kayıt seçer, gerekirse alanları düzeltir. Bulunan kayıtlar
+ * editördeki anahat satırlarıyla aynı dilde: işaret kutusu, ad, soluk tarih; açılınca alanlar.
  */
 export function ImportPreview({
   language,
   onChange,
   onLanguageChange,
+  surface = 'content',
 }: {
   language: CvLanguage
   onChange: (selection: ImportSelection | null) => void
   onLanguageChange?: (language: CvLanguage) => void
+  /** Bileşenin durduğu yüzey: dialog (`content`, varsayılan) ya da gri sayfa (`window`). */
+  surface?: Surface
 }) {
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' })
   const [data, setData] = useState<ImportedCv | null>(null)
@@ -64,31 +93,43 @@ export function ImportPreview({
 
   useEffect(() => () => abortRef.current?.abort(), [])
 
+  const send = useCallback(async (prepared: PreparedImport) => {
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+    setPhase({ kind: 'reading', fileName: prepared.fileName, step: 'parse' })
+    try {
+      const outcome = await sendCvImport(prepared, controller.signal)
+      if (controller.signal.aborted) return
+      setData(outcome.imported)
+      setExcluded(new Set())
+      setPhase({ kind: 'ready', outcome })
+    } catch (error) {
+      if (!controller.signal.aborted) setPhase(failure(error))
+    }
+  }, [])
+
   const read = useCallback(
     async (file: File) => {
       abortRef.current?.abort()
       const controller = new AbortController()
       abortRef.current = controller
       setPhase({ kind: 'reading', fileName: file.name, step: 'pdf' })
+      let prepared: PreparedImport
       try {
-        const outcome = await readCvPdf(file, language, controller.signal, (step) =>
+        prepared = await prepareCvImport(file, language, controller.signal, (step) =>
           setPhase({ kind: 'reading', fileName: file.name, step }),
         )
-        if (controller.signal.aborted) return
-        setData(outcome.imported)
-        setExcluded(new Set())
-        setPhase({ kind: 'ready', outcome })
       } catch (error) {
-        if (controller.signal.aborted) return
-        console.warn('[içe aktarma]', error)
-        setPhase(
-          error instanceof AiError
-            ? { kind: 'error', code: 'parse', detail: aiErrorMessage(error, m.imp_err_parse_body()) }
-            : { kind: 'error', code: importErrorCode(error) },
-        )
+        if (!controller.signal.aborted) setPhase(failure(error))
+        return
       }
+      if (controller.signal.aborted) return
+      // Gerçek sağlayıcıda metin kullanıcı onaylamadan gitmez.
+      if (!getAiProvider().isDemo) setPhase({ kind: 'confirm', prepared })
+      else await send(prepared)
     },
-    [language],
+    [language, send],
   )
 
   const showSample = () => {
@@ -138,69 +179,68 @@ export function ImportPreview({
 
   if (phase.kind === 'idle') {
     return (
-      <div
+      <DropZone
+        active={dragging}
         onDragOver={(e) => {
           e.preventDefault()
           setDragging(true)
         }}
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
-        className={cn(
-          'flex flex-col items-center gap-3 rounded-xl border border-dashed px-6 py-10 text-center transition-colors duration-150',
-          dragging ? 'border-accent bg-accent-soft' : 'border-line-strong',
-        )}
+        className="flex flex-col items-center px-6 py-8 text-center"
       >
-        <FileUp className={cn('size-6 transition-colors duration-150', dragging ? 'text-accent' : 'text-faint')} />
-        <div>
-          <p className="font-medium">{dragging ? m.imp_drop_here() : m.import_pick_title()}</p>
-          <p className="mt-0.5 text-sm text-muted">{m.import_pick_body()}</p>
-        </div>
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <Button variant="primary" onClick={() => inputRef.current?.click()}>
+        <FileUp aria-hidden strokeWidth={1.5} className={dragging ? 'size-8 text-accent' : 'size-8 text-fg-3'} />
+        <p className="mt-3 text-headline text-fg">{dragging ? m.imp_drop_here() : m.import_pick_title()}</p>
+        <p className="mt-1 max-w-90 text-body text-fg-2">{m.import_pick_body()}</p>
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
+          <Button size="lg" variant="primary" onClick={() => inputRef.current?.click()}>
             {m.import_pick_button()}
           </Button>
-          <span className="text-sm text-faint">{m.imp_drop_hint()}</span>
+          <span className="text-body text-fg-2">{m.imp_drop_hint()}</span>
         </div>
-        <p className="max-w-sm text-xs text-faint">{getAiProvider().isDemo ? m.imp_privacy() : m.imp_privacy_live()}</p>
-        <Button variant="ghost" size="sm" onClick={showSample}>
+        <p className="mt-4 max-w-[26rem] text-callout text-fg-2">{getAiProvider().isDemo ? m.imp_privacy() : m.imp_privacy_live()}</p>
+        <Button variant="plain" className="mt-2" onClick={showSample}>
           {m.import_sample_button()}
         </Button>
         {picker}
-      </div>
+      </DropZone>
     )
   }
 
   if (phase.kind === 'reading') {
     return (
-      <div className="flex flex-col items-center justify-center gap-3 py-14 text-sm text-muted" role="status">
-        <span className="flex items-center gap-2">
-          <Loader2 className="size-4 animate-spin" />
+      <div className="flex flex-col items-center justify-center gap-2 py-12 text-center" role="status">
+        <span className="flex items-center gap-2 text-body text-fg">
+          <Spinner />
           {phase.step === 'pdf' ? m.imp_reading_pdf() : m.imp_parsing()}
         </span>
-        <span className="max-w-full truncate text-xs text-faint">{phase.fileName}</span>
-        <Button variant="ghost" size="sm" onClick={reset}>
+        <span className="max-w-full text-callout break-all text-fg-2">{phase.fileName}</span>
+        <Button className="mt-2" onClick={reset}>
           {m.imp_cancel()}
         </Button>
       </div>
     )
   }
 
+  if (phase.kind === 'confirm') {
+    return <ImportConfirm prepared={phase.prepared} onSend={() => void send(phase.prepared)} onCancel={reset} />
+  }
+
   if (phase.kind === 'error') {
     const error = ERRORS[phase.code]
     return (
-      <div className="flex flex-col gap-4 animate-rise-in">
-        <div role="alert" className="flex gap-3 rounded-xl border border-danger/25 bg-danger-soft px-4 py-3.5">
-          <TriangleAlert className="mt-0.5 size-4 shrink-0 text-danger" />
-          <div className="min-w-0 text-[13px]">
-            <p className="font-semibold text-text">{error.title()}</p>
-            <p className="mt-0.5 text-muted">{phase.detail ?? error.body()}</p>
-          </div>
+      <div className="flex animate-rise-in flex-col gap-4">
+        <div role="alert">
+          <InlineNotice tone="danger">
+            <span className="block font-semibold">{error.title()}</span>
+            <span className="mt-0.5 block text-fg-2">{phase.detail ?? error.body()}</span>
+          </InlineNotice>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="primary" onClick={() => inputRef.current?.click()}>
+        <div className="flex flex-wrap gap-2 pl-6">
+          <Button size="lg" variant="primary" onClick={() => inputRef.current?.click()}>
             {m.imp_try_another()}
           </Button>
-          <Button variant="ghost" onClick={showSample}>
+          <Button size="lg" onClick={showSample}>
             {m.import_sample_button()}
           </Button>
         </div>
@@ -210,11 +250,10 @@ export function ImportPreview({
   }
 
   if (!data) return null
-  const outcome = phase.outcome
   return (
     <ImportReview
       language={language}
-      outcome={outcome}
+      outcome={phase.outcome}
       data={data}
       setData={setData}
       excluded={excluded}
@@ -222,6 +261,7 @@ export function ImportPreview({
       onPickAnother={() => inputRef.current?.click()}
       onLanguageChange={onLanguageChange}
       picker={picker}
+      surface={surface}
     />
   )
 }
@@ -238,6 +278,7 @@ function ImportReview({
   onPickAnother,
   onLanguageChange,
   picker,
+  surface,
 }: {
   language: CvLanguage
   outcome: ImportOutcome | null
@@ -248,16 +289,17 @@ function ImportReview({
   onPickAnother: () => void
   onLanguageChange?: (language: CvLanguage) => void
   picker: ReactNode
+  surface: Surface
 }) {
-  const [open, setOpen] = useState<Set<string>>(new Set())
+  const [open, setOpen] = useState<string | null>(null)
   const total = data.sections.reduce((n, s) => n + s.items.length, 0)
   const selected = total - excluded.size
   const detected = outcome?.detected
   const sure = detected && detected.confidence >= 0.6
   const mismatch = sure && detected.language !== language
 
-  const toggle = (set: (fn: (prev: Set<string>) => Set<string>) => void, id: string) =>
-    set((prev) => {
+  const toggleExcluded = (id: string) =>
+    setExcluded((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
@@ -289,92 +331,82 @@ function ImportReview({
   ).filter(([key]) => data.personal[key])
 
   return (
-    <div className="flex flex-col gap-4 animate-rise-in">
+    <div className="flex animate-rise-in flex-col gap-5">
       {outcome ? (
-        <>
-          <div className="flex gap-3 rounded-xl border border-line bg-surface-2 px-4 py-3 text-[13px] text-text">
-            <Info className="mt-0.5 size-4 shrink-0 text-muted" />
-            <p>{outcome.isDemo ? m.imp_banner_rules() : m.imp_banner_ai()}</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
-            <FileText className="size-4 shrink-0 text-faint" />
-            <span className="min-w-0 truncate text-muted">
-              {m.imp_file_meta({ file: outcome.fileName, pages: outcome.pageCount })}
+        <div className="flex flex-col gap-3">
+          <InlineNotice tone="info">
+            {outcome.isDemo ? m.imp_banner_rules() : m.imp_banner_ai()}
+            {outcome.dropped > 0 && <> {m.imp_dropped({ count: outcome.dropped })}</>}
+          </InlineNotice>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-body">
+            <FileText aria-hidden className="size-4 shrink-0 text-fg-2" />
+            <span className="min-w-0 break-all text-fg">{m.imp_file_meta({ file: outcome.fileName, pages: outcome.pageCount })}</span>
+            <span aria-hidden className="text-fg-3">
+              ·
             </span>
-            <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs text-muted" data-testid="import-language">
+            <span className="text-fg-2" data-testid="import-language">
               {sure ? m.imp_detected({ language: languageName(detected.language) }) : m.imp_detected_unsure()}
             </span>
-            <Button variant="ghost" size="sm" className="ml-auto" onClick={onPickAnother}>
+            <Button variant="plain" className="ml-auto -mr-3" onClick={onPickAnother}>
               {m.imp_try_another()}
             </Button>
           </div>
           {mismatch && (
-            <div
-              role="status"
-              className="flex flex-col gap-2.5 rounded-xl border border-warn/25 bg-warn-soft px-4 py-3 text-[13px] sm:flex-row sm:items-center"
-            >
-              <TriangleAlert className="hidden size-4 shrink-0 text-warn sm:block" />
-              <p className="min-w-0 flex-1">
+            <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <InlineNotice tone="warn" className="min-w-0 flex-1 basis-64">
                 {m.imp_mismatch({ detected: languageName(detected.language), selected: languageName(language) })}
-              </p>
+              </InlineNotice>
               {onLanguageChange && (
-                <Button size="sm" className="self-start sm:self-auto" onClick={() => onLanguageChange(detected.language)}>
+                <Button onClick={() => onLanguageChange(detected.language)}>
                   {detected.language === 'en' ? m.imp_switch_en() : m.imp_switch_tr()}
                 </Button>
               )}
             </div>
           )}
-        </>
+        </div>
       ) : (
-        <p className="text-sm text-muted">{m.import_found_sample()}</p>
+        <p className="text-body text-fg-2">{m.import_found_sample()}</p>
       )}
 
-      <div className="rounded-xl border border-line">
-        <div className="border-b border-line px-4 py-2.5 text-xs font-semibold tracking-wide text-muted uppercase">
-          {m.editor_personal_title()}
-        </div>
-        <div className="flex flex-col gap-3 px-4 py-3">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label={m.f_full_name()}>
-              {(id) => <Input id={id} value={data.personal.fullName} onChange={(e) => updatePersonal('fullName', e.target.value)} />}
-            </Field>
-            <Field label={m.f_headline()}>
-              {(id) => <Input id={id} value={data.personal.headline} onChange={(e) => updatePersonal('headline', e.target.value)} />}
-            </Field>
-          </div>
-          {contacts.length > 0 ? (
-            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[13px]" data-testid="import-contacts">
-              {contacts.map(([key, label]) => (
-                <div key={key} className="contents">
-                  <dt className="text-muted">{label}</dt>
-                  <dd className="min-w-0 truncate">{data.personal[key]}</dd>
-                </div>
-              ))}
-            </dl>
-          ) : (
-            <p className="text-[13px] text-faint">{m.imp_contacts_none()}</p>
-          )}
-        </div>
-      </div>
+      <Group title={m.editor_personal_title()} bodyClassName={groupBody(surface)}>
+        <FormRow label={m.f_full_name()}>
+          {(id) => <BareInput id={id} value={data.personal.fullName} onChange={(e) => updatePersonal('fullName', e.target.value)} />}
+        </FormRow>
+        <FormRow label={m.f_headline()}>
+          {(id) => <BareInput id={id} value={data.personal.headline} onChange={(e) => updatePersonal('headline', e.target.value)} />}
+        </FormRow>
+        {contacts.length > 0 ? (
+          <dl
+            className="grid grid-cols-[120px_minmax(0,1fr)] gap-x-3 gap-y-1.5 px-[var(--row-px)] py-3 text-body"
+            data-testid="import-contacts"
+          >
+            {contacts.map(([key, label]) => (
+              <div key={key} className="contents">
+                <dt className="text-fg-2">{label}</dt>
+                <dd className="min-w-0 pl-2 break-words text-fg">{data.personal[key]}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <p className="px-[var(--row-px)] py-3 text-body text-fg-2">{m.imp_contacts_none()}</p>
+        )}
+      </Group>
 
       {total > 0 ? (
-        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          {outcome && <p className="text-[13px] text-muted">{m.imp_review_hint()}</p>}
-          <p className="ml-auto text-xs text-faint tabular-nums">{m.imp_count({ selected, total })}</p>
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-3">
+          {outcome && <p className="min-w-0 flex-1 basis-64 text-callout text-fg-2">{m.imp_review_hint()}</p>}
+          <p className="ml-auto text-callout text-fg-2 tabular-nums">{m.imp_count({ selected, total })}</p>
         </div>
       ) : (
-        <div className="rounded-xl border border-warn/25 bg-warn-soft px-4 py-3 text-[13px]">
-          <p className="font-semibold">{m.imp_none_found_title()}</p>
-          <p className="mt-0.5 text-muted">{m.imp_none_found_body()}</p>
-        </div>
+        <InlineNotice tone="warn">
+          <span className="block font-semibold">{m.imp_none_found_title()}</span>
+          <span className="mt-0.5 block text-fg-2">{m.imp_none_found_body()}</span>
+        </InlineNotice>
       )}
 
       {data.sections.map((section) => (
-        <div key={section.id} className="rounded-xl border border-line" data-testid="import-section">
-          <div className="border-b border-line px-4 py-2.5 text-xs font-semibold tracking-wide text-muted uppercase">
-            {sectionTitle(language, section.type, section.title)}
-          </div>
-          <ul>
+        <div key={section.id} data-testid="import-section">
+          <Group title={sectionTitle(language, section.type, section.title)} count={section.items.length} bodyClassName={groupBody(surface)}>
             {(section.items as AnyItem[]).map((item) => (
               <ImportRecord
                 key={item.id}
@@ -382,13 +414,13 @@ function ImportReview({
                 item={item}
                 language={language}
                 on={!excluded.has(item.id)}
-                expanded={open.has(item.id)}
-                onToggle={() => toggle(setExcluded, item.id)}
-                onExpand={() => toggle(setOpen, item.id)}
+                expanded={open === item.id}
+                onToggle={() => toggleExcluded(item.id)}
+                onExpand={(next) => setOpen(next ? item.id : null)}
                 onField={(key, value) => updateItem(section.id, item.id, key, value)}
               />
             ))}
-          </ul>
+          </Group>
         </div>
       ))}
 
@@ -398,6 +430,11 @@ function ImportReview({
   )
 }
 
+/**
+ * Bulunan kayıt: editördeki anahat satırı (`OutlineRow`) — solda işaret kutusu, ad, soluk
+ * "N madde · tarih"; satıra tıklayınca yerinde açılır (bir anda tek kayıt), alanlar düzeltilebilir.
+ * İşareti kalkan kayıt üstü çizili görünür (CV'ye girmeyecek).
+ */
 function ImportRecord({
   section,
   item,
@@ -414,80 +451,101 @@ function ImportRecord({
   on: boolean
   expanded: boolean
   onToggle: () => void
-  onExpand: () => void
+  onExpand: (open: boolean) => void
   onField: (key: string, value: string) => void
 }) {
   const it = item as AnyItem & Record<string, unknown>
   const dates =
     'dates' in item ? formatDateRange(item.dates, language) : 'date' in item ? formatYearMonth(item.date, language) : ''
-  const fields = section.type === 'summary' ? [] : ITEM_FIELDS[section.type].filter((f) => f.kind !== 'rich' && f.kind !== 'range' && f.kind !== 'month')
+  const fields =
+    section.type === 'summary' ? [] : ITEM_FIELDS[section.type].filter((f) => f.kind !== 'rich' && f.kind !== 'range' && f.kind !== 'month')
   const rich = section.type === 'summary' ? (it.content as string) : ((it.description as string | undefined) ?? '')
   const bulletCount = (rich.match(/<li>/g) ?? []).length
-  const panelId = `imp-${item.id}`
+  const label = itemLabel(section.type, item) || m.editor_untitled()
+  const meta = [
+    section.type === 'skills' && it.name && it.keywords ? (it.keywords as string) : null,
+    bulletCount > 0 ? m.imp_bullets({ count: bulletCount }) : null,
+    dates || null,
+  ].filter(Boolean)
   return (
-    <li className="border-b border-line last:border-b-0" data-testid="import-record">
-      <div className="flex items-center hover:bg-surface-2">
-        <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 py-2.5 pr-2 pl-4 text-sm">
-          <input type="checkbox" className="sr-only" checked={on} onChange={onToggle} />
-          <span
-            aria-hidden
-            className={cn(
-              'flex size-4 shrink-0 items-center justify-center rounded border transition-colors duration-150',
-              on ? 'border-accent bg-accent text-accent-fg' : 'border-line-strong',
-            )}
-          >
-            {on && <Check className="size-3" strokeWidth={3} />}
+    <div data-testid="import-record">
+      <OutlineRow
+        open={expanded}
+        onOpenChange={onExpand}
+        hidden={!on}
+        leading={
+          <span className="flex h-11 items-center pr-1 pl-3">
+            <Checkbox checked={on} onCheckedChange={onToggle} aria-label={m.imp_include_label({ label })} />
           </span>
-          <span className={cn('min-w-0 flex-1 truncate', !on && 'text-faint line-through')}>
-            {itemLabel(section.type, item) || m.editor_untitled()}
-            {section.type === 'skills' && it.name && it.keywords ? (
-              <span className="text-faint"> · {it.keywords as string}</span>
-            ) : null}
-          </span>
-          {bulletCount > 0 && !expanded && (
-            <span className="hidden shrink-0 text-xs text-faint sm:inline">{m.imp_bullets({ count: bulletCount })}</span>
-          )}
-          {dates && <span className="shrink-0 text-xs text-faint tabular-nums">{dates}</span>}
-        </label>
-        <button
-          type="button"
-          onClick={onExpand}
-          aria-expanded={expanded}
-          aria-controls={panelId}
-          aria-label={expanded ? m.imp_fields_hide() : m.imp_fields_show()}
-          className="mr-2 rounded-md p-1.5 text-faint transition-colors hover:bg-surface-3 hover:text-text"
-        >
-          <ChevronDown className={cn('size-4 transition-transform duration-200', expanded && 'rotate-180')} />
-        </button>
-      </div>
-      {expanded && (
-        <div id={panelId} className="flex flex-col gap-3 border-t border-line bg-surface-2/50 px-4 py-3 animate-rise-in">
-          {fields.length > 0 && (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {fields.map((f) => (
-                <Field key={f.key} label={f.label()} className={f.wide ? 'sm:col-span-2' : undefined}>
-                  {(id) => (
-                    <Input
-                      id={id}
-                      value={(it[f.key] as string) ?? ''}
-                      placeholder={f.placeholder?.()}
-                      onChange={(e) => onField(f.key, e.target.value)}
-                    />
-                  )}
-                </Field>
-              ))}
-            </div>
-          )}
+        }
+        title={label}
+        meta={meta.length > 0 ? <span className="tabular-nums">{meta.join(' · ')}</span> : undefined}
+      >
+        <div className="flex flex-col">
+          {fields.map((f) => (
+            <FormRow key={f.key} label={f.label()}>
+              {(id) => (
+                <BareInput
+                  id={id}
+                  value={(it[f.key] as string) ?? ''}
+                  placeholder={f.placeholder?.()}
+                  onChange={(e) => onField(f.key, e.target.value)}
+                />
+              )}
+            </FormRow>
+          ))}
           {rich && (
             <div
-              className="text-[13px] leading-relaxed text-muted [&_li]:mt-0.5 [&_p+p]:mt-1.5 [&_p+ul]:mt-1.5 [&_ul]:list-disc [&_ul]:pl-4"
+              className="px-[var(--row-px)] pt-2 text-body break-words text-fg-2 [&_li]:mt-0.5 [&_p+p]:mt-1.5 [&_p+ul]:mt-1.5 [&_ul]:list-disc [&_ul]:pl-4"
+              // Alanlı kayıtta değer sütununda, özette (alansız) ad hizasında
+              style={{ paddingLeft: fields.length ? 'calc(var(--row-px) + 132px)' : 'calc(var(--row-px) + 50px)' }}
               // İçerik importConvert'te kaçışlanıp sanitizeRichText'ten geçti
               dangerouslySetInnerHTML={{ __html: rich }}
             />
           )}
         </div>
-      )}
-    </li>
+      </OutlineRow>
+    </div>
+  )
+}
+
+/**
+ * Gerçek sağlayıcıda gönderim onayı: yapay zekâya gidecek metnin tamamı (maskeli)
+ * olduğu gibi gösterilir. Ad güvenle bulunamadıysa uyarılır. "Gönder" denmeden
+ * hiçbir şey gitmez; "Vazgeç" dosya seçimine döner.
+ */
+function ImportConfirm({ prepared, onSend, onCancel }: { prepared: PreparedImport; onSend: () => void; onCancel: () => void }) {
+  return (
+    <div className="flex animate-rise-in flex-col gap-4" data-testid="import-confirm">
+      <p className="flex items-start gap-2 text-body text-fg">
+        <ShieldCheck aria-hidden className="mt-px size-4 shrink-0 text-fg-2" />
+        <span className="min-w-0">
+          <span className="block font-semibold">{m.imp_confirm_title()}</span>
+          <span className="mt-0.5 block text-fg-2">{m.imp_confirm_body()}</span>
+        </span>
+      </p>
+      {!prepared.masking.nameFound && <NameMissingNote className="mt-0">{m.imp_name_missing()}</NameMissingNote>}
+      <p className="flex flex-wrap items-center gap-2 text-body text-fg">
+        <FileText aria-hidden className="size-4 shrink-0 text-fg-2" />
+        <span className="min-w-0 break-all">{m.imp_file_meta({ file: prepared.fileName, pages: prepared.pageCount })}</span>
+      </p>
+      <pre
+        data-testid="import-send-text"
+        aria-label={m.imp_confirm_text_label()}
+        tabIndex={0}
+        className="max-h-72 overflow-auto rounded-xl bg-fill-4 px-4 py-3 font-mono text-callout break-words whitespace-pre-wrap text-fg"
+      >
+        {prepared.request.text}
+      </pre>
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button size="lg" onClick={onCancel}>
+          {m.common_cancel()}
+        </Button>
+        <Button size="lg" variant="primary" onClick={onSend}>
+          {m.imp_confirm_send()}
+        </Button>
+      </div>
+    </div>
   )
 }
 
@@ -503,21 +561,19 @@ function RawText({ text, defaultOpen }: { text: string; defaultOpen: boolean }) 
     }
   }
   return (
-    <details className="group rounded-xl border border-line" open={defaultOpen}>
-      <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-2.5 text-sm font-medium select-none hover:bg-surface-2 [&::-webkit-details-marker]:hidden">
-        <ChevronDown className="size-4 -rotate-90 text-faint transition-transform duration-200 group-open:rotate-0" />
-        {m.imp_raw_text()}
-        <span className="ml-auto hidden text-xs font-normal text-faint sm:inline">{m.imp_raw_hint()}</span>
-      </summary>
-      <div className="relative border-t border-line">
-        <Button variant="secondary" size="sm" className="absolute top-2 right-3" onClick={() => void copy()}>
-          {copied ? <Check /> : <Copy />}
-          {copied ? m.imp_copied() : m.imp_copy()}
-        </Button>
-        <pre className="max-h-64 overflow-auto px-4 py-3 pr-28 font-mono text-xs leading-relaxed whitespace-pre-wrap text-muted">
+    <Disclosure summary={m.imp_raw_text()} defaultOpen={defaultOpen} className="[&>button]:ml-2">
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3">
+          <p className="text-callout text-fg-2">{m.imp_raw_hint()}</p>
+          <Button size="sm" onClick={() => void copy()}>
+            {copied ? <Check /> : <Copy />}
+            {copied ? m.imp_copied() : m.imp_copy()}
+          </Button>
+        </div>
+        <pre className="max-h-64 overflow-auto rounded-xl bg-fill-4 px-4 py-3 font-mono text-callout break-words whitespace-pre-wrap text-fg">
           {text}
         </pre>
       </div>
-    </details>
+    </Disclosure>
   )
 }

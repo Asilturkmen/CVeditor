@@ -1,0 +1,119 @@
+/*
+ * Yalın (`yalin`): docs/sablonlar/SET-14.md Şablon 1. Çizgisiz, süssüz sade tek sütun; yalnız boşluk
+ * ve ağırlıkla kurulur (Resume.io Stockholm ailesi). Kare fotoğraf adın solunda. Varsayılan şablon.
+ * Her kural `.tpl-yalin` ile başlar. Sözleşme ve ortak varsayılanlar: base.css başı. Gövde boyu,
+ * satır aralığı ve boşluklar templateMeta.ts `scale` ile gelir (CSS'te yeniden çarpma).
+ *
+ * Ölçüler (orta boy, normal aralık): gövde 8.8 pt / 1.4; ad 21.5 pt; bölüm başlığı 10.5 pt;
+ * kenar 18 × 14 mm; blok 2.7 mm, bölüm 6 mm (başlıktan gövdeye de). Dikey boşluklar
+ * yalnız beş değerden: 6 / 2.7 / 1.6 / 1 / 0.5 mm. Örnek CV tek sayfa.
+ */
+
+/* ---------- Başlık ---------- */
+
+.tpl-yalin .cv-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0;
+  padding: var(--pad-y) var(--pad-x) var(--section-gap);
+}
+
+/*
+ * Fotoğraf solda; boşluğu fotoğrafın kendisinde (fotoğrafsızda `auto` sütun kapanır). Üst kenarı adın
+ * büyük harf yüksekliğine oturur (Inter, 2.45em adda satır kutusunun üstünden ~0.19em = 0.47em gövde).
+ */
+.tpl-yalin .cv-photo {
+  grid-column: 1;
+  grid-row: 1;
+  width: 22mm;
+  height: 22mm;
+  margin: 0.42em 5.5mm 0 0;
+  border-radius: 2mm;
+}
+
+.tpl-yalin .cv-identity {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.tpl-yalin .cv-name {
+  --name-size: 2.45em;
+  --name-room: 145mm;
+  --name-char: 0.62;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+
+.tpl-yalin .cv-headline {
+  margin-top: 1mm;
+  font-size: 1.12em;
+  font-weight: 400;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+.tpl-yalin .cv-contact {
+  margin-top: 1.6mm;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* Ortalı başlık: fotoğraf adın üstünde */
+.tpl-yalin.align-center .cv-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.tpl-yalin.align-center .cv-photo {
+  margin: 0 0 3.5mm;
+}
+
+/*
+ * Ortalı iletişim: satırlar dengeli; satır sonundaki gizli ayırıcının (K3) payı son öğeye de görünmez
+ * bir ayırıcı eklenip liste soldan o kadar içeri alınarak dengelenir (görünen metin tam ortada durur).
+ */
+.tpl-yalin.align-center .cv-contact {
+  text-wrap: balance;
+  padding-left: calc(0.57em + 1.2mm);
+}
+
+.tpl-yalin.align-center .cv-contact li:last-child::after {
+  content: ' ·';
+  padding-right: 1.2mm;
+  visibility: hidden;
+}
+
+/* ---------- Bölüm başlığı: iri, cümle düzeni, çizgisiz ---------- */
+
+.tpl-yalin .section-title {
+  font-size: 1.2em;
+  font-weight: 600;
+  line-height: 1.25;
+  text-transform: none;
+  letter-spacing: -0.005em;
+  color: var(--accent-ink);
+}
+
+.tpl-yalin .section-title + * {
+  margin-top: calc(1.6mm - var(--block-gap));
+}
+
+/* ---------- Kayıtlar ---------- */
+
+.tpl-yalin .entry-body {
+  margin-top: 1mm;
+}
+
+.tpl-yalin .rich li + li {
+  margin-top: 0.5mm;
+}
+
+.tpl-yalin .entry-skills + .entry-skills,
+.tpl-yalin .entry-languages + .entry-languages {
+  margin-top: calc(0.5mm - var(--block-gap));
+}

@@ -1,5 +1,8 @@
 # 10 şablon planı
 
+> **Not:** Bu belge eski 10 şablonlu sete aittir; güncel şartname `docs/sablonlar/SET-14.md`.
+
+
 > **Durum: uygulandı (2026-10-18).** Asil 5 kararın hepsini onayladı; 3 aşama tamamlandı, bağımsız incelemenin bulguları düzeltildi. Commit Asil'in onayını bekliyor.
 
 ## Bu plan nereden geldi

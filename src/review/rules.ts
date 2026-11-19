@@ -1,3 +1,4 @@
+import { BIRTHDATE_RE, phonesIn } from '@/ai/mask'
 import { MAX_PDF_PAGES, type PdfText } from '@/ai/pdfText'
 import { formatDateRange, isRangeInverted } from '@/cv/dates'
 import { SECTION_TITLES, sectionTitle } from '@/cv/locale'
@@ -68,13 +69,23 @@ export function isValidPhone(value: string): boolean {
   return PHONE_CHARS_RE.test(v) && digits >= 7 && digits <= 15
 }
 
-/** "site.com/yol", "https://site.com" biçiminde mi? Boşluk, eksik alan adı, garip protokol hatadır. */
+/** Alan adı etiketi (Unicode harfli: "çiçek"; tireyle başlamaz/bitmez) ve kök alan (".com", ".türkiye", "xn--..."). */
+const URL_HOST_RE = /^(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]{0,61}[\p{L}\p{N}])?\.)+(?:\p{L}{2,63}|xn--[a-z0-9-]{2,59})(?::\d{1,5})?$/iu
+
+/**
+ * "site.com/yol", "https://site.com", "çiçek.com.tr", "site.com:8080/yol"
+ * biçiminde mi? Boşluk, eksik alan adı (yalnız "localhost:3000" da), garip
+ * protokol hatadır. "site.com:8080" protokol sanılmaz: iki noktadan sonra
+ * rakam gelirse port'tur.
+ */
 export function isValidUrl(value: string): boolean {
   const v = value.trim()
   if (!v || /\s/.test(v)) return false
-  if (/^[a-z][a-z0-9+.-]*:/i.test(v) && !/^https?:\/\//i.test(v)) return false
+  if (/^[a-z][a-z0-9+.-]*:(?!\d)/i.test(v) && !/^https?:\/\//i.test(v)) return false
   const host = v.replace(/^https?:\/\//i, '').split(/[/?#]/)[0]
-  return /^([a-z0-9-]+\.)+[a-z]{2,}(:\d+)?$/i.test(host) && !host.startsWith('-')
+  const port = /:(\d+)$/.exec(host)
+  if (port && (Number(port[1]) < 1 || Number(port[1]) > 65535)) return false
+  return URL_HOST_RE.test(host)
 }
 
 interface Ctx {
@@ -599,7 +610,7 @@ function checkPhoto(ctx: Ctx) {
 // ================================================================ PDF
 
 const EMAIL_FIND = /[\p{L}\p{N}._%+-]+@[\p{L}\p{N}.-]+\.[a-z]{2,}/iu
-const PHONE_FIND = /(?:\+\d{1,3}[\s.-]?)?(?:\(?\d{3,4}\)?[\s.-]?)\d{3}[\s.-]?\d{2}[\s.-]?\d{2}\b|\+\d[\d\s().-]{8,}\d/
+// Telefon: maskeyle aynı tanım (src/ai/mask.ts `phonesIn`): TC kimlik no, tarih aralığı ve yıl dizisi telefon sayılmaz.
 const LINKEDIN_FIND = /linkedin\.com\/(in|pub)\/[\w%-]+/i
 
 const MONTHS = [
@@ -636,6 +647,11 @@ export function detectDateStyles(text: string): Map<DateStyle, { count: number; 
   return found
 }
 
+/** "Doğum Tarihi: 12.03.1995", "Date of birth: 12/03/1995", "DOB 1995" gibi etiketli doğum tarihleri çıkarılır (maskeyle aynı tanım). */
+export function withoutBirthDates(text: string): string {
+  return text.replace(new RegExp(BIRTHDATE_RE.source, BIRTHDATE_RE.flags), (found) => ' '.repeat(found.length))
+}
+
 const TR_HINT = /\b(ve|ile|bir|için|olarak|bu|da|de|gibi|üzerinde|deneyim|eğitim)\b/giu
 
 export function reviewPdfText(pdf: PdfText): Finding[] {
@@ -667,7 +683,7 @@ export function reviewPdfText(pdf: PdfText): Finding[] {
   } else {
     out.push({ id: 'pdf-email', category: 'iletisim', severity: 'problem', title: m.rv_pdf_email_missing(), detail: m.rv_pdf_email_missing_d() })
   }
-  const phone = text.match(PHONE_FIND)?.[0]
+  const phone = phonesIn(text)[0]
   out.push(
     phone
       ? { id: 'pdf-phone', category: 'iletisim', severity: 'ok', title: m.rv_pdf_phone_ok({ value: phone.trim() }), detail: m.rv_pdf_phone_ok_d() }
@@ -684,7 +700,9 @@ export function reviewPdfText(pdf: PdfText): Finding[] {
   const headings = new Map<SectionType, string>()
   for (const l of pdf.lines) {
     const t = l.text.replace(/[:：]\s*$/, '').trim()
-    if (!t || t.split(/\s+/).length > 5) continue
+    const words = t.split(/\s+/)
+    // Harf aralıklı başlık ("E Ğ İ T İ M") çok sözcüklü görünür
+    if (!t || (words.length > 5 && !words.every((w) => [...w].length === 1))) continue
     const type = standardTypeOf(t)
     if (type && !headings.has(type)) headings.set(type, t)
   }
@@ -695,8 +713,8 @@ export function reviewPdfText(pdf: PdfText): Finding[] {
   if (!headings.has('education')) out.push({ id: 'pdf-h-education', category: 'yapi', severity: 'warn', title: m.rv_pdf_heading_missing({ name: 'Eğitim / Education' }), detail: m.rv_pdf_heading_missing_d() })
   if (!headings.has('skills')) out.push({ id: 'pdf-h-skills', category: 'yapi', severity: 'info', title: m.rv_pdf_heading_missing({ name: 'Beceriler / Skills' }), detail: m.rv_need_skills_d() })
 
-  // ---- tarihler
-  const styles = detectDateStyles(text)
+  // ---- tarihler (doğum tarihi deneyim tarihi değildir: biçim karşılaştırmasına girmez)
+  const styles = detectDateStyles(withoutBirthDates(text))
   const specific = [...styles.entries()].filter(([s]) => s !== 'yyyy')
   const yearOnly = styles.get('yyyy')
   if (!styles.size) {
@@ -756,10 +774,16 @@ function checkGarbled(out: Finding[], text: string) {
  * (aralarında sayfanın en az %25'i) varsa iki sütun var demektir. Satırlar
  * akış sırasında bu iki küme arasında sık sık gidip geliyorsa ATS metni
  * karışık okur. Sağa yaslı kısa öğeler (tarih) kümelere girmez.
+ *
+ * Kümeler okuma satırlarından (`lines`: aynı satırdaki unvan/tarih tek satır)
+ * bulunur; gidip gelme ise içerik akışının HAM sırasından (`flow`) sayılır.
+ * `lines` sütunları ayrı okumak için yeniden sıralanmıştır, orada karışma
+ * hiç görünmez.
  */
 export function columnInterleaving(pdf: PdfText): { twoColumn: boolean; switches: number } {
   let twoColumn = false
   let switches = 0
+  const flow = pdf.flow ?? pdf.lines
   const pages = new Set(pdf.lines.map((l) => l.page))
   for (const page of pages) {
     const lines = pdf.lines.filter((l) => l.page === page && l.text.length >= 3)
@@ -779,7 +803,8 @@ export function columnInterleaving(pdf: PdfText): { twoColumn: boolean; switches
     if (rightLines.length < 4 || avg < 12) continue
     twoColumn = true
     let prev: 'L' | 'R' | null = null
-    for (const l of lines) {
+    for (const l of flow) {
+      if (l.page !== page || l.text.length < 3) continue
       const col = l.x >= right - 4 && l.x <= right + 40 ? 'R' : l.x >= left - 4 && l.x <= left + 40 ? 'L' : null
       if (!col) continue
       if (prev && col !== prev) switches++

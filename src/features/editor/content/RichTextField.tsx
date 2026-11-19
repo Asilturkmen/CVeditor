@@ -1,34 +1,67 @@
 import Placeholder from '@tiptap/extension-placeholder'
-import { EditorContent, useEditor, useEditorState } from '@tiptap/react'
+import { EditorContent, useEditor, useEditorState, type Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { Bold, Italic, Link2, List, Unlink } from 'lucide-react'
-import { Popover } from 'radix-ui'
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/Button'
-import { controlClass } from '@/components/ui/controlClass'
+import { controlClass, controlFocusedClass, controlOnContentClass } from '@/components/ui/controlClass'
 import { Input } from '@/components/ui/Field'
-import { Tooltip } from '@/components/ui/Tooltip'
+import { IconButton } from '@/components/ui/IconButton'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
 import { cn } from '@/lib/cn'
+import { formatShortcut } from '@/lib/platform'
 import { m } from '@/paraglide/messages'
 import { toHref } from '@/render/richtext'
 
+/** Düzenleyici eklentileri: yalnız madde, kalın, italik, bağlantı (TipTap'in kendi geçmişi kapalı). */
+function richExtensions(placeholder: string) {
+  return [
+    StarterKit.configure({
+      heading: false,
+      codeBlock: false,
+      code: false,
+      blockquote: false,
+      horizontalRule: false,
+      strike: false,
+      orderedList: false,
+      underline: false,
+      undoRedo: false,
+      link: { openOnClick: false, autolink: true, defaultProtocol: 'https', HTMLAttributes: { rel: null, target: null } },
+    }),
+    Placeholder.configure({ placeholder }),
+  ]
+}
+
 /**
- * Açıklama düzenleyici: yalnız madde, kalın, italik, bağlantı. Renk ve
- * boyut şablondan gelir. Geri al/yinele editörün ortak geçmişindedir
- * (TipTap'in kendi geçmişi kapalı), böylece Ctrl+Z her alanda aynı çalışır.
+ * Açıklama düzenleyici: yalnız madde, kalın, italik, bağlantı. Renk ve boyut şablondan gelir.
+ * Geri al/yinele editörün ortak geçmişindedir (TipTap'in kendi geçmişi kapalı), böylece Ctrl+Z her
+ * alanda aynı çalışır; dışarıdan gelen değişiklik (geri al, öneri kabulü) düzenleyiciye yansır.
+ *
+ * `variant`:
+ * - `bare` (inspector grubu içinde): çerçevesiz. Üstte 36px satır (solda etiket, sağda biçim
+ *   düğmeleri), altında metin; odakta metin bölgesine içe 2px vurgu halkası. Kutu içinde kutu yok.
+ * - `framed` (grup dışı, ör. çeviri penceresi): tek başına alan görünümü.
+ *
+ * Eklenti listesi ve düzenleyici bir kez kurulur: her çizimde yeni `StarterKit.configure()` vermek
+ * TipTap'e "seçenekler değişti" dedirtir ve her tuşta düzenleyiciyi yeniden yapılandırır.
  */
-export function RichTextField({
+export const RichTextField = memo(function RichTextField({
   value,
   onChange,
   placeholder,
   id,
   label,
+  variant = 'framed',
+  showLabel = true,
 }: {
   value: string
   onChange: (html: string) => void
   placeholder?: string
   id?: string
   label: string
+  variant?: 'framed' | 'bare'
+  /** `bare`: etiketi biçim satırının solunda göster (özet gibi başlığı zaten görünen yerde kapat). */
+  showLabel?: boolean
 }) {
   // Düzenleyici bir kez kurulur; onUpdate her zaman en son onChange'i çağırsın.
   const onChangeRef = useRef(onChange)
@@ -36,31 +69,21 @@ export function RichTextField({
     onChangeRef.current = onChange
   })
 
-  const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        heading: false,
-        codeBlock: false,
-        code: false,
-        blockquote: false,
-        horizontalRule: false,
-        strike: false,
-        orderedList: false,
-        underline: false,
-        undoRedo: false,
-        link: { openOnClick: false, autolink: true, defaultProtocol: 'https', HTMLAttributes: { rel: null, target: null } },
-      }),
-      Placeholder.configure({ placeholder: placeholder ?? '' }),
-    ],
-    content: value,
-    editorProps: {
-      attributes: { 'aria-label': label, ...(id ? { id } : {}), role: 'textbox', 'aria-multiline': 'true' },
+  const extensions = useMemo(() => richExtensions(placeholder ?? ''), [placeholder])
+  const editor = useEditor(
+    {
+      extensions,
+      content: value,
+      editorProps: {
+        attributes: { 'aria-label': label, ...(id ? { id } : {}), role: 'textbox', 'aria-multiline': 'true' },
+      },
+      onUpdate({ editor }) {
+        const html = editor.isEmpty ? '' : editor.getHTML()
+        onChangeRef.current(html)
+      },
     },
-    onUpdate({ editor }) {
-      const html = editor.isEmpty ? '' : editor.getHTML()
-      onChangeRef.current(html)
-    },
-  })
+    [extensions, label, id],
+  )
 
   // Dışarıdan gelen değişiklik (geri al, öneri kabulü) düzenleyiciye yansır.
   useEffect(() => {
@@ -80,79 +103,97 @@ export function RichTextField({
     }),
   })
 
-  return (
-    <div
-      className={cn(
-        controlClass,
-        'rich-editor overflow-hidden p-0 text-sm',
-        state?.focused && 'border-accent ring-3 ring-accent/15',
-      )}
-    >
-      <div className="flex items-center gap-0.5 border-b border-line bg-surface-2/60 px-1.5 py-1">
-        <ToolButton
-          label={m.rich_bold()}
-          shortcut="Ctrl+B"
-          active={state?.bold}
-          onClick={() => editor?.chain().focus().toggleBold().run()}
+  const toolbar = (
+    <div role="toolbar" aria-label={m.rich_toolbar({ name: label })} className="flex shrink-0 items-center gap-1">
+      <ToolButton
+        label={m.rich_bold()}
+        shortcut={formatShortcut('Ctrl+B')}
+        active={state?.bold}
+        onClick={() => editor?.chain().focus().toggleBold().run()}
+        icon={<Bold />}
+      />
+      <ToolButton
+        label={m.rich_italic()}
+        shortcut={formatShortcut('Ctrl+I')}
+        active={state?.italic}
+        onClick={() => editor?.chain().focus().toggleItalic().run()}
+        icon={<Italic />}
+      />
+      <ToolButton
+        label={m.rich_bullets()}
+        shortcut={formatShortcut('Ctrl+Shift+8')}
+        active={state?.list}
+        onClick={() => editor?.chain().focus().toggleBulletList().run()}
+        icon={<List />}
+      />
+      <LinkButton editor={editor} active={state?.link ?? false} />
+    </div>
+  )
+
+  if (variant === 'bare') {
+    return (
+      <div className="rich-editor min-w-0">
+        <div className="flex min-h-9 items-center gap-2 pr-[calc(var(--row-px)-4px)] pl-[var(--row-px)]">
+          <span className={cn('min-w-0 flex-1 text-body text-fg-2', !showLabel && 'sr-only')} aria-hidden>
+            {label}
+          </span>
+          {toolbar}
+        </div>
+        <div
+          className={cn(
+            'mx-[calc(var(--row-px)-12px)] mb-1 cursor-text rounded-lg text-fg transition-shadow duration-150',
+            state?.focused && 'shadow-[inset_0_0_0_2px_var(--accent)]',
+          )}
+          onMouseDown={(e) => {
+            // Metnin altındaki boş yere tıklamak da düzenleyiciyi odaklar.
+            if (e.target === e.currentTarget) {
+              e.preventDefault()
+              editor?.commands.focus('end')
+            }
+          }}
         >
-          <Bold />
-        </ToolButton>
-        <ToolButton
-          label={m.rich_italic()}
-          shortcut="Ctrl+I"
-          active={state?.italic}
-          onClick={() => editor?.chain().focus().toggleItalic().run()}
-        >
-          <Italic />
-        </ToolButton>
-        <ToolButton
-          label={m.rich_bullets()}
-          shortcut="Ctrl+Shift+8"
-          active={state?.list}
-          onClick={() => editor?.chain().focus().toggleBulletList().run()}
-        >
-          <List />
-        </ToolButton>
-        <LinkButton editor={editor} active={state?.link ?? false} />
+          <EditorContent editor={editor} />
+        </div>
       </div>
+    )
+  }
+
+  return (
+    <div className={cn(controlClass, 'rich-editor overflow-hidden p-0', state?.focused && controlFocusedClass)}>
+      <div className="flex items-center gap-1 border-b border-separator px-1.5 py-1">{toolbar}</div>
       <EditorContent editor={editor} />
     </div>
   )
-}
+})
 
 function ToolButton({
   label,
   shortcut,
   active,
   onClick,
-  children,
+  icon,
 }: {
   label: string
   shortcut?: string
   active?: boolean
   onClick: () => void
-  children: ReactNode
+  icon: React.ReactNode
 }) {
   return (
-    <Tooltip content={shortcut ? `${label} · ${shortcut}` : label}>
-      <button
-        type="button"
-        aria-label={label}
-        aria-pressed={active}
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={onClick}
-        className={cn(
-          'inline-flex size-7 items-center justify-center rounded-md transition-colors [&_svg]:size-3.5',
-          active ? 'bg-surface text-text shadow-sm ring-1 ring-line' : 'text-muted hover:bg-surface hover:text-text',
-        )}
-      >
-        {children}
-      </button>
-    </Tooltip>
+    <IconButton
+      label={label}
+      shortcut={shortcut}
+      icon={icon}
+      active={active}
+      aria-pressed={active}
+      // Düğmeye basmak düzenleyicideki seçimi bozmasın.
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={onClick}
+    />
   )
 }
 
-function LinkButton({ editor, active }: { editor: ReturnType<typeof useEditor>; active: boolean }) {
+function LinkButton({ editor, active }: { editor: Editor | null; active: boolean }) {
   const [open, setOpen] = useState(false)
   const [url, setUrl] = useState('')
 
@@ -170,73 +211,57 @@ function LinkButton({ editor, active }: { editor: ReturnType<typeof useEditor>; 
   }
 
   return (
-    <Popover.Root
+    <Popover
       open={open}
       onOpenChange={(next) => {
         setOpen(next)
         if (next) setUrl((editor?.getAttributes('link').href as string | undefined) ?? '')
       }}
     >
-      <Tooltip content={m.rich_link()}>
-        <Popover.Trigger asChild>
-          <button
-            type="button"
-            aria-label={m.rich_link()}
-            aria-pressed={active}
-            onMouseDown={(e) => e.preventDefault()}
-            className={cn(
-              'inline-flex size-7 items-center justify-center rounded-md transition-colors [&_svg]:size-3.5',
-              active ? 'bg-surface text-text shadow-sm ring-1 ring-line' : 'text-muted hover:bg-surface hover:text-text',
-            )}
-          >
-            <Link2 />
-          </button>
-        </Popover.Trigger>
-      </Tooltip>
-      <Popover.Portal>
-        <Popover.Content
-          align="start"
-          sideOffset={6}
-          className="pop z-50 w-72 rounded-xl border border-line bg-surface p-2.5 shadow-md"
-          onOpenAutoFocus={(e) => e.preventDefault()}
+      <PopoverTrigger asChild>
+        <IconButton
+          label={m.rich_link()}
+          icon={<Link2 />}
+          active={active}
+          aria-pressed={active}
+          onMouseDown={(e) => e.preventDefault()}
+        />
+      </PopoverTrigger>
+      <PopoverContent align="end" aria-label={m.rich_link()} className="w-80 p-3">
+        <form
+          className="flex flex-col gap-2"
+          onSubmit={(e) => {
+            e.preventDefault()
+            apply()
+          }}
         >
-          <form
-            className="flex gap-1.5"
-            onSubmit={(e) => {
-              e.preventDefault()
-              apply()
-            }}
-          >
+          <div className="flex items-center gap-2">
             <Input
               autoFocus
+              controlSize="sm"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder={m.ph_website()}
               aria-label={m.rich_link_url()}
-              className="h-8"
+              className={controlOnContentClass}
             />
-            <Button type="submit" size="sm" variant="primary" className="h-8">
+            {active && (
+              <IconButton
+                label={m.rich_unlink()}
+                icon={<Unlink />}
+                onClick={() => {
+                  editor?.chain().focus().extendMarkRange('link').unsetLink().run()
+                  setOpen(false)
+                }}
+              />
+            )}
+            <Button type="submit" variant="primary">
               {m.common_ok()}
             </Button>
-            {active && (
-              <Tooltip content={m.rich_unlink()}>
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  className="size-8"
-                  aria-label={m.rich_unlink()}
-                  onClick={() => {
-                    editor?.chain().focus().extendMarkRange('link').unsetLink().run()
-                    setOpen(false)
-                  }}
-                >
-                  <Unlink />
-                </Button>
-              </Tooltip>
-            )}
-          </form>
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
+          </div>
+          <p className="text-callout text-fg-2">{m.rich_link_keys()}</p>
+        </form>
+      </PopoverContent>
+    </Popover>
   )
 }

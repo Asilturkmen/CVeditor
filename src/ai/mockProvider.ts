@@ -222,6 +222,8 @@ function delay<T>(value: () => T, ms: number, signal: AbortSignal): Promise<T> {
  *   { "password": "deneme" }  → parola ister; doğru parola girilene dek her çağrı 'unauthorized'
  *   { "fail": "rate_limited" } → her çağrı bu hata koduyla döner
  *   { "malformed": true }     → her çağrı şemaya uymayan bir yanıt döndürür (doğrulama hatası)
+ *   { "live": true }          → arayüz gerçek sağlayıcı varmış gibi davranır (isDemo: false): "Örnek"
+ *                               rozetleri kalkar, içe aktarmada gönderim onayı çıkar. İstek yine hiçbir yere gitmez.
  * Bayrak yoksa (varsayılan) parola istenmez, hata üretilmez.
  */
 export const MOCK_FLAGS_KEY = 'cveditor:mockAi'
@@ -231,6 +233,8 @@ interface MockFlags {
   fail?: AiErrorCode
   /** Yanıt şemaya uymayan bir nesne olur (doğrulama yolunu denemek için) */
   malformed?: boolean
+  /** Arayüzde gerçek sağlayıcı gibi görün (onay adımlarını denemek için) */
+  live?: boolean
 }
 
 function mockFlags(): MockFlags {
@@ -262,7 +266,9 @@ function guarded<T>(value: () => T): () => T {
 
 export const mockProvider: AiProvider = {
   id: 'mock',
-  isDemo: true,
+  get isDemo() {
+    return !mockFlags().live
+  },
   get requiresAuth() {
     return !!mockFlags().password
   },
