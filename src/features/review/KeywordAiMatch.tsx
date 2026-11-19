@@ -90,10 +90,10 @@ export function KeywordAiMatch({ match, cv, pdf, jobAd }: { match: KeywordMatch;
           {result.related.length > 0 && (
             <TermList title={m.rv_kw_ai_related()} count={result.related.length} hint={m.rv_kw_ai_related_hint()}>
               {result.related.map((r) => (
-                <TermChip key={r.term} present aria-label={m.rv_kw_ai_pair({ term: r.term, cvTerm: r.cvTerm })}>
-                  <span className="break-all">{r.term}</span>
-                  <ArrowRight className="size-3.5 shrink-0 text-fg-2" aria-hidden />
-                  <span className="break-all text-fg-2">{r.cvTerm}</span>
+                <TermChip key={r.term} aria-label={m.rv_kw_ai_pair({ term: r.term, cvTerm: r.cvTerm })}>
+                  <span>{r.term}</span>
+                  <ArrowRight className="mx-1 inline size-3.5 align-[-2px] text-fg-2" aria-hidden />
+                  <span className="text-fg-2">{r.cvTerm}</span>
                 </TermChip>
               ))}
             </TermList>
@@ -101,18 +101,17 @@ export function KeywordAiMatch({ match, cv, pdf, jobAd }: { match: KeywordMatch;
           {result.missing.length > 0 && (
             <TermList title={m.rv_kw_missing()} count={result.missing.length}>
               {result.missing.map((term) => (
-                <TermChip key={term} present={false}>
-                  <span className="break-all">{term}</span>
+                <TermChip key={term}>
+                  <span>{term}</span>
                 </TermChip>
               ))}
             </TermList>
           )}
           {result.matched.length > 0 && (
-            <TermList title={m.rv_kw_present()} count={result.matched.length}>
+            <TermList title={m.rv_kw_present()} count={result.matched.length} icon={<Check className="text-ok" />}>
               {result.matched.map((term) => (
-                <TermChip key={term} present>
-                  <Check className="size-3.5 shrink-0 text-ok" aria-hidden />
-                  <span className="break-all">{term}</span>
+                <TermChip key={term}>
+                  <span>{term}</span>
                 </TermChip>
               ))}
             </TermList>

@@ -95,6 +95,140 @@ describe('sayfalama: başlık taşması raporlanır', () => {
   })
 })
 
+/**
+ * Düzen taklidi: sütun 0'dan COL_H'ye; sütundaki bloklar alt alta dizilir (aralık yok). Bir öğenin
+ * yüksekliği `data-h`'si, yoksa (ya da bölünmüş parçaysa) çocuklarının toplamı.
+ */
+const COL_H = 1000
+
+function mockFlow() {
+  const height = (el: Element): number =>
+    el.hasAttribute('data-h') && !el.classList.contains('is-split')
+      ? Number(el.getAttribute('data-h'))
+      : Array.from(el.children).reduce((sum, c) => sum + height(c), 0)
+  const box = (el: Element): DOMRect => {
+    if (el.classList.contains('page')) return rect(0, 0, PAGE.width, PAGE.height)
+    if (el.classList.contains('col')) return rect(0, 0, 300, COL_H)
+    const parent = el.parentElement
+    if (!parent) return rect(0, 0, 300, height(el))
+    let top = box(parent).top
+    for (let s = el.previousElementSibling; s; s = s.previousElementSibling) top += height(s)
+    return rect(0, top, 300, height(el))
+  }
+  vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+    return box(this)
+  })
+  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(COL_H)
+  vi.spyOn(window, 'getComputedStyle').mockReturnValue({ paddingTop: '0px', paddingBottom: '0px' } as CSSStyleDeclaration)
+}
+
+const heading = (sec: string, h = 30) =>
+  `<h2 class="section-title" data-block="" data-keep-with-next="" data-section-id="${sec}" data-h="${h}"><span>${sec}</span></h2>`
+const line = (sec: string, id: string, h = 20) =>
+  `<div class="entry entry-skills" data-block="" data-section-id="${sec}" data-item-id="${id}" data-h="${h}"><div class="entry-line">${id}</div></div>`
+const filler = (id: string, h: number) =>
+  `<div class="entry entry-experience" data-block="" data-section-id="deneyim" data-item-id="${id}" data-h="${h}"><div class="entry-head">${id}</div></div>`
+const lines = (sec: string, ids: string[], h = 20) => heading(sec) + ids.map((id) => line(sec, id, h)).join('')
+/** Bir sayfadan uzun kayıt: başlık + `bullets` madde (her biri `h` px). */
+const long = (id: string, bullets: number, h = 100) =>
+  `<div class="entry entry-experience" data-block="" data-section-id="deneyim" data-item-id="${id}"><div class="entry-head" data-h="30">${id}</div><div class="entry-body rich"><ul>${Array.from(
+    { length: bullets },
+    (_, i) => `<li data-h="${h}">${id}-${i + 1}</li>`,
+  ).join('')}</ul></div></div>`
+
+/** Her sayfanın ana sütunu: bölüm başlığı "#<bölüm>", kayıt kimliği, bölünmüş parçada maddeler. */
+function layout(source: string) {
+  mockFlow()
+  const doc = shell(`<div data-flow="main">${source}</div>`)
+  const result = paginate(doc)
+  const pages = Array.from(doc.querySelectorAll('#cv-pages > .page')).map((page) =>
+    Array.from(page.querySelectorAll('.col-main > *')).flatMap((el) =>
+      el.hasAttribute('data-keep-with-next')
+        ? [`#${el.getAttribute('data-section-id')}`]
+        : el.classList.contains('is-split')
+          ? [`${el.getAttribute('data-item-id')}[${el.querySelectorAll('li').length}]`]
+          : [el.getAttribute('data-item-id')!],
+    ),
+  )
+  return { result, pages }
+}
+
+describe('sayfalama: satır dizilerinde yetim ve dul (SET-14 §5.5)', () => {
+  it('dibe tek satır düşecekse başlık ve satır sonraki sayfaya geçer (yetim)', () => {
+    const { pages } = layout(filler('f', 940) + lines('beceri', ['a', 'b', 'c']))
+    expect(pages).toEqual([['f'], ['#beceri', 'a', 'b', 'c']])
+  })
+
+  it('son satır tek başına sonraki sayfaya düşmez; önceki sayfada 2 satır kalır (dul)', () => {
+    const { pages } = layout(filler('f', 900) + lines('beceri', ['a', 'b', 'c', 'd']))
+    expect(pages).toEqual([['f', '#beceri', 'a', 'b'], ['c', 'd']])
+  })
+
+  it('iki satırlık bölüm (Diller: Türkçe, İngilizce) bölünmez, başlığıyla taşınır', () => {
+    const { pages } = layout(filler('f', 940) + lines('diller', ['tr', 'en']))
+    expect(pages).toEqual([['f'], ['#diller', 'tr', 'en']])
+  })
+
+  it('üç satırlık bölüm 2+1 bölünmez (Araçlar satırı başlıksız sayfada kalmaz)', () => {
+    const { pages } = layout(filler('f', 920) + lines('beceri', ['diller', 'catilar', 'araclar']))
+    expect(pages).toEqual([['f'], ['#beceri', 'diller', 'catilar', 'araclar']])
+  })
+
+  it('her iki sayfada 2+ satır kalıyorsa dokunulmaz', () => {
+    const { pages } = layout(filler('f', 900) + lines('beceri', ['a', 'b', 'c', 'd', 'e', 'f2', 'g']))
+    expect(pages).toEqual([['f', '#beceri', 'a', 'b', 'c'], ['d', 'e', 'f2', 'g']])
+  })
+
+  it('sonraki bölüm ayrı dizidir: bölümler arası sayfa sonu kural dışı', () => {
+    const { pages } = layout(filler('f', 870) + lines('beceri', ['a', 'b']) + lines('diller', ['tr', 'en']))
+    // beceri: 870+30+40 = 940; diller başlığı + tr = 990 sığar, en sığmaz → tr yetim, başlığıyla taşınır.
+    expect(pages).toEqual([['f', '#beceri', 'a', 'b'], ['#diller', 'tr', 'en']])
+  })
+
+  it('önceki sayfada başka içerik kalmayacaksa taşınmaz (boş sayfa yok)', () => {
+    const { pages, result } = layout(heading('beceri') + line('beceri', 'a', 960) + line('beceri', 'b'))
+    expect(pages).toEqual([['#beceri', 'a'], ['b']])
+    expect(result.pageCount).toBe(2)
+  })
+
+  it('satır olmayan kayıtlar (deneyim) bu kurala girmez', () => {
+    const { pages } = layout(filler('f', 900) + heading('deneyim') + filler('e1', 40) + filler('e2', 40))
+    expect(pages).toEqual([['f', '#deneyim', 'e1'], ['e2']])
+  })
+
+  it('tek sütunda iki sayfalık uzun dizi: hiçbir sayfada tek satır yok, satır kaybolmaz', () => {
+    const ids = Array.from({ length: 60 }, (_, i) => `s${i}`)
+    const { pages } = layout(filler('f', 450) + lines('beceri', ids))
+    expect(pages.flat().filter((x) => x.startsWith('s'))).toEqual(ids)
+    for (const page of pages) {
+      const count = page.filter((x) => x.startsWith('s')).length
+      expect(count === 0 || count >= 2).toBe(true)
+    }
+    expect(pages.every((p) => p.length > 0)).toBe(true)
+  })
+})
+
+describe('sayfalama: bölünen kayıtta yetim ve dul madde (SET-14 §5.5)', () => {
+  it('son madde sonraki sayfada tek kalmaz', () => {
+    // 60 + 30 + 9×100 = 990: 9 madde sığar, 10. madde tek kalırdı → 8 + 2.
+    const { pages, result } = layout(filler('f', 60) + long('x', 10))
+    expect(pages).toEqual([['f', 'x[8]'], ['x[2]']])
+    expect(result.oversized).toEqual([{ sectionId: 'deneyim', itemId: 'x' }])
+  })
+
+  it('ilk parçada tek madde kalacaksa kayıt sonraki sayfadan başlar', () => {
+    const { pages } = layout(filler('f', 800) + long('x', 12))
+    expect(pages).toEqual([['f'], ['x[9]'], ['x[3]']])
+  })
+
+  it('taze sayfada bile sığmayan maddeler: döngü yok, her madde bir kez', () => {
+    // Başlık taze ilk sayfada kalır (orada da sığmayacaktı); maddeler birer sayfada.
+    const { pages, result } = layout(long('x', 2, 980))
+    expect(pages).toEqual([['x[0]'], ['x[1]'], ['x[1]']])
+    expect(result.pageCount).toBe(3)
+  })
+})
+
 describe('sayfalama: ölçüm animasyondan etkilenmez', () => {
   it('bütün ölçümler #cv-pages[data-measuring] altında yapılır; bitince öznitelik kalkar', () => {
     const doc = shell(

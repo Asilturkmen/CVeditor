@@ -301,6 +301,7 @@ export const PreviewPane = forwardRef<
   const pageCount = useEditorUi((s) => s.pageCount)
   const oversized = useEditorUi((s) => s.oversized)
   const clipped = useEditorUi((s) => s.clipped)
+  const headerClipped = useEditorUi((s) => s.headerClipped)
   const reveal = useEditorUi((s) => s.reveal)
   const flash = useEditorUi((s) => s.flash)
   const storedFit = useCanvas((s) => s.fitMode)
@@ -341,7 +342,7 @@ export const PreviewPane = forwardRef<
   const onResult = useCallback(
     (r: PaginateResult) => {
       drawFailed.current = false
-      setPagination({ pageCount: r.pageCount, oversized: r.oversized, clipped: r.clipped })
+      setPagination({ pageCount: r.pageCount, oversized: r.oversized, clipped: r.clipped, headerClipped: r.headerClipped })
       markDrawn()
     },
     [setPagination, markDrawn],
@@ -479,6 +480,8 @@ export const PreviewPane = forwardRef<
   }, [readOnly, setFitMode, setZoom])
 
   const warnings = oversizedLabels(cv, oversized)
+  // Taşan başlık da `clipped` sayılır; o durumda paragraf uyarısı değil başlığa özgü uyarı gösterilir.
+  const clippedText = headerClipped ? m.header_clipped_body() : m.clipped_body()
 
   return (
     <div ref={canvasRef} data-canvas className="relative h-full min-h-0 overflow-hidden bg-canvas">
@@ -524,7 +527,7 @@ export const PreviewPane = forwardRef<
           ? (warnings.length > 0 || clipped) && (
               <FloatingNotice tone="warn" role="alert" className="max-w-[min(100%,560px)] animate-rise-in">
                 {warnings.length > 0 && m.ai2_oversized_mobile({ count: warnings.length, names: warnings.map((w) => w.label).join(', ') })}
-                {clipped && <span className="block text-danger">{m.clipped_body()}</span>}
+                {clipped && <span className="block text-danger">{clippedText}</span>}
               </FloatingNotice>
             )
           : (warnings.length > 0 || clipped) && (
@@ -551,7 +554,7 @@ export const PreviewPane = forwardRef<
                     ))}
                   </>
                 )}
-                {clipped && <span className={cn(warnings.length > 0 && 'mt-1 block', 'text-danger')}>{m.clipped_body()}</span>}
+                {clipped && <span className={cn(warnings.length > 0 && 'mt-1 block', 'text-danger')}>{clippedText}</span>}
               </FloatingNotice>
             )}
       </div>

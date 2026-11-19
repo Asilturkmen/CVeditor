@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createCv } from '@/cv/factory'
 import { samplePersonal, sampleSections } from '@/cv/sample'
 import type { Cv } from '@/cv/schema'
-import { CvFrame, FONT_TIMEOUT_MS, OWN_PRINT_ATTR, type CvFrameHandle } from './CvFrame'
+import { COALESCE_MS, CvFrame, FONT_TIMEOUT_MS, MAX_DEFER_MS, OWN_PRINT_ATTR, type CvFrameHandle } from './CvFrame'
 import type { PaginateResult } from './paginate'
 import { templateSettingsFor } from './templates'
 
@@ -73,6 +73,11 @@ async function tick(ms = 20) {
   await act(async () => {
     await vi.advanceTimersByTimeAsync(ms)
   })
+}
+
+/** CV az önce (yazarken olduğu gibi) değiştiyse çizim ertelenir (COALESCE_MS): erteleme + çizim kadar ilerletir. */
+async function tickAfterChange() {
+  await tick(COALESCE_MS + 20)
 }
 
 beforeEach(() => {
@@ -162,12 +167,53 @@ describe('CvFrame: çizim', () => {
     await tick()
     const stale = fontLoads.splice(0)
     await mount({ cv: sampleCv('Yeni Ad'), onResult }, ref)
-    await tick()
+    await tickAfterChange()
     for (const load of [...stale, ...fontLoads]) load.resolve([{}])
     await tick()
     expect(onResult).toHaveBeenCalledTimes(1)
     expect(pagesText()).toContain('Yeni Ad')
     expect(pagesText()).not.toContain('Eski Ad')
+  })
+
+  it('yazarken arka arkaya gelen değişiklikler tek çizimde birleşir; son değişiklikten kısa süre sonra önizleme güncel', async () => {
+    const onResult = vi.fn()
+    const ref = await mount({ cv: sampleCv('Ad 0'), onResult })
+    await loadFrame()
+    await tick()
+    expect(onResult).toHaveBeenCalledTimes(1)
+    // Duraklamadan sonraki ilk değişiklik hemen çizilir.
+    await tick(500)
+    await mount({ cv: sampleCv('Ad 1'), onResult }, ref)
+    await tick()
+    expect(onResult).toHaveBeenCalledTimes(2)
+    expect(pagesText()).toContain('Ad 1')
+    // Tuş aralığıyla (40 ms) gelen değişiklikler beklenir…
+    for (let i = 2; i <= 6; i++) {
+      await mount({ cv: sampleCv(`Ad ${i}`), onResult }, ref)
+      await tick(40)
+    }
+    expect(onResult).toHaveBeenCalledTimes(2)
+    // …son değişiklikten sonra tek çizim, yalnız son CV.
+    await tick(COALESCE_MS)
+    expect(onResult).toHaveBeenCalledTimes(3)
+    expect(pagesText()).toContain('Ad 6')
+    await tick(500)
+    expect(onResult).toHaveBeenCalledTimes(3)
+  })
+
+  it('hiç duraklamadan yazarken de önizleme en geç MAX_DEFER_MS bayat kalır', async () => {
+    const onResult = vi.fn()
+    const ref = await mount({ cv: sampleCv('Ad 0'), onResult })
+    await loadFrame()
+    await tick()
+    let i = 0
+    // Tuşlar 50 ms arayla, MAX_DEFER_MS'in iki katı süre boyunca.
+    while (i * 50 < MAX_DEFER_MS * 2) {
+      i++
+      await mount({ cv: sampleCv(`Ad ${i}`), onResult }, ref)
+      await tick(50)
+    }
+    expect(onResult.mock.calls.length).toBeGreaterThanOrEqual(2)
   })
 
   it('çizim hatası yutulmaz: onError\'a gider; önceki çizim belgede kalır', async () => {
@@ -179,7 +225,7 @@ describe('CvFrame: çizim', () => {
     expect(onResult).toHaveBeenCalledTimes(1)
     const broken = { ...sampleCv('Bozuk Kayıt'), sections: null } as unknown as Cv
     await mount({ cv: broken, onResult, onError }, ref)
-    await tick()
+    await tickAfterChange()
     expect(onError).toHaveBeenCalledTimes(1)
     expect(onError.mock.calls[0][0]).toBeInstanceOf(Error)
     expect(onResult).toHaveBeenCalledTimes(1)
@@ -191,7 +237,7 @@ describe('CvFrame: çizim', () => {
     await loadFrame()
     await tick()
     await mount({ cv: { ...sampleCv(), sections: null } as unknown as Cv }, ref)
-    await tick()
+    await tickAfterChange()
     expect(logged.mock.calls.some(([first]) => first instanceof Error)).toBe(true)
   })
 })
@@ -232,7 +278,7 @@ describe('CvFrame: yazdırma', () => {
     expect(pagesText()).toContain('Deniz Aksoy')
     const print = spyPrint()
     await mount({ cv: { ...sampleCv('Yeni Ad'), sections: null } as unknown as Cv, onError }, ref)
-    await tick()
+    await tickAfterChange()
     // Belgede hâlâ eski CV duruyor; güncel CV çizilemedi.
     expect(pagesText()).toContain('Deniz Aksoy')
 
@@ -269,7 +315,7 @@ describe('CvFrame: yazdırma', () => {
     })
     // …o sırada CV bozuk bir hâle değişir: daha yeni çizim başlar ve hata verir.
     await mount({ cv: { ...sampleCv(), sections: null } as unknown as Cv, onError }, ref)
-    await tick()
+    await tickAfterChange()
     for (const load of fontLoads) load.resolve([{}])
     await tick()
     await act(async () => {

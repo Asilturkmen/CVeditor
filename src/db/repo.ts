@@ -76,10 +76,6 @@ export async function restoreCv(cv: Cv): Promise<boolean> {
   })
 }
 
-export async function countCvs(): Promise<number> {
-  return db.cvs.count()
-}
-
 export async function allCvs(): Promise<Cv[]> {
   return db.cvs.orderBy('updatedAt').reverse().toArray()
 }

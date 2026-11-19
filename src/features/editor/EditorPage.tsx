@@ -47,7 +47,7 @@ import { cn } from '@/lib/cn'
 import { usePrefs } from '@/lib/prefs'
 import { useChanged } from '@/lib/useChanged'
 import { useMediaQuery } from '@/lib/useMediaQuery'
-import { exportPdf } from '@/lib/pdfExport'
+import { exportPdf, pdfServerAvailable } from '@/lib/pdfExport'
 import type { OversizedBlock } from '@/render/paginate'
 import { m } from '@/paraglide/messages'
 import { OWN_PRINT_ATTR, type CvFrameHandle } from '@/render/CvFrame'
@@ -599,6 +599,21 @@ let mountSeq = 0
  * Editörden çıkıldı ama son değişiklikler yazılamadı (çıkış koruması atlandıysa son güvenlik ağı):
  * CV bellekte tutulur, kullanıcı uyarılır ve yedeğini indirebilir.
  */
+/** PDF sunucusu var mı (düğmenin ipucu için): sunucu varsa PDF doğrudan iner, yoksa yazdır penceresi açılır. */
+function usePdfServer(): boolean {
+  const [available, setAvailable] = useState(false)
+  useEffect(() => {
+    let alive = true
+    void pdfServerAvailable().then((ok) => {
+      if (alive) setAvailable(ok)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
+  return available
+}
+
 function warnUnsavedLeft() {
   // Yedek, uyarı anındaki CV'dir: bu arada başka bir CV açılsa da indirilen o olmaz.
   const snapshot = useEditor.getState().cv
@@ -654,6 +669,7 @@ export function EditorPage() {
   const [translating, setTranslating] = useState(false)
   const frameRef = useRef<CvFrameHandle>(null)
   const narrow = useMediaQuery('(max-width: 899px)')
+  const pdfServer = usePdfServer()
 
   useEffect(() => {
     let cancelled = false
@@ -938,7 +954,7 @@ export function EditorPage() {
               </MenuItem>
             </MenuContent>
           </Menu>
-          <Tooltip content={m.pdf_hint()} shortcut="Ctrl+P">
+          <Tooltip content={pdfServer ? m.pdf_hint_server() : m.pdf_hint()} shortcut="Ctrl+P">
             <Button variant="primary" size="lg" onClick={requestPrint}>
               <FileDown />
               {m.pdf_button()}

@@ -42,6 +42,19 @@ export const FONT_TIMEOUT_MS = 4000
 /** Bir kez zaman aşımına uğradıktan sonraki çizimlerde bekleme: her tuşta 4 sn gecikme olmasın. */
 const FONT_RETRY_TIMEOUT_MS = 300
 
+/**
+ * Yazarken çizim ertelenir: çizim (işaretleme + sayfalama) ana iş parçacığında onlarca ms sürer ve
+ * her tuşta yapılırsa yazmayı bloklar. Bir önceki değişiklikten bu süreden kısa sürede gelen değişiklik
+ * "arka arkaya" sayılır; çizim son değişiklikten bu kadar sonra, tek sefer yapılır. Tek değişiklik
+ * (ya da duraklamadan sonraki ilk tuş) hemen çizilir. Son tuştan sonra önizleme ≈ bu süre + bir çizim
+ * içinde günceldir (≤ 250 ms).
+ */
+export const COALESCE_MS = 120
+/** Hiç duraklamadan yazarken bile önizleme en geç bu kadar bayat kalır. */
+export const MAX_DEFER_MS = 800
+/** Küçük resimler (yalnız ilk sayfa) daha geç ve tarayıcı boşta kalınca çizilir: ana önizlemeye ve yazmaya yol verir. */
+const THUMB_COALESCE_MS = 400
+
 interface Props {
   cv: Cv
   suggestions?: SuggestionMap
@@ -167,13 +180,21 @@ export const CvFrame = forwardRef<CvFrameHandle, Props>(function CvFrame(
   }, [effectiveScale, onScaleChange])
 
   /** Çizer; belge hazır değilse ya da çizim yarıda bırakıldıysa (daha yenisi başladı, bileşen kalktı) false. */
-  const draw = useCallback(async (): Promise<boolean> => {
+  const draw = useCallback(async (yieldToInput: boolean): Promise<boolean> => {
     const doc = iframeRef.current?.contentDocument
     if (!doc || !doc.getElementById('cv-source')) return false
     const token = gate.begin()
     if (crossfadeKey !== lastCrossfadeKey.current) {
       lastCrossfadeKey.current = crossfadeKey
       snapshotForCrossfade(doc)
+    }
+    // İşaretleme (renderToStaticMarkup) çizimin en pahalı parçası. Kendiliğinden çizimde ardından ana iş
+    // parçacığına bir kez yol verilir ki bekleyen tuşlar sayfalamadan önce işlensin; bu arada daha yeni
+    // çizim başladıysa bu bırakılır. Yazdırma beklemez.
+    const html = renderCvSource(cv, { suggestions, placeholders, emptyHint, photoHint })
+    if (yieldToInput) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0))
+      if (!gate.isCurrent(token)) return false
     }
     doc.body.classList.toggle('interactive', interactive)
     // Gövde ailesinin yanında şablonun başlık ve eş aralıklı aileleri de (bütün yüzleriyle) yüklenir.
@@ -191,7 +212,7 @@ export const CvFrame = forwardRef<CvFrameHandle, Props>(function CvFrame(
           : '#cv-pages{--sheet-gap:24px;--sheet-shadow:0 1px 2px rgba(0,0,0,.06),0 6px 24px rgba(0,0,0,.08)}' +
             // Kesikli "uzun kayıt" çerçevesi yalnız düzenlenebilir önizlemede (küçük resimde, telefonda değil).
             (interactive ? '' : '.overflow-warning{outline:none}'),
-        html: renderCvSource(cv, { suggestions, placeholders, emptyHint, photoHint }),
+        html,
         fontQueries: fonts.flatMap(fontLoadQueries),
         fontTimeoutMs: slowFonts.current ? FONT_RETRY_TIMEOUT_MS : FONT_TIMEOUT_MS,
         previousPageCount: pageCountRef.current,
@@ -232,8 +253,8 @@ export const CvFrame = forwardRef<CvFrameHandle, Props>(function CvFrame(
     return true
   }, [cv, suggestions, interactive, placeholders, emptyHint, photoHint, firstPageOnly, crossfadeKey, gate])
 
-  const render = useCallback(() => {
-    const run = draw()
+  const render = useCallback((yieldToInput = false) => {
+    const run = draw(yieldToInput)
     run.then(
       (drawn) => {
         if (drawn) drawError.current = null
@@ -252,18 +273,60 @@ export const CvFrame = forwardRef<CvFrameHandle, Props>(function CvFrame(
     if (ready && doc) applyMarks(doc, marks.current, false)
   }, [ready, focusedItemId])
 
+  // Kendiliğinden çizim zamanlaması (bkz. COALESCE_MS): son değişikliğin ve son çizimin bitişinin zamanı,
+  // ertelenen çizimin ilk isteği.
+  const schedule = useRef<{ lastChange: number; lastDrawEnd: number; deferredSince: number; render: unknown }>({
+    lastChange: Number.NEGATIVE_INFINITY,
+    lastDrawEnd: Number.NEGATIVE_INFINITY,
+    deferredSince: 0,
+    render: null,
+  })
   useEffect(() => {
     if (!ready) return
-    const frame = requestAnimationFrame(() => {
+    const s = schedule.current
+    const now = performance.now()
+    // Yalnız içerik değişikliği (render) ertelenebilir; belge yeniden yüklendiyse ya da geç yazı tipi geldiyse hemen.
+    // Çizim bitince hemen gelen değişiklik de arka arkaya sayılır: o tuş çizim sürerken basılıp beklemişti.
+    const changed = s.render !== render
+    const burst = changed && now - Math.max(s.lastChange, s.lastDrawEnd) < (firstPageOnly ? THUMB_COALESCE_MS : COALESCE_MS)
+    if (changed) {
+      s.render = render
+      s.lastChange = now
+    }
+    let frame = 0
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let idle = 0
+    const run = () => {
+      s.deferredSince = 0
       // Hata yutulmaz: çağırana (onError) iletilir, yoksa konsola yazılır.
-      render().catch((error: unknown) => {
-        if (callbacks.current.onError) callbacks.current.onError(error)
-        else console.error(error)
-      })
-    })
-    return () => cancelAnimationFrame(frame)
+      render(true)
+        .catch((error: unknown) => {
+          if (callbacks.current.onError) callbacks.current.onError(error)
+          else console.error(error)
+        })
+        .finally(() => {
+          s.lastDrawEnd = performance.now()
+        })
+    }
+    const queue = () => {
+      // Küçük resimler boşta çizilir: birkaç tanesi art arda gelse de aralarda tuşlar işlenir.
+      if (firstPageOnly && typeof requestIdleCallback === 'function') idle = requestIdleCallback(run, { timeout: 1000 })
+      else frame = requestAnimationFrame(run)
+    }
+    if (!burst) queue()
+    else {
+      if (!s.deferredSince) s.deferredSince = now
+      const waited = now - s.deferredSince
+      if (!firstPageOnly && waited >= MAX_DEFER_MS) queue()
+      else timer = setTimeout(queue, firstPageOnly ? THUMB_COALESCE_MS : COALESCE_MS)
+    }
+    return () => {
+      clearTimeout(timer)
+      cancelAnimationFrame(frame)
+      if (idle) cancelIdleCallback(idle)
+    }
     // lateFonts: zaman aşımından sonra gelen yazı tipi ölçüleri değiştirir, yeniden çizilir.
-  }, [ready, loadCount, render, lateFonts])
+  }, [ready, loadCount, render, lateFonts, firstPageOnly])
 
   // Tıklanan kaydı editöre bildir.
   useEffect(() => {

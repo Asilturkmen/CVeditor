@@ -44,9 +44,18 @@ function times(value: string, factor: number | undefined): string {
   return match ? `${Number((parseFloat(match[1]) * factor).toFixed(3))}${match[2]}` : value
 }
 
+/** Kâğıt kenar boşluğunun tabanı (mm; SET-14 §5.2): ev yazıcıları bunun altını kırpar. */
+export const MIN_PAGE_MARGIN_MM = 12
+
+/** "10.5mm" → "12mm": kenar boşluğu tabanın altına inmez (sıkı aralık × < 1 çarpan). */
+function atLeastMargin(value: string): string {
+  return parseFloat(value) < MIN_PAGE_MARGIN_MM ? `${MIN_PAGE_MARGIN_MM}mm` : value
+}
+
 /**
  * Boy ve aralık değişkenleri: Görünüm'deki ayar (yazı boyu, aralık) × şablonun ölçek çarpanları
  * (K4, templateMeta `scale`). Şablon CSS'i bu değişkenleri yeniden çarpmaz; `--fs` gövde boyudur.
+ * `--pad-x` / `--pad-y` en az 12 mm (tek yerde; şablon CSS'i `max(12mm, …)` yazmaz).
  */
 export function scaledMetrics(settings: Pick<TemplateSettings, 'fontSize' | 'spacing'>, template: TemplateDef): Record<string, string> {
   const scale = template.scale ?? {}
@@ -56,8 +65,8 @@ export function scaledMetrics(settings: Pick<TemplateSettings, 'fontSize' | 'spa
     '--lh': times(spacing['--lh'], scale.lh),
     '--block-gap': times(spacing['--block-gap'], scale.blockGap),
     '--section-gap': times(spacing['--section-gap'], scale.sectionGap),
-    '--pad-x': times(spacing['--pad-x'], scale.padX),
-    '--pad-y': times(spacing['--pad-y'], scale.padY),
+    '--pad-x': atLeastMargin(times(spacing['--pad-x'], scale.padX)),
+    '--pad-y': atLeastMargin(times(spacing['--pad-y'], scale.padY)),
   }
 }
 

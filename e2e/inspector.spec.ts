@@ -6,6 +6,9 @@ import { createCv, openRow, openRowIn, patchCv, preview } from './helpers.ts'
  * öneri farkı, Bölüm ekle menüsü, ⋯ ile taşıma, prompt çubuğunun boşta/odakta hâli, Görünüm satırları.
  */
 
+// Yazma adımları arasında bilinçli beklemeler var (geri alma birleştirmesi 1,2 sn); yavaş makinede pay.
+test.describe.configure({ timeout: 60_000 })
+
 const toggleOf = (page: Page, text: string) =>
   page.locator('[id^="item-"]', { hasText: text }).first().locator('[aria-expanded]').first()
 
@@ -43,10 +46,12 @@ test('anahat: kayıtlar kapalı satır, bir kayıt açılınca öbürü kapanır
   await expect(page.getByRole('switch', { name: 'Tümünü aç' })).toBeChecked()
   await expect(page.getByRole('region', { name: 'Deneyim', exact: true }).getByLabel('Pozisyon')).toHaveCount(3)
   // Tümünü açıkken tek kayıt yine kapatılabilir.
+  // (Kapanan kaydın alanları çizili kalır ama görünmez ve odak almaz: `inert`.)
   await toggleOf(page, 'Lacivert Yazılım').click()
-  await expect(page.getByRole('region', { name: 'Deneyim', exact: true }).getByLabel('Pozisyon')).toHaveCount(2)
+  const expanded = page.getByRole('region', { name: 'Deneyim', exact: true }).locator('[id^="item-"] [aria-expanded="true"]')
+  await expect(expanded).toHaveCount(2)
   await page.getByRole('switch', { name: 'Tümünü aç' }).click()
-  await expect(page.getByLabel('Pozisyon')).toHaveCount(0)
+  await expect(expanded).toHaveCount(0)
 })
 
 test('beceri ve dil satır içi formdur; bölüm ⋯ menüsünden aşağı taşınır', async ({ page }) => {
@@ -69,11 +74,11 @@ test('Bölüm ekle: eklenebilenler önce; eklenen bölümün ilk kaydı açık v
   await page.locator('[data-add-section]').click()
   const menu = page.getByRole('menu')
   await expect(menu.getByRole('menuitem', { name: /Deneyim/ })).toContainText('Eklendi')
-  await menu.getByRole('menuitem', { name: 'Sertifikalar' }).click()
-  const section = page.getByRole('region', { name: 'Sertifikalar', exact: true })
-  await expect(section.getByLabel('Sertifika', { exact: true })).toBeFocused()
-  await page.keyboard.type('Örnek Sertifika')
-  await expect(preview(page).getByText('Örnek Sertifika')).toBeVisible()
+  await menu.getByRole('menuitem', { name: 'Ödüller' }).click()
+  const section = page.getByRole('region', { name: 'Ödüller', exact: true })
+  await expect(section.getByLabel('Ödül', { exact: true })).toBeFocused()
+  await page.keyboard.type('Örnek Ödül')
+  await expect(preview(page).getByText('Örnek Ödül')).toBeVisible()
 
   await page.locator('[data-add-section]').click()
   await page.getByRole('menu').getByRole('menuitem', { name: /Eğitim/ }).click()

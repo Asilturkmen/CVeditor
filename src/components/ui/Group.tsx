@@ -192,6 +192,8 @@ export function GroupRow({
  * Inspector form satırı: solda 120px etiket (ikincil), sağda çıplak alan (`BareInput`, `SelectMenu`,
  * metin). 40px. Etiketsiz boş yere tıklamak alanı odaklar. `stacked`: etiket üstte, alan tam genişlik
  * (zengin metin, uzun etiket). Hata: alanın altında kırmızı callout; alana `aria-invalid` ver.
+ * Dar ekranda (telefon, 640px'ten dar pencere) etiket kendiliğinden üste geçer: yanında sıkışan alan
+ * e-posta gibi uzun değerleri kırmasın.
  */
 export function FormRow({
   label,
@@ -222,13 +224,20 @@ export function FormRow({
     }
   }
   return (
-    <div className={cn('px-[var(--row-px)]', stacked ? 'py-2' : 'py-1', className)} onMouseDown={focusField}>
+    <div
+      className={cn('px-[var(--row-px)]', stacked ? 'py-2' : 'py-1', className)}
+      style={{ '--label-w': `${labelWidth}px` } as CSSProperties}
+      onMouseDown={focusField}
+    >
       <div
-        className={cn(stacked ? 'flex flex-col gap-1' : 'grid min-h-8 items-center gap-x-3')}
-        style={stacked ? undefined : { gridTemplateColumns: `${labelWidth}px minmax(0, 1fr)` }}
+        className={cn(
+          stacked
+            ? 'flex flex-col gap-1'
+            : 'grid min-h-8 grid-cols-[var(--label-w)_minmax(0,1fr)] items-center gap-x-3 max-sm:grid-cols-1 max-sm:gap-y-1',
+        )}
         onMouseDown={focusField}
       >
-        <label htmlFor={id} className={cn('text-body break-words text-fg-2', stacked && 'px-2 pt-1')}>
+        <label htmlFor={id} className={cn('text-body break-words text-fg-2', stacked ? 'px-2 pt-1' : 'max-sm:px-2 max-sm:pt-1')}>
           {label}
         </label>
         <div className="min-w-0">{children(id, note ? noteId : undefined)}</div>
@@ -236,8 +245,11 @@ export function FormRow({
       {note && (
         <p
           id={noteId}
-          className={cn('pb-1 text-callout', error ? 'text-danger' : 'text-fg-2')}
-          style={stacked ? { paddingLeft: 8 } : { paddingLeft: labelWidth + 12 + 8 }}
+          className={cn(
+            'pb-1 text-callout',
+            error ? 'text-danger' : 'text-fg-2',
+            stacked ? 'pl-2' : 'pl-[calc(var(--label-w)+20px)] max-sm:pl-2',
+          )}
         >
           {note}
         </p>

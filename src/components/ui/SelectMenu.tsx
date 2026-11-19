@@ -1,6 +1,6 @@
 import { Select as S } from 'radix-ui'
 import { Check, ChevronsUpDown } from 'lucide-react'
-import type { CSSProperties, ReactNode } from 'react'
+import { useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { cn } from '@/lib/cn'
 import { menuItemClass } from './Menu'
 
@@ -35,6 +35,7 @@ export function SelectMenu({
   disabled,
   placeholder,
   className,
+  menu = 'item-aligned',
   'aria-label': ariaLabel,
   'aria-describedby': ariaDescribedBy,
 }: {
@@ -48,14 +49,31 @@ export function SelectMenu({
   disabled?: boolean
   placeholder?: ReactNode
   className?: string
+  /**
+   * `item-aligned` (varsayılan): seçili öğe düğmenin üstüne gelir (macOS pop-up). `popover`: menü
+   * düğmenin altında, sağ kenarına hizalı, en az 280px, pencere kenarından 12px içeride açılır ve
+   * satırlar kırılmaz; uzun/zengin seçenekli listede (yazı tipi) ve dar panelin sağ kenarında kullan.
+   * Tetikleyicinin bir atası `data-collision-boundary` taşıyorsa menü o kabın içinde kalır (ör. inspector'ın
+   * kayan alanı: menü yer yoksa yukarı açılsa da panel başlığındaki segmenti ve alttaki prompt çubuğunu örtmez).
+   */
+  menu?: 'item-aligned' | 'popover'
   'aria-label'?: string
   'aria-describedby'?: string
 }) {
+  const popover = menu === 'popover'
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const [boundary, setBoundary] = useState<Element | null>(null)
   const all = groups ?? [{ options: options ?? [] }]
   const selected = all.flatMap((g) => g.options).find((o) => o.value === value)
   return (
-    <S.Root value={value} onValueChange={onValueChange} disabled={disabled}>
+    <S.Root
+      value={value}
+      onValueChange={onValueChange}
+      disabled={disabled}
+      onOpenChange={(open) => open && popover && setBoundary(triggerRef.current?.closest('[data-collision-boundary]') ?? null)}
+    >
       <S.Trigger
+        ref={triggerRef}
         id={id}
         aria-label={ariaLabel}
         aria-describedby={ariaDescribedBy}
@@ -78,8 +96,22 @@ export function SelectMenu({
       </S.Trigger>
       <S.Portal>
         <S.Content
-          position="item-aligned"
-          className="pop z-50 max-h-[min(70dvh,var(--radix-select-content-available-height))] max-w-80 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-xl bg-elevated shadow-3"
+          {...(popover
+            ? {
+                position: 'popper' as const,
+                side: 'bottom' as const,
+                align: 'end' as const,
+                sideOffset: 4,
+                collisionPadding: 12,
+                collisionBoundary: boundary ?? undefined,
+              }
+            : { position: 'item-aligned' as const })}
+          className={cn(
+            'pop z-50 max-h-[min(70dvh,var(--radix-select-content-available-height))] overflow-hidden rounded-xl bg-elevated shadow-3',
+            popover
+              ? 'w-max max-w-[calc(100vw-24px)] min-w-[max(280px,var(--radix-select-trigger-width))] overflow-y-auto'
+              : 'max-w-80 min-w-[var(--radix-select-trigger-width)]',
+          )}
         >
           <S.Viewport className="p-1">
             {all.map((group, gi) => (
@@ -89,14 +121,21 @@ export function SelectMenu({
                   <S.Label className="flex min-h-7 items-center px-2.5 pl-8 text-callout text-fg-2">{group.label}</S.Label>
                 )}
                 {group.options.map((o) => (
-                  <S.Item key={o.value} value={o.value} disabled={o.disabled} className={cn(menuItemClass, 'gap-1.5 pl-2 text-fg')}>
-                    <span className="flex size-4 items-center justify-center">
+                  <S.Item
+                    key={o.value}
+                    value={o.value}
+                    disabled={o.disabled}
+                    className={cn(menuItemClass, 'gap-1.5 pl-2 text-fg', popover && 'whitespace-nowrap [&>span:last-child]:flex-1')}
+                  >
+                    <span className="flex size-4 shrink-0 items-center justify-center">
                       <S.ItemIndicator>
                         <Check className="size-3.5" />
                       </S.ItemIndicator>
                     </span>
                     <S.ItemText>
-                      <span style={o.style}>{o.label}</span>
+                      <span style={o.style} className={popover ? 'block' : undefined}>
+                        {o.label}
+                      </span>
                     </S.ItemText>
                   </S.Item>
                 ))}

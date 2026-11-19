@@ -38,8 +38,9 @@ describe('/api/pdf gerçek Chromium ile', () => {
     const res = await app.request('/api/pdf', jsonPost(cv))
     expect(res.status).toBe(200)
     expect(res.headers.get('content-type')).toBe('application/pdf')
+    // Dosya adı yazdır yoluyla aynı (`pdfBaseName`): "Ad_Soyad_CV_<dil>.pdf".
     expect(res.headers.get('content-disposition')).toBe(
-      `attachment; filename="Yazilim Ogrencisi TR.pdf"; filename*=UTF-8''Yaz%C4%B1l%C4%B1m%20%C3%96%C4%9Frencisi%20TR.pdf`,
+      `attachment; filename="Deniz_Aksoy_CV_tr.pdf"; filename*=UTF-8''Deniz_Aksoy_CV_tr.pdf`,
     )
     const data = await res.arrayBuffer()
     expect(new TextDecoder().decode(data.slice(0, 5))).toBe('%PDF-')

@@ -6,6 +6,11 @@
  * - Bölüm başlığı ([data-keep-with-next]) sayfanın dibinde yalnız kalmaz.
  * - Bir sayfadan uzun kayıt "oversized" olarak raporlanır ve madde/paragraf
  *   arasından bölünür; metin asla alttan kesilip kaybolmaz.
+ * - Yetim/dul (SET-14 §5.5): bölünen kayıtta her iki sayfada en az 2 madde kalır (ilk parçada 2'den az
+ *   madde kalacaksa kayıt sonraki sayfadan başlar; son madde tek başına sonraki sayfaya düşmez).
+ *   Aynı bölümün ardışık kısa satır blokları (beceri, dil satırı: tek çocuğu `.entry-line`) bir
+ *   dizidir: dizi bölünürse her iki sayfada en az 2 satır kalır; 2-3 satırlık dizi bölünmez, başlığıyla
+ *   birlikte taşınır (bkz. keepLinesTogether).
  * - Tek bir paragraf bile sayfaya sığmıyorsa (çok nadir) "clipped" raporlanır.
  * - Başlık (ad, unvan, iletişim, fotoğraf) ilk sayfanın kutusundan taşıyorsa "headerClipped"
  *   (ve "clipped") raporlanır: başlık bölünmez, taşan kısmı sayfa kenarında kesilir.
@@ -213,8 +218,14 @@ export function paginate(doc: Document, options: { previousPageCount?: number } 
     let page = pageIndex
     let col = column(page, flow)
     let part = startPart(block, col, false)
+    let continued = false
     let open: { src: Element; clone: Element }[] = []
-    let placed = 0
+    /** Bu parçaya yerleşen atomların kopyaları (sırayla); `partStart` parçanın ilk atomunun sırası. */
+    let placed: Node[] = []
+    let partStart = 0
+    /** Gövde atomu (madde, paragraf): kaydın başlığı ve alt satırı değil. */
+    const isBody = (atom: Atom) => atom.path.length > 0
+    const countBody = (from: number, to: number) => atoms.slice(from, to).filter(isBody).length
 
     const openPath = (path: Element[]): Element => {
       let common = 0
@@ -235,45 +246,125 @@ export function paginate(doc: Document, options: { previousPageCount?: number } 
       }
     }
 
-    for (const atom of atoms) {
-      for (;;) {
-        const parent = openPath(atom.path)
-        const node = atom.node.cloneNode(true)
-        parent.appendChild(node)
-        if (fits(col)) {
-          placed++
-          break
-        }
-        const nodeHeight = (node as Element).getBoundingClientRect().height
-        parent.removeChild(node)
-        pruneEmpty()
-        if (placed === 0) {
-          const fresh = Array.from(col.children).every((c) => c === part || c.hasAttribute('data-keep-with-next'))
-          // Başlıklı ilk sayfada sığmayan parça, başlıksız sayfaya sığıyorsa kırpılmaz, taşınır.
-          if (!fresh || (page === 0 && nodeHeight <= emptyColumnHeight(flow))) {
-            // Bu sayfada ilk parçaya bile yer yok: kaydı sonraki sayfadan başlat (başlığıyla).
-            part.remove()
-            page = moveToNextPage(flow, page)
-            col = column(page, flow)
-            part = startPart(block, col, false)
-            open = []
-            continue
-          }
-          // Taze sayfada bile sığmayan tek parça: yerleştir, kırpılma uyarısı ver.
-          openPath(atom.path).appendChild(atom.node.cloneNode(true))
-          result.clipped = true
-          placed++
-          break
-        }
-        if (part.childNodes.length === 0) part.remove()
-        page++
-        col = column(page, flow)
-        part = startPart(block, col, true)
-        open = []
-        placed = 0
+    /** Kaydı (başlığıyla) sonraki sayfadan baştan başlatır. */
+    const restartOnNextPage = () => {
+      part.remove()
+      page = moveToNextPage(flow, page)
+      col = column(page, flow)
+      part = startPart(block, col, false)
+      continued = false
+      open = []
+      placed = []
+      partStart = 0
+    }
+
+    let i = 0
+    while (i < atoms.length) {
+      const atom = atoms[i]
+      const parent = openPath(atom.path)
+      const node = atom.node.cloneNode(true)
+      parent.appendChild(node)
+      if (fits(col)) {
+        placed.push(node)
+        i++
+        continue
       }
+      const nodeHeight = (node as Element).getBoundingClientRect().height
+      parent.removeChild(node)
+      pruneEmpty()
+      const fresh = Array.from(col.children).every((c) => c === part || c.hasAttribute('data-keep-with-next'))
+      if (placed.length === 0) {
+        // Başlıklı ilk sayfada sığmayan parça, başlıksız sayfaya sığıyorsa kırpılmaz, taşınır.
+        if (!fresh || (page === 0 && nodeHeight <= emptyColumnHeight(flow))) {
+          // Bu sayfada ilk parçaya bile yer yok: kaydı sonraki sayfadan başlat (başlığıyla).
+          restartOnNextPage()
+          continue
+        }
+        // Taze sayfada bile sığmayan tek parça: yerleştir, kırpılma uyarısı ver.
+        const lone = atom.node.cloneNode(true)
+        openPath(atom.path).appendChild(lone)
+        result.clipped = true
+        placed.push(lone)
+        i++
+        continue
+      }
+      // Sayfa sonu atoms[i - 1] ile atoms[i] arasında. Yetim/dul (SET-14 §5.5): bölünen kayıtta her
+      // sayfada en az 2 madde. Kaydın ilk parçasında 2'den az madde kalıyorsa (yalnız başlık + alt
+      // satır + 1 madde) kayıt sonraki sayfadan başlar; sayfada kayıttan önce içerik yoksa (taze
+      // sayfa) bu yapılmaz: orada da sığmayacaktı, sonsuz döngü olmasın.
+      const bodyHere = countBody(partStart, i)
+      if (!continued && !fresh && atoms.slice(i).some(isBody) && bodyHere < 2) {
+        restartOnNextPage()
+        i = 0
+        continue
+      }
+      // Son madde sonraki sayfada tek başına kalacaksa bir madde daha onunla gider (bu sayfada en az
+      // 2 madde kalmak şartıyla).
+      if (countBody(i, atoms.length) === 1 && isBody(atoms[i]) && isBody(atoms[i - 1]) && bodyHere >= 3) {
+        const last = placed.pop()!
+        let up = last.parentElement
+        last.parentNode?.removeChild(last)
+        while (up && up !== part && up.childNodes.length === 0) {
+          const next = up.parentElement
+          up.remove()
+          up = next
+        }
+        i--
+      }
+      if (part.childNodes.length === 0) part.remove()
+      page++
+      col = column(page, flow)
+      part = startPart(block, col, true)
+      continued = true
+      open = []
+      placed = []
+      partStart = i
     }
     return page
+  }
+
+  /** Kısa satır bloğu: tek çocuğu `.entry-line` olan kayıt (beceri satırı, dil satırı). */
+  function isLine(el: Element): boolean {
+    return el.children.length === 1 && el.firstElementChild!.classList.contains('entry-line')
+  }
+
+  /** Aynı bölümün ardışık satır blokları bir "dizi"dir (ör. Beceriler'in Diller/Çatılar/Araçlar satırları). */
+  function sameRun(a: Element, b: Element): boolean {
+    const id = b.getAttribute('data-section-id')
+    return id !== null && a.getAttribute('data-section-id') === id && isLine(a) && isLine(b)
+  }
+
+  /**
+   * Satır dizisinde yetim/dul (SET-14 §5.5). `block` sayfa sonundan sonra sonraki sayfanın başına
+   * düştü; `rest` = kaynakta bu blok dahil dizide kalan blok sayısı. Dizi bölünüyorsa her iki sayfada
+   * en az 2 satır kalır: önceki sayfanın dibinde tek satır kalıyorsa (yetim) ya da bu blok dizinin son
+   * ve tek satırıysa (dul) önceki sayfanın sonundaki satırlar bu sayfaya alınır. Önceki sayfada dizinin
+   * hiç satırı kalmıyorsa bölüm başlığı da gelir (başlık başlıksız kalmaz, başlıksız satır da olmaz).
+   * Önceki sütunda başka içerik kalmayacaksa (boş sayfa olurdu) ya da taşınan satırlar sığmazsa
+   * hiçbir şey yapılmaz. Taşıma yalnız ileri: döngü yok.
+   */
+  function keepLinesTogether(block: HTMLElement, flow: Flow, prevPage: number, rest: number) {
+    const prev = column(prevPage, flow)
+    const next = column(prevPage + 1, flow)
+    if (next.firstElementChild !== block) return
+    const run: Element[] = []
+    for (let el = prev.lastElementChild; el && sameRun(el, block); el = el.previousElementSibling) run.unshift(el)
+    const k = run.length
+    if (k === 0) return
+    // Yetim: önceki sayfada tek satır → hepsi gelir. Dul: bu blok son ve tek satır → önceki sayfadan
+    // bir satır gelir; orada 2'den az kalacaksa hepsi.
+    const move = k < 2 ? k : rest < 2 ? (k - 1 >= 2 ? 1 : k) : 0
+    if (move === 0) return
+    const moving = run.slice(k - move)
+    if (move === k) {
+      for (let el = run[0].previousElementSibling; el?.hasAttribute('data-keep-with-next'); el = el.previousElementSibling) {
+        moving.unshift(el)
+      }
+    }
+    const stays = Array.from(prev.children).filter((c) => !moving.includes(c))
+    if (!stays.some((c) => !c.hasAttribute('data-keep-with-next'))) return
+    next.prepend(...moving)
+    if (!fits(next)) prev.append(...moving)
   }
 
   function startPart(block: HTMLElement, col: HTMLElement, continued: boolean): HTMLElement {
@@ -344,6 +435,20 @@ export function paginate(doc: Document, options: { previousPageCount?: number } 
         })
       }
     }
+    // Ortalı/sağa yaslı satırda gizli ayırıcı yer kapladığı için görünen metin kayardı. Ayırıcının
+    // gerçek genişliği ölçülüp listeye `--contact-sep-w` yazılır; base.css son öğeye aynı genişlikte
+    // boşluk (padding, metin değil) verir ve ortalıda listeyi soldan o kadar içeri alır, sağa yaslıda
+    // sağdan o kadar dışarı çıkarır. Her satırın görünen metni tam ortada / sağ kenarda durur.
+    // Satır kırılımı bunlardan sonra ölçülür. Ayırıcıyı gizleyen (ızgara iletişim) şablonda genişlik 0.
+    for (const list of lists) {
+      const sep = list.querySelector('.sep')
+      const width = sep ? sep.getBoundingClientRect().width : 0
+      const align = getComputedStyle(list).textAlign
+      const side = /center/.test(align) ? 'contact-center' : align === 'right' || align === 'end' ? 'contact-end' : null
+      if (!side || !(width > 0)) continue
+      ;(list as HTMLElement).style.setProperty('--contact-sep-w', `${width.toFixed(2)}px`)
+      list.classList.add(side)
+    }
     mark('eol')
     const slot = first.page.querySelector<HTMLElement>('.cv-header .ph-photo')
     const style = slot?.getAttribute('style') ?? null
@@ -362,9 +467,17 @@ export function paginate(doc: Document, options: { previousPageCount?: number } 
 
     for (const [flow, el] of flows) {
       let pageIndex = 0
-      for (const src of Array.from(el.children)) {
-        pageIndex = place(src.cloneNode(true) as HTMLElement, flow, pageIndex)
-      }
+      const blocks = Array.from(el.children)
+      blocks.forEach((src, i) => {
+        const block = src.cloneNode(true) as HTMLElement
+        const before = pageIndex
+        pageIndex = place(block, flow, pageIndex)
+        if (pageIndex === before + 1 && isLine(block)) {
+          let rest = 1
+          while (i + rest < blocks.length && sameRun(blocks[i + rest], block)) rest++
+          keepLinesTogether(block, flow, before, rest)
+        }
+      })
     }
 
     if (header && headerOverflows(pages[0])) {

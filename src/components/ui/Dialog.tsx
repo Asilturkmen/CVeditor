@@ -1,9 +1,10 @@
 import { Dialog as D } from 'radix-ui'
 import { X } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { cn } from '@/lib/cn'
 import { m } from '@/paraglide/messages'
 import { buttonClass } from './buttonClass'
+import { useScrollEdge } from './useScrollEdge'
 
 interface DialogProps {
   open: boolean
@@ -37,6 +38,10 @@ export function Dialog({
   className,
 }: DialogProps) {
   const showClose = closeButton ?? !footer
+  // Gövde kayınca başlığın altında ince kaydırma kenarı belirir (içerik başlığın altına girmiş görünmesin).
+  const [body, setBody] = useState<HTMLDivElement | null>(null)
+  const bodyRef = useMemo(() => ({ current: body }), [body])
+  const scrolled = useScrollEdge(bodyRef, 'top')
   return (
     <D.Root open={open} onOpenChange={onOpenChange}>
       <D.Portal>
@@ -53,7 +58,7 @@ export function Dialog({
           )}
         >
           <div aria-hidden className="mx-auto mt-2 h-[5px] w-9 shrink-0 rounded-full bg-fill-1 sm:hidden" />
-          <div className="flex items-start gap-4 px-5 pt-5 max-sm:pt-3">
+          <div data-scrolled={scrolled ? '' : undefined} className="scroll-edge-bottom flex items-start gap-4 px-5 pt-5 pb-3 max-sm:pt-3">
             <div className="min-w-0 flex-1">
               <D.Title className="text-title-2 text-fg">{title}</D.Title>
               {description ? (
@@ -71,7 +76,9 @@ export function Dialog({
               </D.Close>
             )}
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pt-4 pb-5">{children}</div>
+          <div ref={setBody} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pt-1 pb-5">
+            {children}
+          </div>
           {footer && (
             <div
               className={cn(

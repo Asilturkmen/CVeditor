@@ -71,9 +71,10 @@ const DOT: Record<Suggestion['kind'], string> = {
 }
 
 /**
- * Önerilerin listesi (prompt kutusunun yerini alır): başlık, "Örnek" rozeti, toplu Reddet/Kabul; her
- * satırda hedef, tür, açıklama ve değişen ilk satır (eski → yeni). Satıra tıklamak kaydı açar ve fark
- * kaydın içinde, alanın altında okunur; yazılı "Reddet / Kabul et" orada.
+ * Önerilerin listesi (prompt kutusunun yerini alır): başlık, "Örnek" rozeti, toplu Reddet/Kabul (her
+ * zaman görünür, listenin üstünde); her satırda hedef ve tür. Seçili satırda (varsayılan ilki) açıklama
+ * ve değişen ilk satır (eski → yeni) açılır. Satıra tıklamak kaydı da açar; fark kaydın içinde, alanın
+ * altında okunur. Tepsi panelin en çok ~%35'i kadar yer kaplar, liste kendi içinde kayar.
  */
 function SuggestionReview({ cv, demo }: { cv: Cv; demo: boolean }) {
   const suggestions = useEditorUi((s) => s.suggestions)
@@ -81,8 +82,11 @@ function SuggestionReview({ cv, demo }: { cv: Cv; demo: boolean }) {
   const highlightItem = useEditorUi((s) => s.highlightItem)
   const revealSuggestion = useEditorUi((s) => s.revealSuggestion)
   const setTab = useEditorUi((s) => s.setTab)
+  const [chosen, setChosen] = useState<string | null>(null)
+  const activeId = suggestions.some((s) => s.id === chosen) ? chosen : (suggestions[0]?.id ?? null)
 
   const show = (s: Suggestion) => {
+    setChosen(s.id)
     revealSuggestion(s.id)
     // Yeni kaydın panelde satırı yok; yalnız önizlemede gösterilir.
     if (s.kind !== 'addItem') {
@@ -92,7 +96,8 @@ function SuggestionReview({ cv, demo }: { cv: Cv; demo: boolean }) {
   }
 
   return (
-    <div className="flex max-h-[46vh] flex-col overflow-hidden rounded-xl bg-content shadow-1 animate-rise-in">
+    // Üst çubuk 52px; tepsi (Toolbar'ın 20px dikey boşluğuyla) panel yüksekliğinin ~%35'i.
+    <div className="flex max-h-[max(180px,calc((100dvh-52px)*0.35-20px))] flex-col overflow-hidden rounded-xl bg-content shadow-1 animate-rise-in">
       <div className="flex min-h-11 flex-wrap items-center gap-2 py-2 pr-2 pl-3">
         <p className="flex flex-1 items-center gap-2 text-headline text-fg">
           {m.ai_review_title({ count: suggestions.length })}
@@ -107,7 +112,8 @@ function SuggestionReview({ cv, demo }: { cv: Cv; demo: boolean }) {
       <ul className="group-rows min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-separator [--row-px:12px]">
         {suggestions.map((s) => {
           const { title, kind } = describe(cv, s)
-          const line = s.kind === 'field' ? firstChangedLine(s) : null
+          const active = s.id === activeId
+          const line = active && s.kind === 'field' ? firstChangedLine(s) : null
           return (
             <li
               key={s.id}
@@ -115,15 +121,23 @@ function SuggestionReview({ cv, demo }: { cv: Cv; demo: boolean }) {
               onMouseEnter={() => highlightItem(suggestionTargetId(s))}
               onMouseLeave={() => highlightItem(null)}
             >
-              <button type="button" className="flex min-w-0 flex-1 items-start gap-2 rounded-md px-2 py-1.5 text-left outline-offset-[-3px]" onClick={() => show(s)}>
+              <button
+                type="button"
+                aria-expanded={active}
+                className="flex min-w-0 flex-1 items-start gap-2 rounded-md px-2 py-1.5 text-left outline-offset-[-3px]"
+                onClick={() => show(s)}
+              >
                 <span className={cn('mt-[5px] size-2 shrink-0 rounded-full', DOT[s.kind])} aria-hidden />
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="text-body font-medium break-words text-fg">{title}</span>
-                  <span className="text-callout break-words text-fg-2">
-                    {kind && <span className={cn('font-medium', s.kind === 'removeItem' ? 'text-danger' : s.kind === 'addItem' ? 'text-ok' : 'text-fg')}>{kind}</span>}
-                    {kind && s.note && ' · '}
-                    {s.note}
+                  <span className="flex flex-wrap items-baseline gap-x-1.5">
+                    <span className="text-body font-medium break-words text-fg">{title}</span>
+                    {kind && (
+                      <span className={cn('text-callout font-medium', s.kind === 'removeItem' ? 'text-danger' : s.kind === 'addItem' ? 'text-ok' : 'text-fg-2')}>
+                        {kind}
+                      </span>
+                    )}
                   </span>
+                  {active && s.note && <span className="text-callout break-words text-fg-2">{s.note}</span>}
                   {line && (line.before || line.after) && (
                     <span className="mt-0.5 text-callout break-words text-fg">
                       {line.before && <del className="text-fg-2 decoration-danger/70">{line.before}</del>}

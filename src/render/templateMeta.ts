@@ -59,7 +59,7 @@ export type BodyFontKey =
   | 'manrope'
   | 'space-grotesk'
   | 'libre-franklin'
-export type DisplayFontKey = 'poppins' | 'dm-serif-display' | 'playfair-display' | 'ibm-plex-mono' | 'fraunces'
+export type DisplayFontKey = 'poppins' | 'fraunces'
 export type FontKey = BodyFontKey | DisplayFontKey
 
 /**
@@ -134,7 +134,7 @@ export const TEMPLATE_META = [
     muted: '#5b6675',
     rule: '#d9dee5',
     headerAlign: 'left',
-    scale: { fs: 0.9, lh: 1, blockGap: 0.9, sectionGap: 1.071, padX: 1.125, padY: 1 },
+    scale: { fs: 0.92308, lh: 0.957, blockGap: 0.76667, sectionGap: 0.89286, padX: 1.125, padY: 0.92857 },
   },
   {
     id: 'zarif',
@@ -153,7 +153,7 @@ export const TEMPLATE_META = [
     muted: '#6b6359',
     rule: '#d9d2c5',
     headerAlign: 'center',
-    scale: { fs: 1.046, lh: 0.914, blockGap: 0.767, sectionGap: 0.786, padX: 1.25, padY: 0.929 },
+    scale: { fs: 1.046, lh: 0.914, blockGap: 0.667, sectionGap: 0.679, padX: 1.25, padY: 0.857 },
   },
   {
     id: 'ikili',
@@ -173,7 +173,7 @@ export const TEMPLATE_META = [
     muted: '#5f5f5f',
     rule: '#d4d4d4',
     headerAlign: 'left',
-    scale: { fs: 0.944, lh: 1.014, blockGap: 1, sectionGap: 1.25, padX: 0.9375, padY: 1 },
+    scale: { fs: 0.944, lh: 1.014, blockGap: 1.1, sectionGap: 1.4, padX: 0.9375, padY: 1 },
   },
   {
     id: 'panel',
@@ -192,7 +192,7 @@ export const TEMPLATE_META = [
     muted: '#5b6675',
     rule: '#d9dee5',
     headerAlign: 'left',
-    scale: { fs: 1, lh: 1, blockGap: 1, sectionGap: 1.143, padX: 0.8125, padY: 1 },
+    scale: { fs: 1, lh: 1, blockGap: 1.067, sectionGap: 1.25, padX: 0.8125, padY: 1 },
   },
   {
     id: 'teknik',
@@ -228,7 +228,7 @@ export const TEMPLATE_META = [
     muted: '#5b6675',
     rule: '#d9dee5',
     headerAlign: 'left',
-    scale: { fs: 1, lh: 0.943, blockGap: 0.867, sectionGap: 0.929, padX: 1.0625, padY: 1.071 },
+    scale: { fs: 1, lh: 0.929, blockGap: 0.767, sectionGap: 0.786, padX: 1.0625, padY: 1 },
   },
   {
     id: 'bant',
@@ -247,7 +247,7 @@ export const TEMPLATE_META = [
     muted: '#5b6675',
     rule: '#d9dee5',
     headerAlign: 'left',
-    scale: { fs: 0.92, lh: 0.957, blockGap: 0.767, sectionGap: 0.875, padX: 1.0625, padY: 1 },
+    scale: { fs: 0.92, lh: 0.943, blockGap: 0.7, sectionGap: 0.786, padX: 1.0625, padY: 1 },
   },
   {
     id: 'cizelge',
@@ -266,7 +266,7 @@ export const TEMPLATE_META = [
     muted: '#5b6675',
     rule: '#d9dee5',
     headerAlign: 'left',
-    scale: { fs: 0.92, lh: 0.979, blockGap: 0.867, sectionGap: 0.893, padX: 1, padY: 1 },
+    scale: { fs: 0.92, lh: 0.929, blockGap: 0.767, sectionGap: 0.857, padX: 1, padY: 1 },
   },
   {
     id: 'isvicre',
@@ -284,15 +284,16 @@ export const TEMPLATE_META = [
     muted: '#5f5f5f',
     rule: '#cfcfcf',
     headerAlign: 'left',
-    scale: { fs: 0.944, lh: 1.036, blockGap: 0.933, sectionGap: 1, padX: 1, padY: 1.071 },
+    scale: { fs: 0.944, lh: 0.986, blockGap: 0.867, sectionGap: 1, padX: 1, padY: 1.071 },
   },
   {
     id: 'yonetici',
     columns: [1],
     tags: ['executive'],
+    // Varsayılan lacivert: siyah-beyaz Teknik'ten küçük resimde ayrılsın (siyah ikinci takım)
     colorSets: [
-      { id: 'siyah', accent: '#1a1a1a' },
       { id: 'lacivert', accent: '#1b2f4b' },
+      { id: 'siyah', accent: '#1a1a1a' },
       { id: 'bordo', accent: '#6e1f2b' },
       { id: 'orman', accent: '#234a3d' },
     ],
@@ -302,7 +303,7 @@ export const TEMPLATE_META = [
     muted: '#5f5f5f',
     rule: '#1a1a1a',
     headerAlign: 'left',
-    scale: { fs: 0.94, lh: 0.957, blockGap: 0.867, sectionGap: 0.929, padX: 1.1875, padY: 1 },
+    scale: { fs: 0.964, lh: 0.914, blockGap: 0.7, sectionGap: 0.75, padX: 1.125, padY: 0.929 },
   },
   {
     id: 'portre',
@@ -321,7 +322,7 @@ export const TEMPLATE_META = [
     muted: '#5b6675',
     rule: '#d9dee5',
     headerAlign: 'left',
-    scale: { fs: 0.92, lh: 0.971, blockGap: 0.8, sectionGap: 0.964, padX: 1.0625, padY: 1 },
+    scale: { fs: 0.92, lh: 0.929, blockGap: 0.733, sectionGap: 0.857, padX: 1.0625, padY: 1 },
   },
   {
     id: 'denge',
@@ -340,7 +341,7 @@ export const TEMPLATE_META = [
     muted: '#5f666e',
     rule: '#cfd3d8',
     headerAlign: 'center',
-    scale: { fs: 1, lh: 1, blockGap: 0.933, sectionGap: 1.071, padX: 0.9375, padY: 1.071 },
+    scale: { fs: 1, lh: 0.971, blockGap: 1, sectionGap: 1.25, padX: 0.9375, padY: 1.071 },
   },
   {
     id: 'dergi',
@@ -378,7 +379,7 @@ export const TEMPLATE_META = [
     muted: '#595959',
     rule: '#d4d4d4',
     headerAlign: 'left',
-    scale: { fs: 0.92, lh: 0.986, blockGap: 0.833, sectionGap: 1, padX: 1.25, padY: 1 },
+    scale: { fs: 0.92, lh: 0.929, blockGap: 0.733, sectionGap: 0.821, padX: 1.25, padY: 1 },
   },
 ] as const satisfies readonly TemplateMeta[]
 

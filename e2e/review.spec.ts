@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { lengthenScript, patchCv } from './helpers.ts'
 
 /**
  * CV İnceleme: kural bulguları, "Düzenle" ile editöre odaklı geçiş, ilan
@@ -78,7 +79,7 @@ test('editör menüsünden ve üst menüden incelemeye gidilir', async ({ page }
 test('iş ilanı yapıştırınca eksik anahtar kelimeler görünür', async ({ page }) => {
   const { cvId } = await seedBrokenCv(page)
   await page.goto(`/inceleme?cv=${cvId}`)
-  // İlan alanı hep açık (sağ sütunda)
+  // İlan alanı hep açık (geniş sütunda, sonuçların altında)
   await page.getByLabel('İlan metni').fill(
     ['Frontend Geliştirici arıyoruz', '- React ve TypeScript deneyimi', '- Docker ve Kubernetes bilgisi', '- GraphQL ile API geliştirme'].join('\n'),
   )
@@ -174,12 +175,14 @@ test('20 MB\'tan büyük ya da çok uzun PDF anlaşılır bir sorun olarak gör�
 
 test("kendi CV'nde ATS'nin gördüğü metin basılacak sırayla görünür", async ({ page }) => {
   const { cvId } = await seedBrokenCv(page)
+  // Sayfa sayfa gösterimi denetlemek için CV bilerek birden çok sayfa (şablonun yoğunluğundan bağımsız).
+  await patchCv(page, cvId, lengthenScript())
   await page.goto(`/inceleme?cv=${cvId}`)
   await page.getByRole('button', { name: "ATS'nin gördüğü metin" }).click()
   const text = page.getByTestId('ats-text')
   await expect(text).toBeVisible()
   await expect(page.getByText(/PDF'e basıldığında/)).toBeVisible()
-  // Örnek CV iki sayfa: metin sayfa sayfa
+  // Uzatılmış CV birden çok sayfa: metin sayfa sayfa
   await expect(text.getByText('Sayfa 2', { exact: true })).toBeVisible()
   const lines = (await text.locator('p.whitespace-pre-wrap').allInnerTexts()).map((l) => l.trim())
   // Başlık, iletişim (madde işaretsiz), sonra bölümler DOM sırasıyla

@@ -4,8 +4,8 @@
  * Gövde Libre Franklin (K6). Yalnız iki sütun.
  * Her kural `.tpl-ikili` ile başlar. Sözleşme ve ortak varsayılanlar: base.css başı. Gövde boyu,
  * satır aralığı ve boşluklar templateMeta.ts `scale` ile gelir (CSS'te yeniden çarpma).
- * Ölçüler (orta boy, normal aralık): gövde 9.2 pt / 1.42; ad 23 pt; kenar 15 × 14 mm;
- * blok 3 mm, bölüm 7 mm; sütunlar arası 7 mm, çizgisiz.
+ * Ölçüler (orta boy, normal aralık): gövde 9.2 pt / 1.42; ad 23 pt; unvan 10.6 pt; tarih ve iletişim
+ * 0.92em (dört boy); kenar 15 × 14 mm; blok 3 mm, bölüm 7 mm; sütunlar arası 7 mm, çizgisiz.
  */
 
 .tpl-ikili {
@@ -69,6 +69,7 @@
 
 .tpl-ikili .cv-contact {
   margin-top: 2.2mm;
+  font-size: 0.92em;
   color: var(--muted);
 }
 
@@ -96,12 +97,8 @@
 
 /* ---------- Kayıtlar ---------- */
 
-.tpl-ikili .entry-title strong {
-  font-size: 1.04em;
-}
-
-/* Kurum adı vurgu renginde (setteki tek istisna) */
-.tpl-ikili .col-main .entry-sub .part:first-child {
+/* Kurum adı vurgu renginde (setteki tek istisna; yalnız deneyimde: okul ve derece siyah kalır) */
+.tpl-ikili .col-main .entry-experience .entry-sub .part:first-child {
   font-weight: 600;
   color: var(--accent-ink);
 }

@@ -31,13 +31,13 @@
 }
 
 .tpl-denge .cv-photo {
-  width: 24mm;
-  height: 24mm;
+  width: 20mm;
+  height: 20mm;
   border-radius: 50%;
 }
 
 .tpl-denge.align-center .cv-photo {
-  margin-bottom: 3.5mm;
+  margin-bottom: 2.5mm;
 }
 
 /* Sola yaslı hâl: fotoğraf adın solunda, üst kenarı başlığın iç boşluğunda */
@@ -70,7 +70,13 @@
 
 .tpl-denge .cv-contact {
   margin-top: 2.4mm;
+  font-size: 0.92em;
   color: var(--muted);
+}
+
+/* Ortalı iletişim: satırlar dengeli (son satırda tek öğe kalmaz; gizli ayırıcının payını motor dengeler) */
+.tpl-denge.align-center .cv-contact {
+  text-wrap: balance;
 }
 
 /* ---------- İki sütun: dikey ince çizgi (ana sütunun zemini; kenarlık sayfa boyu uzardı) ---------- */

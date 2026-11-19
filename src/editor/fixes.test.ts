@@ -8,7 +8,7 @@ import { findLinkedItem } from '@/features/translate/linkedItems'
 import { templateSettingsFor } from '@/render/templates'
 import { copyItemToCv } from './actions'
 import { useEditor } from './store'
-import { cssString, pendingMarkerCss, useEditorUi, type Suggestion } from './ui'
+import { useEditorUi } from './ui'
 
 function sampleCv(name = 'Test'): Cv {
   const sections = sampleSections('tr')
@@ -54,41 +54,6 @@ describe('başka CV\'ye kopyalama ve çeviri bağı', () => {
     expect((added as unknown as Record<string, string>).position).toBe((item as unknown as Record<string, string>).position)
     // Bağlı kayıt hâlâ ilk kopya
     expect(findLinkedItem(stored, 'experience', item.translationGroupId)?.itemId).toBe(same[0].id)
-  })
-})
-
-describe('bekleyen öneri işaretleri (CSS)', () => {
-  it('kayıt id\'si CSS kuralını kıramaz', () => {
-    const evil = 'x"]{}body{display:none}</style><script>alert(1)</script>[id="'
-    const suggestion: Suggestion = {
-      kind: 'field',
-      id: 's1',
-      sectionId: 'b1',
-      target: evil,
-      field: 'position',
-      before: 'a',
-      after: 'b',
-      rich: false,
-      note: '',
-    }
-    const css = pendingMarkerCss([suggestion])
-    expect(css).not.toContain('body{display:none}')
-    expect(css).not.toContain('</style>')
-    expect(css).not.toContain('<script>')
-    // Yalnız seçici sınırlarındaki tırnaklar ve content:"" kaçışsız
-    expect(css.match(/(?<!\\)"/g)).toHaveLength(6)
-    expect(cssString('item-kopya-0')).toBe('"item-kopya-0"')
-    expect(cssString('a"b')).toBe('"a\\22 b"')
-  })
-
-  it('kişisel bilgi ve kaldırma önerileri ayrı işaret alır; ekleme işaret almaz', () => {
-    const css = pendingMarkerCss([
-      { kind: 'field', id: '1', sectionId: null, target: 'personal', field: 'headline', before: '', after: 'x', rich: false, note: '' },
-      { kind: 'removeItem', id: '2', sectionId: 's', itemId: 'abc-1', snapshot: '{}', note: '' },
-    ])
-    expect(css).toContain('[id="personal-card"]')
-    expect(css).toContain('[id="item-abc-1"]')
-    expect(css).toContain('var(--danger)')
   })
 })
 

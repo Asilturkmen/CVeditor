@@ -525,6 +525,18 @@ export function UiShowcase() {
                     { label: 'Tırnaklı', options: [{ value: 'garamond', label: 'EB Garamond' }] },
                   ]}
                 />
+                {/* menu="popover": düğmenin altında, sağa hizalı, en az 280px, satır kırılmaz (yazı tipi seçici) */}
+                <SelectMenu
+                  menu="popover"
+                  aria-label="yazı tipi (popover)"
+                  value={font}
+                  onValueChange={setFont}
+                  options={[
+                    { value: 'inter', label: 'Inter' },
+                    { value: 'plex', label: 'IBM Plex Sans' },
+                    { value: 'garamond', label: 'EB Garamond' },
+                  ]}
+                />
                 <SelectMenu
                   bare
                   size="sm"

@@ -241,9 +241,9 @@ function ExtractedText({ pdf, hint }: { pdf: PdfText | ReadingText; hint: string
 }
 
 /**
- * CV İnceleme. Üstte tek satırlık kaynak çubuğu (kendi CV'n ya da PDF); altında solda sonuç
- * (önce düzeltilecekler, geçenler kapalı satırda, ATS metni), sağda iş ilanı (hep açık, anahtar
- * kelime karşılaştırmasıyla) ve yapay zekâ yorumu. Dar ekranda tek sütun.
+ * CV İnceleme. Üstte tek satırlık kaynak çubuğu (kendi CV'n ya da PDF); altında geniş solda sonuç
+ * (önce düzeltilecekler, geçenler kapalı satırda, ATS metni) ve iş ilanı (hep açık, anahtar kelime
+ * karşılaştırmasıyla), dar sağda yapay zekâ yorumu. Dar ekranda tek sütun.
  */
 export function ReviewPage() {
   const search = useSearch({ strict: false }) as { cv?: string }
@@ -367,32 +367,36 @@ export function ReviewPage() {
         </div>
       </Group>
 
+      {/*
+        Geniş sol sütun: kurala dayalı sonuç, altında iş ilanı ve ilanla karşılaştırma (sayfanın en çok
+        metin taşıyan iki parçası geniş sütunda). Dar sağ sütun: yapay zekâ yorumu. Dar ekranda tek sütun.
+      */}
       <div className="mt-8 grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(320px,400px)]">
-        <div className="min-w-0" aria-live="polite">
-          {!findings ? (
-            <EmptyState icon={FileSearch} title={m.rv_empty_title()} description={m.rv_empty_body()} />
-          ) : (
-            <div key={sourceKey} className="flex animate-rise-in flex-col gap-6">
-              <div className="px-4">
-                <SeverityCounts findings={findings} />
+        <div className="flex min-w-0 flex-col gap-8">
+          <div className="min-w-0" aria-live="polite">
+            {!findings ? (
+              <EmptyState icon={FileSearch} title={m.rv_empty_title()} description={m.rv_empty_body()} />
+            ) : (
+              <div key={sourceKey} className="flex animate-rise-in flex-col gap-6">
+                <div className="px-4">
+                  <SeverityCounts findings={findings} />
+                </div>
+                <FindingGroups findings={findings} onEdit={edit} />
+                {atsText && (
+                  <Disclosure summary={m.rv_text_title()} open={textOpen} onOpenChange={setTextOpen} className="-mt-3 [&>button]:ml-3">
+                    <ExtractedText pdf={atsText.pdf} hint={atsText.hint} />
+                  </Disclosure>
+                )}
               </div>
-              <FindingGroups findings={findings} onEdit={edit} />
-              {atsText && (
-                <Disclosure summary={m.rv_text_title()} open={textOpen} onOpenChange={setTextOpen} className="-mt-3 [&>button]:ml-3">
-                  <ExtractedText pdf={atsText.pdf} hint={atsText.hint} />
-                </Disclosure>
-              )}
-            </div>
-          )}
-        </div>
+            )}
+          </div>
 
-        <aside className="flex min-w-0 flex-col gap-8" aria-label={m.rv_side_label()}>
           <Group title={m.rv_ad_title()} count={m.rv_ad_optional()} inset="lg">
             <FormRow label={m.rv_ad_label()} hint={m.rv_ad_hint()} stacked>
               {(id, describedBy) => (
                 <BareTextarea
                   id={id}
-                  rows={8}
+                  rows={6}
                   aria-describedby={describedBy}
                   value={ad}
                   onChange={(e) => setAd(e.target.value)}
@@ -402,8 +406,10 @@ export function ReviewPage() {
             </FormRow>
             {match && findings && <KeywordPanel key={sourceKey} match={match} ai={{ cv: mineCv, pdf: readyPdf, jobAd: deferredAd }} />}
           </Group>
+        </div>
 
-          {findings && (
+        {findings && (
+          <aside className="flex min-w-0 flex-col gap-8" aria-label={m.rv_ai_title()}>
             <ReviewAiCard
               key={sourceKey}
               cv={mineCv}
@@ -412,8 +418,8 @@ export function ReviewPage() {
               jobAd={ad}
               onEdit={edit}
             />
-          )}
-        </aside>
+          </aside>
+        )}
       </div>
     </div>
   )

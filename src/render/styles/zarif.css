@@ -7,14 +7,16 @@
  * Başlık hizası Görünüm'den sola alınabilir: ad ve iletişim sola, fotoğraf adın solunda,
  * bölüm başlığının yalnız sağında çizgi.
  *
- * Ölçüler (orta boy, normal aralık): gövde EB Garamond 10.2 pt / 1.28; ad 26 pt 400; bölüm başlığı ve
- * unvan 0.88em büyük harf; tarih ve iletişim 0.92em (beş boy). Kenar 20 × 13 mm; blok 2.3 mm, bölüm 4.4 mm.
+ * Ölçüler (orta boy, normal aralık): gövde EB Garamond 10.6 pt / 1.28; ad 25 pt 400; bölüm başlığı ve
+ * unvan 0.95em büyük harf (adın %40'ı); tarih ve iletişim 0.92em (dört boy). Kenar 20 × 13 mm;
+ * blok 2.3 mm, bölüm 4.4 mm.
  * Ağırlıklar 400 ve 600 (zengin metindeki kalın da 600). Tarih ve telefonda astarlı rakam (Garamond'un
  * eski üslup rakamları küçük boyda zor seçiliyor).
  */
 
 /* ---------- Başlık ---------- */
 
+/* Kenar boşluğu en az 12 mm: motor `--pad-x`/`--pad-y`'yi tabanla verir (renderCv.ts scaledMetrics). */
 .tpl-zarif .cv-header {
   margin: 0 var(--pad-x);
   padding: var(--pad-y) 0 var(--section-gap);
@@ -27,13 +29,13 @@
 }
 
 .tpl-zarif .cv-photo {
-  width: 20mm;
-  height: 20mm;
+  width: 17mm;
+  height: 17mm;
   border-radius: 50%;
 }
 
 .tpl-zarif.align-center .cv-photo {
-  margin-bottom: 2mm;
+  margin-bottom: 1.8mm;
 }
 
 .tpl-zarif.align-left .cv-photo {
@@ -41,7 +43,7 @@
 }
 
 .tpl-zarif .cv-name {
-  --name-size: 2.5em;
+  --name-size: 2.35em;
   --name-room: 144mm;
   --name-char: 0.6;
   font-weight: 400;
@@ -55,7 +57,7 @@
 
 .tpl-zarif .cv-headline {
   margin-top: 1.2mm;
-  font-size: 0.88em;
+  font-size: 0.95em;
   line-height: 1.3;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -63,7 +65,7 @@
 }
 
 .tpl-zarif .cv-contact {
-  margin-top: 1.2mm;
+  margin-top: 1mm;
   font-size: 0.92em;
   line-height: 1.4;
   font-variant-numeric: lining-nums;
@@ -71,19 +73,11 @@
 }
 
 /*
- * Ortalı iletişim: satırlar dengeli (5 + 1 öğe yerine 3 + 3). Satır sonundaki gizli ayırıcı (K3) yer
- * kapladığından görünen metin sola kayardı: son öğeye de aynı genişlikte görünmez bir ayırıcı eklenir
- * (metin değil, PDF'e girmez) ve liste o kadar soldan içeri alınır; her satırın görünen metni tam ortada durur.
+ * Ortalı iletişim: satırlar dengeli (5 + 1 öğe yerine 3 + 3). Satır sonundaki gizli ayırıcının (K3)
+ * payını motor dengeler (base.css contact-center): her satırın görünen metni tam ortada durur.
  */
 .tpl-zarif.align-center .cv-contact {
   text-wrap: balance;
-  padding-left: calc(0.4em + 1.2mm);
-}
-
-.tpl-zarif.align-center .cv-contact li:last-child::after {
-  content: ' ·';
-  padding-right: 1.2mm;
-  visibility: hidden;
 }
 
 /* ---------- Bölüm başlığı: iki yanında ince çizgi ---------- */
@@ -93,9 +87,9 @@
   align-items: center;
   gap: 3mm;
   font-family: var(--font-display);
-  font-size: 0.88em;
+  font-size: 0.95em;
   font-weight: 600;
-  line-height: 1.3;
+  line-height: 1.2;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--accent-ink);
@@ -141,7 +135,7 @@
 }
 
 .tpl-zarif .entry-body {
-  margin-top: 1mm;
+  margin-top: 0.8mm;
 }
 
 .tpl-zarif .rich strong {

@@ -58,7 +58,9 @@ export function sampleSections(language: CvLanguage): Section[] {
       : '<ul><li>Designed and launched 9 websites for local businesses.</li><li>Maintained the sites under monthly support agreements.</li></ul>',
   })
 
-  const education = createSection('education', 1)
+  // Galeri küçük resimleri dolu görünsün diye ikinci bir eğitim kaydı (SET-14 §4.3): örnek CV her
+  // şablonun varsayılan düzeninde tek sayfanın %88-98'ini doldurur.
+  const education = createSection('education', 2)
   Object.assign(education.items[0], {
     school: tr ? 'Ege Üniversitesi' : 'Ege University',
     degree: tr ? 'Lisans' : "Bachelor's degree",
@@ -66,6 +68,15 @@ export function sampleSections(language: CvLanguage): Section[] {
     location: tr ? 'İzmir' : 'Izmir',
     dates: { start: ym(2020, 9), end: ym(2024, 6), current: false },
     grade: '3.42 / 4.00',
+    description: '',
+  })
+  Object.assign(education.items[1], {
+    school: tr ? 'Viyana Teknik Üniversitesi' : 'TU Wien',
+    degree: tr ? 'Erasmus+ değişim dönemi' : 'Erasmus+ exchange semester',
+    field: tr ? 'Bilgisayar Bilimleri' : 'Computer Science',
+    location: tr ? 'Viyana' : 'Vienna',
+    dates: { start: ym(2023, 2), end: ym(2023, 6), current: false },
+    grade: '',
     description: '',
   })
 

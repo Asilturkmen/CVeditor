@@ -1,17 +1,16 @@
 import type { ReactNode } from 'react'
-import { cn } from '@/lib/cn'
 
 /**
- * Anahtar kelime: CV'de olan gri dolgu + onay, olmayan yalnız ince kenar (renk tek işaret değil).
- * 24px, yarıçap 6; uzun terim sarar.
+ * Anahtar kelime: düz metin, satır içi liste öğesi; terimler arasında süs ayırıcı `·` (hap/çip
+ * değil, DESIGN "değer hap içine alınmaz"). Eksik/Var ayrımı listenin başlığında (renk tek işaret değil).
+ * `present` geriye uyum için kalır; görünümü değiştirmez.
  */
 export function TermChip({
-  present,
   children,
   title,
   'aria-label': ariaLabel,
 }: {
-  present: boolean
+  present?: boolean
   children: ReactNode
   title?: string
   'aria-label'?: string
@@ -20,27 +19,41 @@ export function TermChip({
     <li
       title={title}
       aria-label={ariaLabel}
-      className={cn(
-        'inline-flex min-h-6 max-w-full items-center gap-1 rounded-sm px-2 py-0.5 text-callout text-fg',
-        present ? 'bg-fill-3' : 'shadow-[inset_0_0_0_1px_var(--separator-strong)]',
-      )}
+      className="inline text-body text-fg after:mx-1.5 after:text-fg-3 after:content-['·'] last:after:content-none"
     >
       {children}
     </li>
   )
 }
 
-/** Başlık + düz sayı + (varsa) açıklama + terimler. */
-export function TermList({ title, count, hint, children }: { title: string; count: number; hint?: string; children: ReactNode }) {
+/** Başlık (isteğe bağlı ikonla) + düz sayı + (varsa) açıklama + terimler tek paragraf gibi akar. */
+export function TermList({
+  title,
+  count,
+  hint,
+  icon,
+  children,
+}: {
+  title: string
+  count: number
+  hint?: string
+  icon?: ReactNode
+  children: ReactNode
+}) {
   return (
-    <div>
-      <h4 className="flex items-baseline gap-1.5 text-headline text-fg">
+    <div className="min-w-0">
+      <h4 className="flex items-center gap-1.5 text-headline text-fg">
+        {icon && (
+          <span aria-hidden className="flex [&_svg]:size-4">
+            {icon}
+          </span>
+        )}
         {title}
         <span className="font-normal text-fg-2 tabular-nums">{count}</span>
       </h4>
       {hint && count > 0 && <p className="mt-0.5 text-callout text-fg-2">{hint}</p>}
       {count > 0 && (
-        <ul className="mt-2 flex flex-wrap gap-1.5" aria-label={title}>
+        <ul className="mt-1.5 break-words" aria-label={title}>
           {children}
         </ul>
       )}

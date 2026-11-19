@@ -25,6 +25,7 @@ import { dndScreenReaderInstructions, useDndAnnouncements } from '../content/dnd
 import { useSortDnd, useStableIds } from '../content/keyboardSort'
 import { PhotoRow } from '../content/photo'
 import { useSortableStyle, VERTICAL_ONLY } from '../content/sortableStyle'
+import { DRAG_SOURCE_CLASS, DragGhost, SortOverlay } from '../content/SortOverlay'
 
 /** Ayar satırı: etiket solda, kontrol sağda (44px); altında isteğe bağlı açıklama (sarar). */
 function SettingRow({
@@ -159,8 +160,8 @@ function fontGroups(): SelectMenuGroup[] {
     short: FONTS[id].label,
     style: { fontFamily: FONTS[id].stack },
     label: (
-      <span className="flex items-baseline gap-2">
-        <span className="text-body-user">{FONTS[id].label}</span>
+      <span className="flex items-baseline justify-between gap-6">
+        <span className="text-body-user leading-5">{FONTS[id].label}</span>
         <span className="text-fg-2">{FONT_SAMPLE}</span>
       </span>
     ),
@@ -214,8 +215,8 @@ function SectionRow({
       ref={setNodeRef}
       style={style}
       className={cn(
-        'flex min-h-10 items-center gap-1 bg-content py-1 pr-[var(--row-px)] pl-1 transition-[box-shadow,border-radius,scale] duration-200',
-        isDragging && 'z-20 scale-[1.02] rounded-lg bg-elevated shadow-3',
+        'flex min-h-10 items-center gap-1 bg-content py-1 pr-[var(--row-px)] pl-1',
+        isDragging && DRAG_SOURCE_CLASS,
       )}
     >
       <DragHandle label={m.ap_order_drag({ name: title })} {...attributes} {...listeners} className="h-8 self-center" />
@@ -281,6 +282,7 @@ function SectionsList({ cv, twoColumns }: { cv: Cv; twoColumns: boolean }) {
           ))}
         </ul>
       </SortableContext>
+      <SortOverlay render={(id) => <DragGhost title={nameOf(id)} className="min-h-10 py-2" />} />
     </DndContext>
   )
 }
@@ -304,14 +306,15 @@ export function AppearanceTab({ cv }: { cv: Cv }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <Group title={m.ap_template()} footer={m.ap_template_hint()}>
+      {/* "Şablon değiştirmek içeriği kaybettirmez." notu bir kez, değiştirmenin yapıldığı şablon rayında. */}
+      <Group title={m.ap_template()}>
         <TemplateRow cv={thumbnailCv} />
       </Group>
 
       <Group title={m.ap_format()}>
         <ColorRow cv={cv} template={template} />
         <SettingRow label={m.ap_font()} htmlFor={fontId} note={m.ap_font_hint()}>
-          <SelectMenu id={fontId} value={t.font} onValueChange={(v) => set('font')(v as FontId)} groups={groups} aria-label={m.ap_font()} className="min-w-40" />
+          <SelectMenu id={fontId} value={t.font} onValueChange={(v) => set('font')(v as FontId)} groups={groups} aria-label={m.ap_font()} menu="popover" className="min-w-40" />
         </SettingRow>
         <SettingRow label={m.ap_font_size()}>
           <Segmented

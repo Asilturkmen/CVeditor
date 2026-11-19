@@ -48,9 +48,6 @@ export const BODY_FONT_ORDER: FontId[] = [
 /** Yalnız şablonların ad ve başlıklarında kullanılan aileler (seçilmez). */
 export const DISPLAY_FONTS: Record<DisplayFontKey, FontDef> = {
   poppins: font('poppins', 'Poppins', 'sans'),
-  'dm-serif-display': font('dm-serif-display', 'DM Serif Display', 'serif'),
-  'playfair-display': font('playfair-display', 'Playfair Display', 'serif'),
-  'ibm-plex-mono': font('ibm-plex-mono', 'IBM Plex Mono', 'mono'),
   fraunces: font('fraunces', 'Fraunces', 'serif'),
 }
 

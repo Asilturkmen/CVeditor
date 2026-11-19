@@ -45,8 +45,18 @@ export async function createCv(
     await page.getByRole('button', { name: 'Bu şablonla başla' }).click()
   }
   await page.waitForURL(/\/editor\//)
-  await expect(preview(page).locator('.page').first()).toBeVisible()
+  // Yük altında (çok işçi) editörün ilk çizimi 10 sn'yi aşabiliyor: ilk açılışa daha uzun süre tanınır.
+  await expect(preview(page).locator('.page').first()).toBeVisible({ timeout: 20_000 })
+  await settleViewTransition(page)
   return page.url().split('/').pop()!
+}
+
+/**
+ * Sayfa geçişi (View Transition, ~250 ms) sürerken tarayıcı bütün tıklamaları belge köküne verir:
+ * editör açılır açılmaz yapılan tıklama (önizlemede kayda, panelde satıra) kaybolur. Geçişin bitmesi beklenir.
+ */
+export async function settleViewTransition(page: Page) {
+  await page.waitForFunction(() => !document.getAnimations().some((a) => (a.effect as KeyframeEffect | null)?.pseudoElement?.startsWith('::view-transition')))
 }
 
 /**
@@ -61,13 +71,47 @@ export async function openRow(page: Page, text: string | RegExp, index = 0) {
   return row
 }
 
-/** Bölümdeki n. kaydı açar (adı olmayan boş kayıtlar için). */
+/**
+ * Bölümdeki n. kaydı açar (adı olmayan boş kayıtlar için). Bölümde o kadar kayıt yoksa (boş CV'de
+ * Deneyim/Eğitim kayıtsız gelir) bölümün "+ … ekle" düğmesiyle yeni kayıt eklenir; yeni kayıt açık gelir.
+ */
 export async function openRowIn(page: Page, section: string, index = 0) {
-  const row = page.getByRole('region', { name: section, exact: true }).locator('[id^="item-"]').nth(index)
+  const region = page.getByRole('region', { name: section, exact: true })
+  const rows = region.locator('[id^="item-"]')
+  if ((await rows.count()) <= index) {
+    await region.locator('[data-add-item]').first().click()
+    await expect(rows).toHaveCount(index + 1)
+  }
+  const row = rows.nth(index)
   const toggle = row.locator('[aria-expanded]').first()
   if ((await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click()
   await expect(toggle).toHaveAttribute('aria-expanded', 'true')
   return row
+}
+
+/**
+ * CV'yi bilerek birden çok sayfaya uzatır (şablonun yoğunluğundan bağımsız): deneyime `extra` kayıt
+ * ekler, sürümü (`updatedAt`) artırır ve sayfayı yeniler. Çok sayfa varsayan testler için.
+ */
+export async function lengthenCv(page: Page, cvId: string, extra = 6) {
+  await patchCv(page, cvId, lengthenScript(extra))
+  await page.reload()
+  await expect(preview(page).locator('.page').nth(1)).toBeAttached({ timeout: 15_000 })
+}
+
+/** `patchCv` gövdesi: deneyime `extra` kayıt ekler ve sürümü (`updatedAt`) artırır. */
+export function lengthenScript(extra = 6) {
+  return `const exp = cv.sections.find((s) => s.type === 'experience');
+    for (let i = 1; i <= ${extra}; i++) {
+      exp.items.push({
+        ...structuredClone(exp.items[0]),
+        id: 'ek-' + i,
+        translationGroupId: 'ek-grup-' + i,
+        position: 'Ek Görev ' + i,
+        description: '<ul>' + [1, 2, 3].map((k) => '<li>Görev ' + i + ' maddesi ' + k + ' ölçülebilir bir sonucu kısaca anlatır.</li>').join('') + '</ul>',
+      });
+    }
+    cv.updatedAt = new Date(Date.parse(cv.updatedAt) + 1000).toISOString();`
 }
 
 /** Geliştirme sunucusunda açık olan veritabanı üzerinden CV değiştirir. */

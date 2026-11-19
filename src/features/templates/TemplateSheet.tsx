@@ -2,7 +2,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { ChevronLeft, ChevronRight, Copy, FileText, FileUp, X } from 'lucide-react'
 import { Dialog as D } from 'radix-ui'
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import { createCv, defaultSections, duplicateCv } from '@/cv/factory'
 import { initialCvLanguage } from '@/cv/locale'
 import { describeCvError, migrateCv } from '@/cv/migrate'
@@ -133,6 +133,29 @@ export function TemplateSheet({
     if (templateId === null) creating.current = false
   }, [templateId])
 
+  // Editörün kod parçası sayfa açılınca önden yüklenir: "Bu şablonla başla" / "CV'yi oluştur" sonrası
+  // geçiş beklemesiz olur (yük altında parça geç inince URL editördeyken eski sayfa görünür kalıyordu).
+  useEffect(() => {
+    if (templateId !== null) void import('@/features/editor/EditorPage')
+  }, [templateId])
+
+  // "Eski CV'ni içe aktar" kısayoluyla açılınca seçili içe aktarma satırı görünür olsun (alçak pencerede
+  // sağ sütun başlangıç grubuna kayar; birincil düğme eylem satırında zaten hep görünür).
+  const startGroupId = useId()
+  const opened = templateId !== null
+  useEffect(() => {
+    if (!opened || initialMode !== 'import') return
+    const frame = requestAnimationFrame(() => {
+      const row = document.getElementById(startGroupId)?.querySelector('[aria-checked="true"]')
+      if (!row) return
+      // Eylem satırı (telefonda sayfanın altına yapışık) satırı örtüyorsa da kaydır.
+      const r = row.getBoundingClientRect()
+      const footerTop = primaryRef.current?.parentElement?.getBoundingClientRect().top ?? window.innerHeight
+      if (r.top < 64 || r.bottom > footerTop - 8) row.scrollIntoView({ block: 'center' })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [opened, initialMode, startGroupId])
+
   if (!shownId) return null
   const template = TEMPLATES[shownId]
   const text = TEMPLATE_TEXT[shownId]
@@ -175,8 +198,14 @@ export function TemplateSheet({
       toast({ message: m.err_storage_write(), tone: 'error' })
       return
     }
-    onClose()
-    void navigate({ to: '/editor/$cvId', params: { cvId: cv.id } })
+    // Önce editöre geçilir (düğme "yükleniyor" kalır), sonra sayfa ve içe aktarma penceresi kapanır:
+    // editör yüklenirken kullanıcı açık kalmış bir içe aktarma penceresine bakmaz.
+    try {
+      await navigate({ to: '/editor/$cvId', params: { cvId: cv.id } })
+    } finally {
+      setImportOpen(false)
+      onClose()
+    }
   }
 
   const cvName = () => name.trim() || defaultName(language)
@@ -313,7 +342,7 @@ export function TemplateSheet({
                 </Badge>
               </div>
 
-              {/* Sağ sütun: tanım, görünüm, ad/dil, başlangıç */}
+              {/* Sağ sütun: tanım · ad/dil · başlangıç · görünüm (renk/örnek en sonda; başlangıç katlamanın üstünde) */}
               <div className="flex min-h-0 flex-col md:border-l md:border-separator">
                 <div
                   ref={formScrollRef}
@@ -325,6 +354,96 @@ export function TemplateSheet({
                     <p className="mt-1 text-callout text-fg-2">{text.features()}</p>
                     <D.Description className="mt-2 text-body text-fg">{text.description()}</D.Description>
                   </div>
+
+                  <form
+                    onSubmit={(event) => {
+                      event.preventDefault()
+                      void create()
+                    }}
+                  >
+                    <Group title={m.list_new_cv()}>
+                      <FormRow label={m.new_cv_name()} hint={m.new_cv_name_hint()} labelWidth={96}>
+                        {(id, describedBy) => (
+                          <BareInput
+                            id={id}
+                            value={name}
+                            aria-describedby={describedBy}
+                            onChange={(event) => {
+                              setName(event.target.value)
+                              setNameTouched(true)
+                            }}
+                          />
+                        )}
+                      </FormRow>
+                      <GroupRow
+                        title={m.new_cv_language()}
+                        description={m.new_cv_language_hint()}
+                        trailing={
+                          <Segmented
+                            aria-label={m.new_cv_language()}
+                            value={language}
+                            onChange={changeLanguage}
+                            options={[
+                              { value: 'tr', label: m.lang_tr() },
+                              { value: 'en', label: m.lang_en() },
+                            ]}
+                          />
+                        }
+                      />
+                    </Group>
+                    <button type="submit" hidden />
+                  </form>
+
+                  <Group title={m.new_cv_start_title()} id={startGroupId}>
+                    <RadioGroup
+                      aria-label={m.new_cv_start_title()}
+                      value={mode}
+                      onValueChange={(value) => setMode(value as StartMode)}
+                      className="group-rows gap-0"
+                    >
+                      <RadioRow
+                        value="blank"
+                        selected={mode === 'blank'}
+                        icon={<FileText />}
+                        title={m.start_blank()}
+                        description={m.start_blank_desc()}
+                      />
+                      <RadioRow
+                        value="import"
+                        selected={mode === 'import'}
+                        icon={<FileUp />}
+                        title={m.start_import()}
+                        description={m.start_import_desc()}
+                      />
+                      <RadioRow
+                        value="copy"
+                        selected={mode === 'copy'}
+                        icon={<Copy />}
+                        title={m.start_copy()}
+                        description={cvs.length > 0 ? m.start_copy_desc() : m.start_copy_none()}
+                        disabled={cvs.length === 0}
+                      >
+                        <div className="flex flex-col gap-2">
+                          <Select
+                            controlSize="sm"
+                            className={controlOnContentClass}
+                            value={copyFrom}
+                            onChange={(event) => setCopyFrom(event.target.value)}
+                            aria-label={m.start_copy()}
+                          >
+                            {cvs.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.name} ({c.language.toUpperCase()})
+                              </option>
+                            ))}
+                          </Select>
+                          {copySource && copySource.language !== language && (
+                            <p className="text-callout text-warn">{m.start_copy_language_note()}</p>
+                          )}
+                        </div>
+                      </RadioRow>
+                    </RadioGroup>
+                  </Group>
 
                   <Group title={m.templates_look_title()} footer={m.templates_look_hint()}>
                     <GroupRow
@@ -378,96 +497,6 @@ export function TemplateSheet({
                       }
                     />
                   </Group>
-
-                  <form
-                    onSubmit={(event) => {
-                      event.preventDefault()
-                      void create()
-                    }}
-                  >
-                    <Group title={m.list_new_cv()}>
-                      <FormRow label={m.new_cv_name()} hint={m.new_cv_name_hint()} labelWidth={96}>
-                        {(id, describedBy) => (
-                          <BareInput
-                            id={id}
-                            value={name}
-                            aria-describedby={describedBy}
-                            onChange={(event) => {
-                              setName(event.target.value)
-                              setNameTouched(true)
-                            }}
-                          />
-                        )}
-                      </FormRow>
-                      <GroupRow
-                        title={m.new_cv_language()}
-                        description={m.new_cv_language_hint()}
-                        trailing={
-                          <Segmented
-                            aria-label={m.new_cv_language()}
-                            value={language}
-                            onChange={changeLanguage}
-                            options={[
-                              { value: 'tr', label: m.lang_tr() },
-                              { value: 'en', label: m.lang_en() },
-                            ]}
-                          />
-                        }
-                      />
-                    </Group>
-                    <button type="submit" hidden />
-                  </form>
-
-                  <Group title={m.new_cv_start_title()}>
-                    <RadioGroup
-                      aria-label={m.new_cv_start_title()}
-                      value={mode}
-                      onValueChange={(value) => setMode(value as StartMode)}
-                      className="group-rows gap-0"
-                    >
-                      <RadioRow
-                        value="blank"
-                        selected={mode === 'blank'}
-                        icon={<FileText />}
-                        title={m.start_blank()}
-                        description={m.start_blank_desc()}
-                      />
-                      <RadioRow
-                        value="import"
-                        selected={mode === 'import'}
-                        icon={<FileUp />}
-                        title={m.start_import()}
-                        description={m.start_import_desc()}
-                      />
-                      <RadioRow
-                        value="copy"
-                        selected={mode === 'copy'}
-                        icon={<Copy />}
-                        title={m.start_copy()}
-                        description={cvs.length > 0 ? m.start_copy_desc() : m.start_copy_none()}
-                        disabled={cvs.length === 0}
-                      >
-                        <div className="flex flex-col gap-2">
-                          <Select
-                            controlSize="sm"
-                            className={controlOnContentClass}
-                            value={copyFrom}
-                            onChange={(event) => setCopyFrom(event.target.value)}
-                            aria-label={m.start_copy()}
-                          >
-                            {cvs.map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {c.name} ({c.language.toUpperCase()})
-                              </option>
-                            ))}
-                          </Select>
-                          {copySource && copySource.language !== language && (
-                            <p className="text-callout text-warn">{m.start_copy_language_note()}</p>
-                          )}
-                        </div>
-                      </RadioRow>
-                    </RadioGroup>
-                  </Group>
                 </div>
 
                 {/* Eylem satırı: Vazgeç solda, birincil sağda; telefonda tam genişlik, birincil üstte */}
@@ -507,9 +536,15 @@ export function TemplateSheet({
         onOpenChange={(next) => !next && setImportOpen(false)}
         title={m.import_title()}
         size="lg"
-        className="w-[min(94vw,680px)]"
+        // Gri pencere + beyaz gruplar (şablon sayfası ve editörle aynı kart dili; beyaz üstünde gri kutu yok).
+        className="w-[min(94vw,680px)] bg-window"
         footer={
           <>
+            {importSelection && importSelection.count.total > 0 && (
+              <span className="mr-auto text-callout text-fg-2 tabular-nums max-sm:text-center">
+                {m.imp_count({ selected: importSelection.count.selected, total: importSelection.count.total })}
+              </span>
+            )}
             <Button size="lg" onClick={() => setImportOpen(false)}>
               {m.common_cancel()}
             </Button>
@@ -525,7 +560,7 @@ export function TemplateSheet({
           </>
         }
       >
-        <ImportPreview language={language} onChange={setImportSelection} onLanguageChange={changeLanguage} />
+        <ImportPreview language={language} onChange={setImportSelection} onLanguageChange={changeLanguage} surface="window" />
       </Dialog>
     </>
   )

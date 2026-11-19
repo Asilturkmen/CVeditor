@@ -37,10 +37,7 @@ const FONTS = [
   { id: 'libre-franklin', pkg: 'libre-franklin', family: 'CV Libre Franklin', faces: BODY }, // İkili
   // Yalnız şablonun başlık/ad ailesi (Görünüm'de seçilmez)
   { id: 'poppins', pkg: 'poppins', family: 'CV Poppins', faces: ['500', '600'] }, // Denge'nin adı
-  { id: 'dm-serif-display', pkg: 'dm-serif-display', family: 'CV DM Serif Display', faces: ['400', '400i'] },
-  { id: 'playfair-display', pkg: 'playfair-display', family: 'CV Playfair Display', faces: ['400', '700', '400i'] },
-  { id: 'ibm-plex-mono', pkg: 'ibm-plex-mono', family: 'CV IBM Plex Mono', faces: ['400', '500'] },
-  { id: 'fraunces', pkg: 'fraunces', family: 'CV Fraunces', faces: ['600', '600i'] },
+  { id: 'fraunces', pkg: 'fraunces', family: 'CV Fraunces', faces: ['600', '600i'] }, // Dergi'nin adı
 ]
 
 // Eski dosyalar (ör. önceki değişken yazı tipleri) kalmasın; lisanslar yeniden kopyalanır.

@@ -1,12 +1,13 @@
 /*
  * Bant (`bant`): docs/sablonlar/SET-14.md Şablon 7. Kenardan kenara düz (köşesiz) koyu bant; içinde beyaz
- * tırnaklı ad (Literata) ve bandın İÇİNDE yuvarlak fotoğraf (taşma yok). Gövde Inter. Tek ya da iki
+ * tırnaklı ad (Literata) ve bandın İÇİNDE halkasız yuvarlak fotoğraf (taşma yok); bölüm başlıkları
+ * tırnaklı, altlarında sütun genişliğinde ince vurgu çizgisi. Gövde Inter. Tek ya da iki
  * sütun; yan sütun zeminsiz (kart yok). Bant yalnız ilk sayfada.
  * Her kural `.tpl-bant` ile başlar. Sözleşme ve ortak varsayılanlar: base.css başı. Gövde boyu,
  * satır aralığı ve boşluklar templateMeta.ts `scale` ile gelir (CSS'te yeniden çarpma).
  * Bant başlığın kendi zeminidir; kimlik seçiciyle verilir (editördeki üzerine gelme/odak ve baskıdaki
  * sıfırlama kuralları başlığın `background`'ını ezemez). Başlık konumlandırılmaz (position/z-index yok).
- * İLK SÜRÜM (T0): iskelet ve ölçüler şartnameden; şablon ekibi cilalayacak.
+ * Cilalandı (T-css): örnek CV tek sayfanın %85-95ini doldurur; ölçüler §5 aralıklarında.
  */
 
 .tpl-bant {
@@ -20,7 +21,7 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 0;
-  padding: 9mm var(--pad-x) 8.5mm;
+  padding: 7.5mm var(--pad-x) 7mm;
   margin-bottom: 5mm;
   color: var(--on-accent);
   /* Bant üstündeki öneri farkları ve fotoğraf yer tutucusu renkli zemine göre */
@@ -41,11 +42,11 @@
 .tpl-bant .cv-photo {
   grid-column: 2;
   grid-row: 1;
-  width: 28mm;
-  height: 28mm;
+  width: 24mm;
+  height: 24mm;
   margin-left: 8mm;
+  /* Süs halkası yok (§5.4): fotoğraf bandın içinde düz daire */
   border-radius: 50%;
-  border: 0.7mm solid var(--on-accent);
 }
 
 .tpl-bant .cv-name {
@@ -60,7 +61,7 @@
 .tpl-bant .cv-headline {
   margin-top: 1mm;
   font-family: var(--font-display);
-  font-size: 1.2em;
+  font-size: 1.24em;
   font-style: italic;
   font-weight: 400;
   color: var(--on-accent-dim);
@@ -68,6 +69,7 @@
 
 .tpl-bant .cv-contact {
   margin-top: 2.6mm;
+  font-size: 0.92em;
   color: var(--on-accent-muted);
 }
 
@@ -86,30 +88,25 @@
   margin: 0 0 3.5mm;
 }
 
-/* ---------- Bölüm başlığı: tırnaklı + kısa kalın alt çubuk ---------- */
-
+/*
+ * ---------- Bölüm başlığı: tırnaklı, altında sütun genişliğinde ince vurgu çizgisi ----------
+ * Kısa çubuk yerine kenardan kenara çizgi (§5.3: yarım kalan çizgi yok). Çizgi bandın rengindedir;
+ * başlığın alt iç boşluğu "ğ, ç, ş" kuyruklarını çizgiden ayırır.
+ */
 .tpl-bant .section-title {
+  padding-bottom: 1.2mm;
+  border-bottom: 0.25mm solid var(--accent);
   font-family: var(--font-display);
   font-size: 1.24em;
   font-weight: 600;
-  line-height: 1.2;
+  line-height: 1.25;
   text-transform: none;
   letter-spacing: 0;
   color: var(--accent-ink);
 }
 
-.tpl-bant .section-title::after {
-  content: '';
-  display: block;
-  width: 9mm;
-  height: 0.7mm;
-  margin-top: 0.9mm;
-  background: var(--accent);
-}
-
-/* Çubuk başlığın görsel alt kenarı: ilk kayıt ona 1.4 mm'de yapışır (ortak 1.8 mm yerine) */
 .tpl-bant .section-title + * {
-  margin-top: calc(1.4mm - var(--block-gap));
+  margin-top: calc(1.6mm - var(--block-gap));
 }
 
 /* ---------- İki sütun: zeminsiz yan sütun, aralık 8 mm ---------- */
@@ -144,7 +141,7 @@
 }
 
 .tpl-bant.cols-2 .section-title + * {
-  margin-top: calc(1.8mm - var(--block-gap) * 1.5);
+  margin-top: calc(1.6mm - var(--block-gap) * 1.5);
 }
 
 .tpl-bant.cols-2 .entry-skills + .entry-skills,

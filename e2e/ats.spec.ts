@@ -151,8 +151,19 @@ function expectedOrder(layout: Layout, T: Titles, header: string[]) {
   const order = (list: string[]) => (layout.dateFirst ? datesFirst(list) : list)
   const main = order(MAIN).map(T)
   const side = order(SIDE_SECTIONS).map((s) => labelFor(layout, T(s)))
-  if (layout.columns === 1) return { header: [...header, ...CONTACT], side: [], main: [...main, ...side] }
-  return { header: [...header, ...CONTACT], side, main }
+  if (layout.columns === 1) return { header: [...header, ...CONTACT], side: [], main: [...main, ...side], sideY: [] }
+  return { header: [...header, ...CONTACT], side, main, sideY: layout.dateFirst ? side : datesAfterSub(side) }
+}
+
+/**
+ * Dar yan sütunda tarihli kaydın tarihi alt satırın (kurumun) altına çizilir (base.css ızgara; DOM
+ * sırası değişmez): y sırası başlık → alt satır → tarih, içerik akışı başlık → tarih → alt satır.
+ */
+function datesAfterSub(list: string[]): string[] {
+  const out = [...list]
+  const at = out.indexOf('Kas 2023')
+  if (at >= 0 && out[at + 1] === 'Örnek Akademi') [out[at], out[at + 1]] = [out[at + 1], out[at]]
+  return out
 }
 
 /**
@@ -533,7 +544,7 @@ for (const layout of LAYOUTS) {
       for (const p of pages) expect(p.items.length, 'boş PDF sayfası').toBeGreaterThan(0)
 
       // İçerik akışı: başlık en önde; iki sütunda yan sütunun tamamı ana sütundan önce (DOM sırası).
-      const { header, side, main } = expectedOrder(layout, T, shownHeader)
+      const { header, side, main, sideY } = expectedOrder(layout, T, shownHeader)
       const flow = layout.sideEnd ? [...header, ...main, ...side] : [...header, ...side, ...main]
       expect(orderProblem(norm(text), flow.map(norm))).toBeNull()
 
@@ -556,7 +567,7 @@ for (const layout of LAYOUTS) {
         const sideText = norm(ySortedText(pages, (i, p) => !inHeader(i, p) && inSide(i, p)))
         const mainText = norm(ySortedText(pages, (i, p) => !inHeader(i, p) && !inSide(i, p)))
         expect(orderProblem(headerText, header.map(norm))).toBeNull()
-        expect(orderProblem(sideText, side.map(norm))).toBeNull()
+        expect(orderProblem(sideText, sideY.map(norm))).toBeNull()
         expect(orderProblem(mainText, main.map(norm))).toBeNull()
         // Sütunlar birbirine karışmıyor: ana sütun metni yan sütunda yok (ve tersi).
         for (const needle of [T('DENEYİM'), 'Yazılım Stajyeri', 'Ege Üniversitesi']) expect(sideText).not.toContain(norm(needle))

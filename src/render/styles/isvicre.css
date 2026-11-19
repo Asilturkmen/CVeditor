@@ -10,7 +10,7 @@
  * Etiket iki-üç satıra kırılırsa satır kendiliğinden uzar ve sayfalama başlığın gerçek yüksekliğini
  * ölçer. Başlık son blok olarak sayfa dibinde kalırsa paginate onu ilk kaydıyla birlikte sonraki
  * sayfaya taşır (data-keep-with-next). Etiketin taban çizgisi ilk kaydın ilk satırınınkiyle aynı hizada.
- * İLK SÜRÜM (T0): iskelet ve ölçüler şartnameden; şablon ekibi cilalayacak.
+ * Cilalandı (T-css): örnek CV tek sayfanın %85-95ini doldurur; ölçüler §5 aralıklarında.
  */
 .tpl-isvicre {
   /* Etiket sütunu, içerik genişliğinin %22'si (başlıkta ve gövdede aynı oran) */
@@ -59,17 +59,18 @@
   letter-spacing: -0.015em;
 }
 
+/* Unvan adın %43'ü (10 pt), düz harf: büyük harfli küçük etiket adın yanında kayboluyordu */
 .tpl-isvicre .cv-headline {
-  margin-top: 1.6mm;
-  font-size: 0.86em;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  margin-top: 1.2mm;
+  font-size: 1.1em;
+  font-weight: 400;
+  line-height: 1.3;
   color: var(--muted);
 }
 
 .tpl-isvicre .cv-contact {
   margin-top: 2.2mm;
+  font-size: 0.92em;
   color: var(--muted);
 }
 
@@ -131,7 +132,7 @@
   padding-top: var(--rule-pad);
   padding-right: var(--label-gap);
   text-align: right;
-  font-size: 0.82em;
+  font-size: 0.92em;
   line-height: var(--lh);
   font-weight: 600;
   letter-spacing: 0.05em;
@@ -140,12 +141,12 @@
 }
 
 /*
- * Taban çizgisi hizası: 0.82em'lik etiketin ilk satırı, 1em'lik kayıt satırıyla aynı tabana
- * iner. Satır kutusunda taban ≈ boy × (lh/2 + 0.375); fark 0.18 × gövde ≈ 0.22 × etiket em'i.
+ * Taban çizgisi hizası: 0.92em'lik etiketin ilk satırı, 1em'lik kayıt satırıyla aynı tabana
+ * iner. Satır kutusunda taban ≈ boy × (lh/2 + 0.375); fark 0.08 × gövde ≈ 0.087 × etiket em'i.
  */
 .tpl-isvicre .section-title > span {
   display: block;
-  padding-top: calc((var(--lh) / 2 + 0.375) * 0.22em);
+  padding-top: calc((var(--lh) / 2 + 0.375) * 0.087em);
 }
 
 /*

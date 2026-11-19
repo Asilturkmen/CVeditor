@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { createCv, patchCv, preview } from './helpers.ts'
+import { createCv, lengthenCv, patchCv, preview } from './helpers.ts'
 import { flowText, pdfText, renderPreviewPdf, settledPageCount } from './pdf.ts'
 
 /**
@@ -56,7 +56,8 @@ for (const size of [
 ]) {
   test(`${size.width}x${size.height}: 1. sayfa kaydırmadan, üstte ve altta boşlukla görünür`, async ({ page }) => {
     await page.setViewportSize(size)
-    await createCv(page, { start: 'sample' })
+    // Çok sayfalı CV: kaydırmadan görünmesi gereken yalnız 1. sayfa.
+    await lengthenCv(page, await createCv(page, { start: 'sample' }))
     expect(await settledPageCount(page)).toBeGreaterThan(1)
     await expectPageOneFits(page)
     const m = await pageOneMargins(page)
@@ -159,7 +160,7 @@ test('sol ray: şablon küçük resmi kendi CV\'mle çizilir, tıklayınca tek g
 
 test('Sayfalar: haptaki gösterge ve sol raydaki küçük resimler sayfalar arasında gezdirir', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 })
-  await createCv(page, { start: 'sample' })
+  await lengthenCv(page, await createCv(page, { start: 'sample' }))
   const count = await settledPageCount(page)
   expect(count).toBeGreaterThan(1)
   const pages = page.getByRole('group', { name: 'Sayfa', exact: true })

@@ -2,12 +2,12 @@
 
 Şablonlu, tarayıcıda çalışan CV editörü. CV'yi Canva'da kutu kaydırarak değil, yapılandırılmış veri olarak tutarsın: yeni bir staj = yeni bir kayıt. Şablon bu veriyi çizer; şablon değiştirmek içeriği kaybettirmez. Önizleme ne gösteriyorsa PDF de odur.
 
-> Durum: **yayın öncesi.** Sunucu ve gerçek yapay zekâ dışında her şey çalışır. PDF şimdilik tarayıcının yazdır penceresiyle alınır; yapay zekâ özellikleri örnek sağlayıcıyla çalışır ve hiçbir yere istek atmaz. Kalan iki iş (yapay zekâyı bağlamak, canlıya almak): `docs/DURUM.md`.
+> Durum: **yayına hazır, yapay zekâ bağlantısı hariç.** Tek tuşla PDF veren sunucu ve Docker paketi hazır (`docs/YAYIN.md`). Yapay zekâ özellikleri şimdilik örnek sağlayıcıyla çalışır ve hiçbir yere istek atmaz; bağlamak için kalan tek iş: `docs/YAPAY-ZEKA.md`.
 
 ## Özellikler
 
-- **Şablonlar:** 10 şablon: Zarif, Panel, Bant, Manşet, Gece, İsviçre, Çizelge, Çift Ton, Afiş, Çerçeve. Her birinin kendi renk takımları ve tasarlanmış fotoğraf yeri var; fotoğraf yüklenmezse düzen kendiliğinden fotoğrafsız olur. Sütun düzeni şablona göre: bazıları yalnız tek, bazıları yalnız iki sütun, bazıları ikisi. Hepsi aynı çizim motorunu kullanır ve ATS'nin okuyabileceği düzendedir: seçilebilir metin, DOM sırası = okuma sırası, gömülü TrueType yazı tipleri. Bu, PDF metni üzerinden testle denetlenir.
-- **Editör:** solda canlı CV (bir sayfa ekrana tam sığar), sağda **İçerik | Görünüm**. Bütün alanlar doğrudan düzenlenir; bölüm ve kayıtlar fareyle ya da klavyeyle sürüklenir. CV'de bir kayda tıklamak paneli o kayda götürür.
+- **Şablonlar:** 14 şablon: Yalın, Zarif, İkili, Panel, Teknik, Çizgi, Bant, Çizelge, İsviçre, Yönetici, Portre, Denge, Dergi, Blok. Gerçekten seçilen CV tasarımları araştırılarak kuruldu (`docs/sablonlar/SET-14.md`). Her birinin kendi renk takımları ve tasarlanmış fotoğraf yeri var; fotoğraf yüklenmezse düzen kendiliğinden fotoğrafsız olur. Hepsi aynı çizim motorunu kullanır ve ATS'nin okuyabileceği düzendedir: seçilebilir metin, DOM sırası = okuma sırası, gömülü TrueType yazı tipleri. Bu, PDF metni üzerinden testle denetlenir.
+- **Editör:** solda canlı CV, sağda denetçi (**İçerik | Görünüm**). İçerik anahat düzeninde: her kayıt tek satır, tıkladığın yerinde açılır. Bölüm ve kayıtlar fareyle ya da klavyeyle sürüklenir; CV'de bir kayda tıklamak paneli o kayda götürür. Şablonlar ve sayfa küçük resimleri tuvalin solundaki rayda; tuvalin altında sayfa, yakınlaştırma ve sığdırma hapı.
 - **Gerçek sayfalama:** A4, çok sayfa serbest. Bir kayıt iki sayfaya bölünmez. Bir sayfadan uzun kayıt varsa uyarı verilir; PDF için açık onay istenir ve kayıt maddeler arasından bölünür. Metin asla alttan kesilmez.
 - **Sınırsız CV, her biri tek dil (TR/EN):** bölüm başlıkları ve tarihler CV diline göre yazılır. CV kopyalanabilir, "diğer dile çevir" ile çevrilebilir. Kayıt başka bir CV'ye çevrilerek ya da olduğu gibi eklenebilir; çeviri bağı korunur.
 - **Eski CV içe aktarma:** PDF metni tarayıcıda okunur (dosya gönderilmez), dil algılanır, kayıtlar ayrılır, sen onaylarsın.
@@ -28,14 +28,18 @@ npm run dev        # http://localhost:5173
 
 > Tarayıcı verisi adrese (port dahil) bağlıdır. Port 5173'e sabitlendi; farklı portta CV'ler görünmez. Başka bilgisayara taşımak için Ayarlar → Yedekle / Geri yükle.
 
-PDF almak için editörde **PDF al** (Ctrl+P) → yazdır penceresinde "PDF olarak kaydet". Kenar boşlukları ve sayfa boyutu otomatik gelir; en iyi sonuç Chromium tabanlı tarayıcılarda (Chrome, Edge, Brave).
+**PDF al** (Ctrl+P): sunucu çalışıyorsa (`npm run dev:server` ya da üretim) gerçek PDF doğrudan iner (`Ad_Soyad_CV_tr.pdf`). Düz `npm run dev`'de sunucu yoktur; o zaman tarayıcının yazdır penceresi açılır → "PDF olarak kaydet". En iyi sonuç Chromium tabanlı tarayıcılarda (Chrome, Edge, Brave).
+
+Üretim (kendi sunucunda): `docker compose up -d --build` → ayrıntı `docs/YAYIN.md`.
 
 ## Komutlar
 
 | Komut | Ne yapar |
 | --- | --- |
-| `npm run dev` | Geliştirme sunucusu (5173) |
-| `npm run build` | Üretim derlemesi (`dist/`) |
+| `npm run dev` | Geliştirme sunucusu (5173), sunucusuz |
+| `npm run dev:server` | Geliştirme sunucusu + `/api` (tek tuşla PDF) |
+| `npm run build` | Üretim derlemesi (`dist/` + `dist-server/`) |
+| `npm start` | Üretim sunucusu (`dist-server/index.js`) |
 | `npm run typecheck` | Çeviri dosyalarını derler + TypeScript denetimi |
 | `npm run lint` | oxlint |
 | `npm test` | Birim testleri (Vitest) |
@@ -55,14 +59,16 @@ src/
   review/    CV İnceleme kural motoru ve anahtar kelime eşleştirme
   editor/    Editör durumu (Immer patch'leriyle geri al/yinele), işlemler, örnek öneriler
   features/  Ekranlar: CV'lerim, Şablonlar, yeni CV, editör, içe aktarma, ayarlar
-  components/ui/  Ortak arayüz bileşenleri (Radix tabanlı)
+  components/ui/  Ortak arayüz bileşenleri (Radix tabanlı; vitrin: geliştirmede /_ui)
+server/      Hono sunucusu: statik site, /api/pdf (Playwright Chromium), /api/ai/* (korumalı iskelet)
+deploy/      Caddy örneği (TLS, alan adı)
 messages/    Arayüz metinleri (Paraglide; yeni dil = yeni JSON)
 e2e/         Playwright testleri
 ```
 
 ## Gizlilik
 
-Sunucu yok, hesap yok. CV'lerin yalnız tarayıcında durur. Repoya gerçek CV verisi girmez; örneklerdeki kişi uydurmadır.
+Hesap yok, veritabanı yok. CV'lerin yalnız tarayıcında durur. Sunucu CV'yi saklamaz: PDF için gönderilen veriyi yalnız o PDF'i basmak için kullanır, günlüğe yazmaz. Yapay zekâya yalnız seçtiğin kapsam gider; adın hiç gitmez, iletişim bilgilerin yalnız açıkça seçersen gider, metindeki kişisel bilgiler maskelenir ("Ne gönderilir?" gidecek verinin tamamını gösterir). Repoya gerçek CV verisi girmez; örneklerdeki kişi uydurmadır.
 
 ## Public repo güvenliği
 

@@ -47,30 +47,6 @@ export function suggestionTargetId(s: Suggestion): string {
 }
 
 /**
- * CSS dizgisi içine güvenle yazılacak değer: harf, rakam, "_" ve "-" dışındaki
- * her karakter onaltılık kaçışla yazılır. Kayıt id'leri içe aktarılan
- * yedekten gelebilir; tırnak, süslü ayraç ya da "</style>" kural kıramaz.
- */
-export function cssString(value: string): string {
-  let out = ''
-  for (const ch of value) out += /[A-Za-z0-9_-]/.test(ch) ? ch : `\\${ch.codePointAt(0)!.toString(16)} `
-  return `"${out}"`
-}
-
-/** Bekleyen önerisi olan kayıtların yanındaki nokta işaretleri (editör formunda). */
-export function pendingMarkerCss(suggestions: Suggestion[]): string {
-  return suggestions
-    .filter((s) => s.kind !== 'addItem')
-    .map((s) => {
-      const target = suggestionTargetId(s)
-      const selector = `[id=${cssString(target === 'personal' ? 'personal-card' : `item-${target}`)}]`
-      const color = s.kind === 'removeItem' ? 'var(--danger)' : '#e7c34a'
-      return `${selector}{position:relative}${selector}::before{content:"";position:absolute;left:-14px;top:14px;width:6px;height:6px;border-radius:9999px;background:${color}}`
-    })
-    .join('')
-}
-
-/**
  * Editörün kaydedilmeyen arayüz durumu: sekme, odak, yakınlaştırma,
  * sayfalama sonucu, bekleyen öneriler.
  */
@@ -93,6 +69,8 @@ interface EditorUiState {
   pageCount: number
   oversized: OversizedBlock[]
   clipped: boolean
+  /** Başlık (ad, unvan, iletişim) ilk sayfaya sığmıyor; `clipped` de true */
+  headerClipped: boolean
   suggestions: Suggestion[]
   aiScope: AiScope
   /** Tuvalin solundaki ray: şablonlar ya da sayfa küçük resimleri; null = kapalı */
@@ -109,7 +87,7 @@ interface EditorUiState {
   revealSuggestion: (id: string) => void
   flashItems: (ids: string[]) => void
   setZoom: (zoom: EditorUiState['zoom']) => void
-  setPagination: (r: { pageCount: number; oversized: OversizedBlock[]; clipped: boolean }) => void
+  setPagination: (r: { pageCount: number; oversized: OversizedBlock[]; clipped: boolean; headerClipped: boolean }) => void
   setSuggestions: (s: Suggestion[]) => void
   removeSuggestions: (ids: string[]) => void
   setAiScope: (scope: AiScope) => void
@@ -153,6 +131,7 @@ const initial = {
   pageCount: 1,
   oversized: [],
   clipped: false,
+  headerClipped: false,
   suggestions: [],
   aiScope: { kind: 'all' } as AiScope,
   rail: null as EditorUiState['rail'],
@@ -179,7 +158,7 @@ export const useEditorUi = create<EditorUiState>((set) => ({
   revealSuggestion: (id) => set((s) => ({ reveal: { id, nonce: (s.reveal?.nonce ?? 0) + 1 } })),
   flashItems: (ids) => set((s) => ({ flash: { ids, nonce: (s.flash?.nonce ?? 0) + 1 } })),
   setZoom: (zoom) => set({ zoom }),
-  setPagination: ({ pageCount, oversized, clipped }) => set({ pageCount, oversized, clipped }),
+  setPagination: ({ pageCount, oversized, clipped, headerClipped }) => set({ pageCount, oversized, clipped, headerClipped }),
   setSuggestions: (suggestions) => set({ suggestions }),
   removeSuggestions: (ids) => set((s) => ({ suggestions: s.suggestions.filter((x) => !ids.includes(x.id)) })),
   setAiScope: (aiScope) => set({ aiScope }),

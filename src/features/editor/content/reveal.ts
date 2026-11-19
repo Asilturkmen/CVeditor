@@ -43,6 +43,18 @@ export function revealRow(id: string, { focus = true, flash = true }: { focus?: 
     void el.offsetWidth
     el.classList.add('animate-flash')
   }
-  // İlk alana imleç: tıklayıp hemen yazmaya başlanabilsin.
-  if (focus) el.querySelector<HTMLElement>('input, textarea, [contenteditable="true"]')?.focus({ preventScroll: true })
+  // İlk alana imleç: tıklayıp hemen yazmaya başlanabilsin. Bir menüden geldiyse (Bölüm ekle,
+  // Kopyasını ekle) menü kapanıp odağı tetikleyicisine geri verdikten SONRA.
+  if (focus) afterMenusClosed(() => el.querySelector<HTMLElement>('input, textarea, [contenteditable="true"]')?.focus({ preventScroll: true }))
+}
+
+/** Açık menü kapanıp odağı tetikleyicisine geri verdikten sonra çalıştırır (en çok ~1 sn bekler). */
+export function afterMenusClosed(run: () => void, tries = 0) {
+  if (document.querySelector('[role="menu"]') && tries < 40) {
+    setTimeout(() => afterMenusClosed(run, tries + 1), 25)
+    return
+  }
+  // Radix odağı içerik kaldırılırken geri verir; bir tur daha bekle.
+  if (tries > 0) setTimeout(run, 0)
+  else run()
 }

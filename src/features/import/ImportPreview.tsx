@@ -26,6 +26,8 @@ import { importErrorCode, prepareCvImport, sendCvImport, type ImportErrorCode, t
 export interface ImportSelection {
   personal: Personal
   sections: Section[]
+  /** Seçili / bulunan kayıt sayısı (pencerenin eylem satırında: "9/10 kayıt seçili"). */
+  count: { selected: number; total: number }
 }
 
 type Phase =
@@ -152,7 +154,9 @@ export function ImportPreview({
     const chosen = data.sections
       .map((s) => ({ ...s, items: (s.items as AnyItem[]).filter((i) => !excluded.has(i.id)) }) as Section)
       .filter((s) => s.items.length > 0)
-    onChange({ personal: data.personal, sections: chosen })
+    const total = data.sections.reduce((n, s) => n + s.items.length, 0)
+    const selected = chosen.reduce((n, s) => n + s.items.length, 0)
+    onChange({ personal: data.personal, sections: chosen, count: { selected, total } })
   }, [phase, data, excluded, onChange])
 
   const onDrop = (e: DragEvent) => {
@@ -187,7 +191,8 @@ export function ImportPreview({
         }}
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
-        className="flex flex-col items-center px-6 py-8 text-center"
+        // Dinlenmede çerçevesiz ve zeminsiz (boş durum gibi); kesikli kenar yalnız sürüklerken.
+        className="flex flex-col items-center bg-transparent px-6 py-8 text-center"
       >
         <FileUp aria-hidden strokeWidth={1.5} className={dragging ? 'size-8 text-accent' : 'size-8 text-fg-3'} />
         <p className="mt-3 text-headline text-fg">{dragging ? m.imp_drop_here() : m.import_pick_title()}</p>
@@ -293,7 +298,6 @@ function ImportReview({
 }) {
   const [open, setOpen] = useState<string | null>(null)
   const total = data.sections.reduce((n, s) => n + s.items.length, 0)
-  const selected = total - excluded.size
   const detected = outcome?.detected
   const sure = detected && detected.confidence >= 0.6
   const mismatch = sure && detected.language !== language
@@ -368,35 +372,35 @@ function ImportReview({
         <p className="text-body text-fg-2">{m.import_found_sample()}</p>
       )}
 
-      <Group title={m.editor_personal_title()} bodyClassName={groupBody(surface)}>
-        <FormRow label={m.f_full_name()}>
-          {(id) => <BareInput id={id} value={data.personal.fullName} onChange={(e) => updatePersonal('fullName', e.target.value)} />}
-        </FormRow>
-        <FormRow label={m.f_headline()}>
-          {(id) => <BareInput id={id} value={data.personal.headline} onChange={(e) => updatePersonal('headline', e.target.value)} />}
-        </FormRow>
-        {contacts.length > 0 ? (
-          <dl
-            className="grid grid-cols-[120px_minmax(0,1fr)] gap-x-3 gap-y-1.5 px-[var(--row-px)] py-3 text-body"
-            data-testid="import-contacts"
-          >
-            {contacts.map(([key, label]) => (
-              <div key={key} className="contents">
-                <dt className="text-fg-2">{label}</dt>
-                <dd className="min-w-0 pl-2 break-words text-fg">{data.personal[key]}</dd>
+      {/* Tek ritim: ad, unvan ve her iletişim satırı aynı 40px satır (etiket 120px, değer alanın x'inde), ayırıcılı. */}
+      <div data-testid="import-contacts">
+        <Group title={m.editor_personal_title()} bodyClassName={groupBody(surface)}>
+          <FormRow label={m.f_full_name()}>
+            {(id) => <BareInput id={id} value={data.personal.fullName} onChange={(e) => updatePersonal('fullName', e.target.value)} />}
+          </FormRow>
+          <FormRow label={m.f_headline()}>
+            {(id) => <BareInput id={id} value={data.personal.headline} onChange={(e) => updatePersonal('headline', e.target.value)} />}
+          </FormRow>
+          {contacts.length > 0 ? (
+            contacts.map(([key, label]) => (
+              // Dar ekranda (telefon) etiket değerin üstüne geçer (FormRow gibi): e-posta kırılmasın.
+              <div
+                key={key}
+                className="grid min-h-10 grid-cols-[120px_minmax(0,1fr)] items-center gap-x-3 px-[var(--row-px)] py-1 text-body max-sm:grid-cols-1 max-sm:gap-y-1"
+              >
+                <span className="break-words text-fg-2 max-sm:px-2">{label}</span>
+                <span className="flex min-h-8 min-w-0 items-center px-2 text-fg wrap-anywhere phone:min-h-11">{data.personal[key]}</span>
               </div>
-            ))}
-          </dl>
-        ) : (
-          <p className="px-[var(--row-px)] py-3 text-body text-fg-2">{m.imp_contacts_none()}</p>
-        )}
-      </Group>
+            ))
+          ) : (
+            <p className="flex min-h-10 items-center px-[var(--row-px)] py-1 text-body text-fg-2">{m.imp_contacts_none()}</p>
+          )}
+        </Group>
+      </div>
 
       {total > 0 ? (
-        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-3">
-          {outcome && <p className="min-w-0 flex-1 basis-64 text-callout text-fg-2">{m.imp_review_hint()}</p>}
-          <p className="ml-auto text-callout text-fg-2 tabular-nums">{m.imp_count({ selected, total })}</p>
-        </div>
+        // Seçili kayıt sayısı pencerenin eylem satırında ("9/10 kayıt seçili · CV'yi oluştur").
+        outcome && <p className="px-3 text-callout text-fg-2">{m.imp_review_hint()}</p>
       ) : (
         <InlineNotice tone="warn">
           <span className="block font-semibold">{m.imp_none_found_title()}</span>

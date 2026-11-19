@@ -60,6 +60,18 @@ describe('CV oluşturma', () => {
     expect(CvSchema.safeParse(sampleCv()).success).toBe(true)
   })
 
+  it('boş CV\'de yalnız özet boş kaydıyla gelir; öbür bölümlerde hazır "Adsız kayıt" yok', () => {
+    const sections = defaultSections()
+    expect(sections.map((s) => [s.type, s.items.length])).toEqual([
+      ['summary', 1],
+      ['experience', 0],
+      ['education', 0],
+      ['projects', 0],
+      ['skills', 0],
+      ['languages', 0],
+    ])
+  })
+
   it('her kayıt kendi kalıcı id ve çeviri grubuyla doğar', () => {
     const a = createItem('experience')
     const b = createItem('experience')

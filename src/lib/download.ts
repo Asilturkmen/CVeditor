@@ -24,10 +24,6 @@ export function fileSafe(value: string): string {
   )
 }
 
-export function readFileText(file: File): Promise<string> {
-  return file.text()
-}
-
 /** Bugünün tarihi (YYYY-AA-GG), kullanıcının yerel saatine göre: gece yarısından sonra alınan yedek dünün adını taşımasın. */
 export function todayStamp(now = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, '0')

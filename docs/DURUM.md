@@ -1,78 +1,33 @@
-# Durum (2026-10-18): yayın öncesi
+# Durum (2026-11-19): yayına hazır, yalnız yapay zekâ kaldı
 
-Sunucu ve gerçek yapay zekâ dışındaki her şey yapıldı. Geriye iki iş kaldı:
+Yapay zekâ bağlantısı dışındaki her şey yapıldı: arayüz Apple'ın uygulama tasarım diline göre baştan kuruldu, şablon seti 14 şablonla yenilendi, tek tuşla PDF veren sunucu ve Docker paketi hazır.
 
-1. **Yapay zekâyı bağlamak**
-2. **Canlıya almak**
+Geriye tek iş kaldı: **yapay zekâyı bağlamak** → [`docs/YAPAY-ZEKA.md`](YAPAY-ZEKA.md). Yayına alma adımları → [`docs/YAYIN.md`](YAYIN.md).
 
-İlk sürümün ayrıntıları için `docs/V1-NOTLAR.md`'ye, tasarım kuralları için `DESIGN.md`'ye bak.
-
-## Bu turda yapılanlar
+## Bu turda yapılanlar (2026-11-19)
 
 | Alan | Ne var |
 | --- | --- |
-| Yapay zekâ katmanı | `src/ai`. Tek sözleşme (`types.ts`), sağlayıcı seçimi (`provider.ts`), örnek sağlayıcı. Giden veri kapsamla sınırlı, iletişim bilgileri gerekmedikçe gönderilmez, ad hiç gönderilmez, metinde geçen iletişim bilgileri maskelenir. Yanıtlar Zod ile doğrulanır. Öneri türleri: alan değişikliği, kayıt ekleme, kayıt kaldırma. Prompt kutusunda iptal ve "Ne gönderilir?" penceresi var. |
-| Eski CV içe aktarma | PDF metni tarayıcıda okunur (pdfjs-dist); dosya hiçbir yere gönderilmez. Metin yoksa, PDF parolalıysa ya da dosya PDF değilse açık hata verilir. Dil algılanır ve uyuşmazlıkta uyarılır. İletişim bilgileri kuralla çıkarılır. Kayıtlar kurala dayalı ön ayrıştırmayla bulunur, sen kayıt kayıt onaylarsın. Okunan ham metin de gösterilir. |
-| JSON Resume | Kaldırıldı (2026-10-18, Asil'in kararı). Ayarlar'daki JSON yedek ve geri yükleme duruyor. |
-| Çeviri | "Diğer dile çevir" yeni bir CV oluşturur; "Başka CV'ye ekle" kaydı çevirerek ekler. Her ikisinde de çeviri önce gösterilir, alan alan düzenlenebilir; bağlı kayıt güncellenebilir. Örnek çevirmen yalnız küçük bir sözlüğü çevirir. |
-| CV İnceleme (`/inceleme`) | Kurala dayalı ATS kontrolleri hem kendi CV'lerinde hem yüklenen PDF'te çalışır. "ATS'nin gördüğü metin" paneli ve iş ilanıyla anahtar kelime karşılaştırması var. Puan ya da yüzde yok; her bulgunun "Düzenle" bağlantısı var. |
-| PDF/ATS kalitesi | Yazı tipleri sabit ağırlıklı dosyalar, PDF'e gerçek TrueType olarak gömülüyor (önceden Type3'tü). Başlık harf aralığı düşürüldü (önceden harf harf okunuyordu). İletişim her düzende başlıkta (iki sütunda adresler bölünmüyor). `e2e/ats.spec.ts` PDF metni üzerinden okuma sırasını ve Türkçe karakterleri denetliyor. |
-| Arayüz | İngilizce arayüz ve dil seçici (Ayarlar). DESIGN.md taslağı. Tasarım denetiminin bulguları düzeltildi: kontrast, koyu tema, hizalar, kesilen metinler, yakınlaştırma çubuğu, şablon geçiş animasyonu, odak vurgusu. Klavyeyle sürükleme çalışıyor. |
-| Son tamamlama turu (2026-10-17) | Canlı CV varsayılan olarak bir sayfanın tamamı ekrana sığacak biçimde açılır (üstte/altta boşlukla; dizüstünden 27" ekrana). Görünüm'de bölüm sırası. Fotoğraf yükleme tek geri alma adımı. Tarayıcının kendi Yazdır menüsü de yalnız CV'yi basar; önizlemeye odaklıyken kısayollar çalışır. Safari'ye özgü 7 gün uyarısı. Bütün alanlarda örnek ipucu. CV İnceleme: kendi CV'lerin için de "ATS'nin gördüğü metin", sorunlu her bulguda "Düzenle"; yapay zekâ yorumu ve ilanla anlam eşleştirmesi örnek sağlayıcıyla çalışır. Ortak hata iletileri ve parola penceresi. Gizlilik: serbest metindeki adres ve referans adları da maskelenir. ATS testleri her şablon × sütun düzeninde. |
-| 10 şablon (2026-10-18) | Zarif, Panel, Bant, Manşet, Gece, İsviçre, Çizelge, Çift Ton, Afiş, Çerçeve (`docs/sablonlar/`). Kayıt `src/render/templateMeta.ts`, görünüm `src/render/styles/<id>.css`. Şablon başına sütun düzeni, renk takımları (`colors.ts`, kontrast korumalı), 9 yeni statik yazı tipi. Fotoğraf varsayılan açık; fotoğraf yoksa editörde baskıda gizli "Fotoğraf ekle" kutusu, galeride silüet. Şema 2: Klasik → Zarif, Modern → Panel göçü, yeni `baseColor` alanı. ATS testi her şablon × desteklediği sütun × fotoğraflı/fotoğrafsız; `e2e/stress.spec.ts` uzun ad, uzun iletişim ve uzun beceri satırıyla 10 şablonu zorlar. Bağımsız kod incelemesinin 11 bulgusu düzeltildi. |
-| Repo güvenliği | `npm run scan` (kişisel bilgi ve sır taraması), elle kurulan isteğe bağlı pre-push kancası, `.env.example`. |
+| Tasarım dili | `DESIGN.md` baştan yazıldı: Apple'ın uygulama dili (Pages/Keynote/Ayarlar). Kök 16px, 4'lük ızgara; Apple cihazda SF, diğerlerinde Inter; soğuk nötr zeminler, tek vurgu (Petrol `#00786F`); kart yerine gruplu liste; yarı saydam malzeme yalnız dört yapışkan yüzeyde; CSS `linear()` yaylarıyla hareket. Bileşen vitrini (yalnız geliştirmede): `/_ui`. |
+| Editör | Solda belge, sağda denetçi. İçerik anahat düzeninde: her kayıt tek satır, tıklanan yerinde açılır ("Tümünü aç" eski hep açık davranışı korur). Görünüm tek ekran (etiket solda, kontrol sağda). Şablonlar ve sayfa küçük resimleri tuvalin solundaki rayda (`Ctrl+\`). Tuvalin altında tek hap: sayfa gezinme, yakınlaştırma, Sığdır menüsü (sayfaya / genişliğe / %100). Prompt kutusu boşta tek satır; öneri farkı kaydın içinde okunur. |
+| Diğer ekranlar | Galeri: 4 sütun, sütun ve fotoğraf süzgeci. Şablon sayfası + Yeni CV tek pencerede (renk takımı ve sütun burada seçilir). CV'lerim, İnceleme (önce düzeltilecekler, geçenler katlanır, iş ilanı hep açık), çeviri kontrolü (bölüm listesi + süzgeç), Ayarlar (macOS Ayarlar tarzı gruplu liste). Telefonda önizleme + PDF. |
+| Şablonlar | 14 şablon (`docs/sablonlar/SET-14.md`): Yalın, Zarif, İkili, Panel, Teknik, Çizgi, Bant, Çizelge, İsviçre, Yönetici, Portre, Denge, Dergi, Blok. Çıkanlar (Manşet, Gece, Çift Ton, Afiş, Çerçeve) şema 3 göçüyle en yakın yenisine taşınır, içerik değişmez. Motor: tarih sütunu, sağda yan sütun, satır sonu ayırıcısı, ölçek çarpanları, yetim/dul satır kuralı, en az 12 mm kenar. Yeni yazı tipi Libre Franklin. |
+| Tek tuşla PDF | Sunucu (`server/`, Hono + Playwright Chromium): `POST /api/pdf` CV verisini alır, aynı `src/render` paketiyle çizer, dış ağ isteklerini keser, gömülü yazı tipli A4 PDF döndürür. Sunucu yoksa (düz `npm run dev`) tarayıcının yazdır penceresine düşer. Dosya adı her iki yolda `Ad_Soyad_CV_tr.pdf`. |
+| Yayın | `Dockerfile` (Node 24 + Chromium, root olmayan kullanıcı), `docker-compose.yml`, `deploy/Caddyfile` (cv.asilturkmen.com, otomatik TLS), güvenlik başlıkları ve CSP, IP başına hız sınırı. |
+| Yapay zekâ | Korumalı uç iskeleti hazır: parola → imzalı HttpOnly çerez, Origin denetimi, istek sınırı, günlük tavan, istek/yanıt şeması doğrulaması. İstemci `src/ai/httpProvider.ts` (`VITE_AI_PROVIDER=http`). Uçlar şimdilik `503 not_configured`; doldurulacak tek fonksiyon `server/ai/provider.ts` `runAiTask`. |
+| Gizlilik | Ad hiç gitmez; iletişim bilgileri yalnız prompt kutusundaki "İletişim bilgilerimi de gönder" seçiliyse gider. Serbest metinde e-posta, telefon (yaygın TR ve uluslararası biçimler), adres, doğum tarihi, TC no, kullanıcı adları, aksanlı adlar maskelenir. PDF içe aktarma ve inceleme aynı maskeyi kullanır; gerçek sağlayıcıda içe aktarma gönderimden önce onay ister. |
+| Veri güvenliği | Aynı CV iki sekmede açıksa sessiz ezme yok (çakışma uyarısı). Kayıt başarısızsa editörden çıkış durdurulur, yedek indirme sunulur. Bozuk yedek onarılır, uygulamayı çökertmez. Fotoğraf yalnız gömülü JPEG/PNG/WebP. |
 
-Testler: Vitest birim testleri ve Playwright uçtan uca testleri. Komutlar için CLAUDE.md'ye bak.
-
-## 1. Yapay zekâyı bağlamak
-
-Arayüzün hiçbir yeri değişmez. Yapılacaklar:
-
-1. **Sağlayıcıyı seç.** Vault'ta açık soru; önce sağlayıcıyı sen seçeceksin.
-2. **Küçük sunucuyu kur** (Hono, Node 24). Uçların hepsi `POST`, gövde ve yanıt JSON; tipler ve Zod şemaları `src/ai/types.ts`'te:
-
-   | Uç | İstek | Yanıt | Kullanan yer |
-   | --- | --- | --- | --- |
-   | `/api/ai/auth` | `{ password }` | 204 + HttpOnly çerez; yanlışsa 401 | Parola penceresi |
-   | `/api/ai/edit` | `EditPayload` | `EditResult` | Editördeki prompt kutusu |
-   | `/api/ai/translate` | `TranslateRequest` | `TranslateResult` | Diğer dile çevir, Başka CV'ye ekle |
-   | `/api/ai/import` | `ImportRequest` | `ImportResult` | Eski CV'yi içe aktar |
-   | `/api/ai/review` | `ReviewRequest` | `ReviewResult` (yorum listesi; puan ya da yüzde yok) | CV İnceleme → Yapay zekâ yorumu |
-   | `/api/ai/keywords` | `KeywordMatchRequest` | `KeywordMatchResult` (eşleşen / eksik / başka adla) | CV İnceleme → Anlamına göre karşılaştır |
-
-   - Hata durumları: 401 parola gerekli ya da çerez geçersiz, 429 istek sınırı, 503 günlük sınır ya da bakım.
-   - AI SDK burada kullanılır; sağlayıcı değişikliği tek satırdır.
-   - Model talimatında şu kurallar yer almalı:
-     - yalnız verilen kimliklere dokun;
-     - ⟦EMAIL⟧ gibi yer tutuculara dokunma;
-     - çeviri kurallarına uy: adlar, şirketler ve bağlantılar çevrilmez; okul resmî adıyla yazılır;
-     - incelemede puan, yüzde ya da not verme; yorumu `language` alanındaki dilde yaz.
-3. **`src/ai/httpProvider.ts` yaz**, sonra `getAiProvider()` içinde onu döndür. Başka dosyaya dokunulmaz.
-   - `AiProvider`'ın hepsini uygular: `id`, `isDemo: false`, `requiresAuth: true`, `authenticate`, `edit`, `translate`, `parseImport`, `review`, `matchKeywords`. Ayrıntı `src/ai/provider.ts`'in açıklamasında.
-   - Her çağrı `fetch(..., { credentials: 'same-origin', signal })`. HTTP durumunu `AiError` koduna çevirir: 401 → `unauthorized`, 429 → `rate_limited`, 503 → `unavailable`, ağ hatası → `network`, iptal → `aborted`.
-   - Arayüz hazır: yanıtlar `validate.ts` ile doğrulanır; her hata kodunun kendi iletisi var (`src/features/ai/aiErrorMessage.ts`); `unauthorized` gelince sayfa içi parola penceresi açılır, parola doğrulanınca istek bir kez yenilenir (`src/features/ai/aiAuth.ts`).
-   - `isDemo: false` olunca "Örnek" rozetleri ve örnek notları kendiliğinden kalkar.
-   - Örnek sağlayıcı parola istemez. Parola penceresini ve hata iletilerini denemek için localStorage'a `cveditor:mockAi` yaz: `{"password":"deneme"}` ya da `{"fail":"rate_limited"}`.
-4. **Ucu koru.**
-   - Önlemler: parola (HttpOnly çerez), istek sınırı, günlük maliyet tavanı, sağlayıcı tarafında harcama limiti. Turnstile isteğe bağlı.
-   - Anahtar yalnız sunucuda durur; değişken adları `.env.example`'da.
-5. **Gizlilik hazır.** Giden veri tarayıcıda kurulur: düzenleme `payload.ts`, çeviri `translate.ts`, içe aktarma `importText.ts`, inceleme ve ilan eşleşmesi `review.ts`. Ad ve iletişim bilgileri maskeli gider; her ekranda "Ne gönderilir?" gidecek verinin tamamını gösterir.
-
-## 2. Canlıya almak
-
-1. **Tek tuşla PDF.**
-   - Aynı sunucuda `/api/pdf`: istemci CV verisini gönderir, HTML'i sunucu `src/render` ile üretir, Playwright Chromium PDF basar. Dış ağ istekleri kapalı.
-   - Bu iş V2 planındaydı ve sunucu gerektiriyor.
-2. **Docker imajı:** statik site + Hono + Chromium.
-3. **Barındırma ve alan adı:**
-   - Sunucu: kendi VDS'in. Chromium yaklaşık 1 GB boş bellek ister.
-   - Adres: `cv.asilturkmen.com` (DNS, TLS).
-4. **Veri taşıma:** localhost'taki CV'ler yayındaki adrese kendiliğinden geçmez; Ayarlar → Yedekle / Geri yükle ile taşınır.
-5. **Yayından önce son kontroller:** `npm run check`, `npm run scan` ve gerçek PDF'lerle bir tur.
+Testler: Vitest (uygulama + sunucu projeleri) ve Playwright. Komutlar için CLAUDE.md'ye bak.
 
 ## Bilerek sonraya bırakılanlar
 
 - DOCX içe ve dışa aktarma.
 - OCR (görsel PDF'ler).
 - Hesap, kullanıcı başına token hakkı, BYOK, istatistik.
-- Yeni şablonlar: her şablon `e2e/ats.spec.ts` ve `e2e/stress.spec.ts`'ten geçmeli; kurallar `src/render/styles/base.css` başındaki sözleşmede.
+- Akademik şablon (sayfa üstünde ad ve sayfa numarası motorun bugün yapmadığı bir iş; şimdilik Zarif, Çizelge ve Teknik önerilir).
+- Yeni şablon: `docs/sablonlar/SET-14.md` §5 kalite çıtası + `e2e/ats.spec.ts` ve `e2e/stress.spec.ts`'ten geçmeli.
+
+## Önceki turlar
+
+V1 (2026-10-16) için `docs/V1-NOTLAR.md`, 10 şablonlu eski set için `docs/sablonlar/PLAN.md` (eski).

@@ -91,18 +91,6 @@ export async function sendCvImport(prepared: PreparedImport, signal: AbortSignal
   }
 }
 
-/** Onay adımı olmadan oku + gönder (örnek sağlayıcı ve testler). */
-export async function readCvPdf(
-  file: File,
-  language: CvLanguage,
-  signal: AbortSignal,
-  onStep?: (step: 'pdf' | 'parse') => void,
-): Promise<ImportOutcome> {
-  const prepared = await prepareCvImport(file, language, signal, onStep)
-  onStep?.('parse')
-  return sendCvImport(prepared, signal)
-}
-
 const KNOWN_CODES: readonly ImportErrorCode[] = ['not_pdf', 'encrypted', 'no_text', 'unreadable', 'too_large', 'too_long']
 
 export function importErrorCode(error: unknown): ImportErrorCode {

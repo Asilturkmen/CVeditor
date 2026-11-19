@@ -243,6 +243,8 @@ test('kayıt silinince odak komşu kayda gider; "Geri al" bildirimi fare üstün
 
   const toastEl = page.locator('[data-toast]', { hasText: 'silindi' })
   await expect(toastEl).toBeVisible()
+  // Giriş animasyonu bitsin: kayarken üzerine gelinirse bildirim imlecin altından çıkar, süre işlemeye başlar.
+  await toastEl.evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)))
   await toastEl.hover()
   await expect(toastEl).toHaveAttribute('data-paused', '')
   await page.waitForTimeout(7_600)

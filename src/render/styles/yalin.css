@@ -4,9 +4,9 @@
  * Her kural `.tpl-yalin` ile başlar. Sözleşme ve ortak varsayılanlar: base.css başı. Gövde boyu,
  * satır aralığı ve boşluklar templateMeta.ts `scale` ile gelir (CSS'te yeniden çarpma).
  *
- * Ölçüler (orta boy, normal aralık): gövde 8.8 pt / 1.4; ad 21.5 pt; bölüm başlığı 10.5 pt;
- * kenar 18 × 14 mm; blok 2.7 mm, bölüm 6 mm (başlıktan gövdeye de). Dikey boşluklar
- * yalnız beş değerden: 6 / 2.7 / 1.6 / 1 / 0.5 mm. Örnek CV tek sayfa.
+ * Ölçüler (orta boy, normal aralık): gövde 9 pt / 1.38; ad 22 pt; unvan 10 pt; bölüm başlığı 10.8 pt;
+ * tarih ve iletişim 0.92em (beş boy). Kenar 18 × 13 mm; blok 2.4 mm, bölüm 5.4 mm (başlıktan gövdeye de).
+ * Dikey boşluklar yalnız beş değerden: 5.4 / 2.4 / 1.6 / 1 / 0.5 mm. Örnek CV tek sayfa (%88-98).
  */
 
 /* ---------- Başlık ---------- */
@@ -57,6 +57,7 @@
 
 .tpl-yalin .cv-contact {
   margin-top: 1.6mm;
+  font-size: 0.92em;
   line-height: 1.5;
   color: var(--muted);
 }
@@ -73,19 +74,9 @@
   margin: 0 0 3.5mm;
 }
 
-/*
- * Ortalı iletişim: satırlar dengeli; satır sonundaki gizli ayırıcının (K3) payı son öğeye de görünmez
- * bir ayırıcı eklenip liste soldan o kadar içeri alınarak dengelenir (görünen metin tam ortada durur).
- */
+/* Ortalı iletişim: satırlar dengeli (gizli ayırıcının payını motor dengeler: base.css contact-center) */
 .tpl-yalin.align-center .cv-contact {
   text-wrap: balance;
-  padding-left: calc(0.57em + 1.2mm);
-}
-
-.tpl-yalin.align-center .cv-contact li:last-child::after {
-  content: ' ·';
-  padding-right: 1.2mm;
-  visibility: hidden;
 }
 
 /* ---------- Bölüm başlığı: iri, cümle düzeni, çizgisiz ---------- */

@@ -56,6 +56,10 @@
  *                                              baskıda). Ayırıcısı `visibility: hidden` (aşağıda): asılı "·" yok,
  *                                              PDF metnine girmez. Ayırıcıyı kendin gizleyen şablon (ızgara
  *                                              iletişim) `.cv-contact .sep { display: none }` der.
+ *   ul.cv-contact.contact-center / .contact-end  ortalı / sağa yaslı iletişim (paginate, hesaplanan text-align'dan)
+ *                                              + `--contact-sep-w`: gizli ayırıcının payı motorca dengelenir
+ *                                              (aşağıda); şablon `::after`/padding hilesi yazmaz.
+ *   --pad-x / --pad-y                          en az 12 mm (renderCv.ts scaledMetrics); şablon max() yazmaz.
  *   h1.cv-name.is-long (> 24 karakter) .has-long-word (12+ harfli kelime)   dev adı küçültmek için
  *   h1.cv-name[style="--name-longest:N"]      en uzun kelimenin harf sayısı. Adın boyu base.css'te
  *     min(--name-size, --name-room / (N × --name-char)): şablon font-size değil bu üç değişkeni verir
@@ -84,7 +88,8 @@
  *   metin taşıyan öğede opacity < 1, transform, filter, z-index, mix-blend-mode, isolation: isolate,
  *   will-change (transform/opacity) da yasak: hepsi ayrı boyama katmanı açar, PDF'te metin kayar ya da
  *   resim olarak basılıp kaybolur (metinsiz süs ve img serbest). Metin grid/flex ile yer değiştirmez; yalnız
- *   fotoğraf başka hücreye yerleşebilir. harf aralığı ≤ 0.05em; iletişim başlıkta. font-synthesis: none
+ *   fotoğraf başka hücreye yerleşebilir. Tek istisna motorda: dar yan sütunda tarih alt satırın altına
+ *   iner (aşağıda `.col-side .entry`; içerik akışı yine başlık → tarih → alt satır). harf aralığı ≤ 0.05em; iletişim başlıkta. font-synthesis: none
  *   (aşağıda): sunulmayan kalınlık/italik isteme. Süs = içeriksiz sözde öğe, background ya da border.
  */
 @page {
@@ -114,7 +119,7 @@ body {
   text-rendering: optimizeLegibility;
   font-kerning: normal;
   /*
-   * Sahte kalın/italik yok: sunulmayan yüz (ör. DM Serif Display 700, Manrope italik) taklit
+   * Sahte kalın/italik yok: sunulmayan yüz (ör. Manrope ya da Poppins italik) taklit
    * edilirse Chromium onu PDF'e Type3 basar. Eksik yüzde en yakın gerçek ağırlık kullanılır.
    */
   font-synthesis: none;
@@ -327,6 +332,27 @@ ul {
   }
 }
 
+/*
+ * K3 ortalı/sağa yaslı iletişim: satır sonundaki gizli ayırıcı yer kapladığından görünen metin
+ * merkezden (sağ kenardan) kayardı. paginate ayırıcının gerçek genişliğini `--contact-sep-w` olarak
+ * yazar ve listeyi `contact-center` / `contact-end` ile işaretler (hesaplanan text-align'a göre).
+ * Son öğe aynı genişlikte boşluk alır (padding: metin ya da ::after değil); ortalıda liste soldan o
+ * kadar içeri, sağa yaslıda sağdan o kadar dışarı. Şablon bunu kendisi yazmaz.
+ */
+/* Kimlik seçici: şablonun `.cv-contact { padding: … }` kısaltması (Yönetici) payı ezmesin */
+#cv-pages .cv-contact.contact-center li:last-child,
+#cv-pages .cv-contact.contact-end li:last-child {
+  padding-right: var(--contact-sep-w, 0px);
+}
+
+#cv-pages .cv-contact.contact-center {
+  padding-left: var(--contact-sep-w, 0px);
+}
+
+#cv-pages .cv-contact.contact-end {
+  margin-right: calc(-1 * var(--contact-sep-w, 0px));
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -406,9 +432,29 @@ a {
   white-space: normal;
 }
 
-.col-side .entry-head {
+/*
+ * Dar yan sütunda kayıt başlığı alt alta: başlık, alt satır (kurum), sonra tarih. DOM sırası
+ * değişmez (içerik akışında tarih başlığın hemen ardında): alt satırlı tarihli kayıt tek sütunlu
+ * ızgara olur, .entry-head `display: contents` ile çocuklarını ızgaraya bırakır ve tarih alt satırın
+ * altındaki satıra yerleşir (grid-row; order/position yok). Gövde dördüncü satıra akar. Tarihsiz ya
+ * da alt satırsız kayıtta doğal sıra zaten doğru. K1 (date-first, Çizelge) bu kurallara girmez.
+ */
+.col-side .entry-head:not(.date-first) {
   flex-direction: column;
   gap: 0;
+}
+
+.col-side .entry:has(> .entry-sub):has(> .entry-head:not(.date-first) > .entry-date) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.col-side .entry:has(> .entry-sub) > .entry-head:not(.date-first):has(> .entry-date) {
+  display: contents;
+}
+
+.col-side .entry:has(> .entry-sub) > .entry-head:not(.date-first) > .entry-date {
+  grid-row: 3;
 }
 
 .entry-sub {
@@ -446,6 +492,13 @@ a {
 
 .rich p + p {
   margin-top: 1mm;
+}
+
+/* Paragraf, madde ve beceri satırının son satırında tek kelime kalmasın ("kısaldı.", "CSS") */
+.rich p,
+.rich li,
+.entry-line {
+  text-wrap: pretty;
 }
 
 .rich ul {

@@ -7,7 +7,7 @@ import { FONT_IDS, type Cv } from '@/cv/schema'
 import { contrast, colorVariables, ensureContrast, onColor } from './colors'
 import { FONT_FACES } from './fontFaces.generated'
 import { DISPLAY_FONTS, familyOf, FONTS } from './fonts'
-import { cvVariables, renderCvSource } from './renderCv'
+import { cvVariables, MIN_PAGE_MARGIN_MM, renderCvSource, scaledMetrics } from './renderCv'
 import {
   activeColorSet,
   getTemplate,
@@ -217,11 +217,26 @@ describe('renkler ve kontrast koruması', () => {
 
   it('K4: boy ve aralık değişkenleri şablonun ölçeğiyle çarpılır', () => {
     const yalin = cvVariables(cvWith('yalin').template, TEMPLATES.yalin)
-    expect(yalin).toContain('--fs:8.97pt')
+    expect(yalin).toContain('--fs:9pt')
     expect(yalin).toContain('--pad-x:18mm')
-    expect(yalin).toContain('--section-gap:7mm')
+    expect(yalin).toContain('--section-gap:5mm')
     const teknik = cvVariables({ ...cvWith('teknik').template, spacing: 'compact' }, TEMPLATES.teknik)
-    expect(teknik).toContain('--block-gap:1.32mm')
+    expect(teknik).toContain('--block-gap:1.613mm')
+  })
+
+  it('kenar boşluğu (--pad-x, --pad-y) her şablon ve aralıkta en az 12 mm (SET-14 §5.2)', () => {
+    for (const template of Object.values(TEMPLATES)) {
+      for (const spacing of ['compact', 'normal', 'relaxed'] as const) {
+        const vars = scaledMetrics({ fontSize: 'md', spacing }, template)
+        for (const key of ['--pad-x', '--pad-y']) {
+          expect(parseFloat(vars[key]), `${template.id} ${spacing} ${key}`).toBeGreaterThanOrEqual(MIN_PAGE_MARGIN_MM)
+          expect(vars[key]).toMatch(/mm$/)
+        }
+      }
+    }
+    // Taban yalnız alttan keser: normal aralıkta çarpılmış değer aynen gelir.
+    expect(scaledMetrics({ fontSize: 'md', spacing: 'compact' }, TEMPLATES.teknik)['--pad-y']).toBe('12mm')
+    expect(scaledMetrics({ fontSize: 'md', spacing: 'normal' }, TEMPLATES.teknik)['--pad-x']).toBe('13mm')
   })
 })
 

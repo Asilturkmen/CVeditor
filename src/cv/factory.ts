@@ -68,12 +68,15 @@ export const emptyPersonal = (): Personal => ({
   photo: null,
 })
 
-/** Boş CV'nin başlangıç bölümleri; ipucu metinleri görünsün diye bazılarında boş kayıt var. */
+/**
+ * Boş CV'nin başlangıç bölümleri. Özet tek metindir, boş kaydıyla gelir (satırı "Henüz özet yok" der);
+ * öbür bölümler kayıtsız gelir: panelde "Adsız kayıt" hazır durmaz, bölüm satırı "+ Deneyim ekle" der.
+ */
 export function defaultSections(): Section[] {
   return [
     createSection('summary', 1),
-    createSection('experience', 1),
-    createSection('education', 1),
+    createSection('experience'),
+    createSection('education'),
     createSection('projects'),
     createSection('skills'),
     createSection('languages'),

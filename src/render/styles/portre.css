@@ -1,13 +1,18 @@
 /*
- * Portre (`portre`): docs/sablonlar/SET-14.md Şablon 11. Sağ üstte büyük vesikalık (34 × 44 mm, Alman
- * Lebenslauf ölçüsüne yakın); solda ad ve iki sütunluk iletişim listesi; bölüm başlıklarının solunda
- * dikey vurgu çubuğu. Ad Manrope, gövde Inter. Tek ya da iki sütun.
+ * Portre (`portre`): docs/sablonlar/SET-14.md Şablon 11. Alman Lebenslauf geleneği: sağ üstte büyük
+ * dikey vesikalık (34 × 44 mm); solda ad, unvan ve altında iki sütunlu iletişim TABLOSU (her satırın
+ * üstünde ince çizgi, "Persönliche Daten" tablosu gibi); bölüm başlıklarının solunda dikey vurgu
+ * çubuğu. Ad Manrope, gövde Inter. Tek ya da iki sütun.
  * Her kural `.tpl-portre` ile başlar. Sözleşme ve ortak varsayılanlar: base.css başı. Gövde boyu,
  * satır aralığı ve boşluklar templateMeta.ts `scale` ile gelir (CSS'te yeniden çarpma).
  *
  * Başlığın iki ucu fotoğrafa oturur: adın büyük harf üst kenarı fotoğrafın üst kenarıyla, iletişim
- * listesinin son satırı fotoğrafın alt kenarıyla aynı yükseklikte (kimlik sütunu fotoğraf boyunca
- * uzar, ad üstte, iletişim altta). Fotoğrafsızda kimlik kendi yüksekliğindedir.
+ * tablosunun alt çizgisi fotoğrafın alt kenarıyla aynı yükseklikte (kimlik sütunu fotoğraf boyunca
+ * uzar, ad üstte, tablo altta). Başlığın altında ayrı çizgi yok: sayfadaki bütün yatay çizgiler
+ * tablonun kendi çizgileri, hepsi aynı boyda (§5.3). Fotoğrafsızda tablo üç sütun, kenardan kenara.
+ *
+ * Ölçüler (orta boy, normal aralık): gövde 9 pt / 1.38; ad 24 pt 700; unvan 10.3 pt; bölüm başlığı
+ * 0.92em büyük harf 700; tarih ve iletişim 0.92em (dört boy). Kenar 17 × 14 mm.
  */
 
 .tpl-portre {
@@ -21,9 +26,8 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: stretch;
   gap: 0;
-  margin: 0 var(--pad-x) 4.5mm;
-  padding: var(--pad-y) 0 4mm;
-  border-bottom: 0.25mm solid var(--rule);
+  margin: 0 var(--pad-x);
+  padding: var(--pad-y) 0 var(--section-gap);
 }
 
 #cv-pages.tpl-portre .cv-header {
@@ -47,8 +51,8 @@
   grid-column: 2;
   grid-row: 1;
   align-self: start;
-  width: 32mm;
-  height: 41mm;
+  width: 34mm;
+  height: 44mm;
   margin: 0.54em 0 0 9mm;
   border-radius: 1.5mm;
 }
@@ -72,34 +76,38 @@
 }
 
 /*
- * İletişim: iki sütunluk liste (satır satır okunur: DOM sırası = okuma sırası); ayırıcı gizli, ayrımı
- * sütun boşluğu taşır. Her öğe yarım genişlikten başlar ve bölünmez; yarıma sığmayan uzun öğe kendi
- * satırına iner ve tam genişliğe yayılır. Fotoğrafsızda üç sütun.
+ * İletişim tablosu: iki sütun (fotoğrafsızda üç), satır satır okunur (DOM sırası = okuma sırası).
+ * Her öğenin üstünde ince çizgi, tablonun altında bir çizgi; sütun aralığı öğenin sağ iç boşluğu
+ * (aralık yok, çizgiler satır boyunca kesintisiz). Ayırıcı gizli; ayrımı hücre taşır. Her öğe
+ * bölünmez; yarıma sığmayan uzun öğe kendi satırına iner ve tam genişliğe yayılır.
  */
 .tpl-portre .cv-contact {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.8mm 6mm;
   margin-top: 4.5mm;
+  border-bottom: 0.25mm solid var(--rule);
+  font-size: 0.92em;
   line-height: 1.35;
   color: var(--ink);
 }
 
 .tpl-portre .cv-contact li {
   display: block;
-  flex: 1 0 calc(50% - 3mm);
+  flex: 1 0 49.9%;
   max-width: 100%;
+  padding: 1.5mm 5mm 1.5mm 0;
+  border-top: 0.25mm solid var(--rule);
 }
 
 .tpl-portre .cv-header.no-photo .cv-contact li {
-  flex-basis: calc(33.333% - 4mm);
+  flex-basis: 33.2%;
 }
 
 .tpl-portre .cv-contact .sep {
   display: none;
 }
 
-/* Ortalı hâl: fotoğraf adın üstünde, iletişim ortalı satırlar */
+/* Ortalı hâl: fotoğraf adın üstünde; tablo ortalı hücrelerle kenardan kenara */
 .tpl-portre.align-center .cv-header {
   display: flex;
   flex-direction: column;
@@ -109,6 +117,7 @@
 
 .tpl-portre.align-center .cv-identity {
   display: block;
+  align-self: stretch;
 }
 
 .tpl-portre.align-center .cv-photo {
@@ -118,12 +127,9 @@
   margin: 0 0 4mm;
 }
 
-.tpl-portre.align-center .cv-contact {
-  justify-content: center;
-}
-
 .tpl-portre.align-center .cv-contact li {
-  flex: 0 1 auto;
+  padding-left: 2.5mm;
+  padding-right: 2.5mm;
 }
 
 /* ---------- Bölüm başlığı: solunda dikey vurgu çubuğu ---------- */
@@ -131,7 +137,7 @@
 .tpl-portre .section-title {
   padding-left: 2.4mm;
   border-left: 1.1mm solid var(--accent);
-  font-size: 0.95em;
+  font-size: 0.92em;
   font-weight: 700;
   line-height: 1.15;
   letter-spacing: 0.04em;
@@ -140,6 +146,7 @@
 
 /* ---------- Kayıtlar ---------- */
 
+/* Kurum adı düz ağırlık, koyu: ağırlıklar 400 / 600 / 700 (§5.1 en çok üç) */
 .tpl-portre .entry-sub .part:first-child {
-  font-weight: 500;
+  font-weight: 400;
 }

@@ -261,7 +261,7 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-[720px] animate-fade-in flex-col gap-8 pb-12">
+    <div className="flex max-w-[720px] animate-fade-in flex-col gap-8 pb-12">
       <h1 className="text-title-lg text-fg">{m.settings_title()}</h1>
 
       <SettingsGroup title={m.settings_appearance()} footer={m.settings_appearance_desc()}>

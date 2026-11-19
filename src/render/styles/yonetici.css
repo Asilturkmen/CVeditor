@@ -1,47 +1,58 @@
 /*
- * Yönetici (`yonetici`): docs/sablonlar/SET-14.md Şablon 10. Tırnaklı (Literata), ağırbaşlı; iletişim iki
- * ince çizgi arasında, bölümler kalın ÜST çizgiyle ayrılır, özet bir giriş paragrafı (FlowCV Executive,
- * Resume Genius Chicago). Fotoğraf sağ üstte dikey dikdörtgen. Tek sütun.
+ * Yönetici (`yonetici`): docs/sablonlar/SET-14.md Şablon 10. Tırnaklı (Literata), ağırbaşlı ve ferah;
+ * iletişim kenardan kenara iki ince çizgi arasında (Resume Genius Chicago), bölümler vurgu renginde
+ * kalın ÜST çizgiyle ayrılır ve başlıkları iri, düz harfli tırnaklıdır (FlowCV Executive / Editorial
+ * Rule); özet bir giriş paragrafı. Varsayılan renk lacivert. Fotoğraf sağ üstte dikey dikdörtgen. Tek sütun.
  * Her kural `.tpl-yonetici` ile başlar. Sözleşme ve ortak varsayılanlar: base.css başı. Gövde boyu,
  * satır aralığı ve boşluklar templateMeta.ts `scale` ile gelir (CSS'te yeniden çarpma).
  *
- * Ölçüler (orta boy, normal aralık): gövde 9.2 pt / 1.34, özet 9.7 pt / 1.4; ad 25 pt 600; bölüm başlığı
- * 0.86em 700 büyük harf, üstünde 0.5 mm çizgi; iletişim şeridi 0.25 mm çizgiler arasında.
- * Kenar 19 × 14 mm; blok 2.6 mm, bölüm 5.2 mm (başlıktan gövdeye de).
+ * Teknik'ten ayrımı (küçük resimde): Teknik siyah, sık, büyük harfli küçük etiket + altında ince siyah
+ * çizgi. Yönetici renkli kalın üst çizgi + iri cümle düzeni başlık, kenardan kenara iletişim şeridi,
+ * bir boy büyük özet ve daha geniş kenar.
+ *
+ * Ölçüler (orta boy, normal aralık): gövde 9.4 pt / 1.28; özet 1.06em; ad 26 pt 600; unvan ve bölüm
+ * başlığı 1.12em (adın %41'i); tarih ve iletişim 0.92em (beş boy). Ağırlıklar 400 / 600 / 700 (zengin
+ * metindeki kalın). Çizgi iki kalınlık: 0.5 mm (bölüm, vurgu rengi) ve 0.25 mm (iletişim şeridi).
+ * Kenar 18 × 13 mm; blok 2.2 mm, bölüm 4.4 mm. Örnek CV (2 eğitim, 2 proje, 3 iş) tek sayfa.
  */
 
 /* ---------- Başlık ---------- */
 
+/*
+ * Izgara: 1. satırda ad + unvan | fotoğraf, 2. satırda iletişim şeridi kenardan kenara. Kimlik
+ * kutusu `display: contents`: başlık ve iletişim doğrudan başlık ızgarasına yerleşir (DOM sırası
+ * aynı: ad → unvan → iletişim). Şerit fotoğrafın altına da uzar; bütün çizgiler --pad-x'ten
+ * --pad-x'e aynı boyda (§5.3). Fotoğrafsızda `auto` sütun kapanır, düzen aynı.
+ */
 .tpl-yonetici .cv-header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
+  align-items: center;
   gap: 0;
   padding: var(--pad-y) var(--pad-x) var(--section-gap);
 }
 
-/* Kimlik 1. sütunda, fotoğraf 2. sütunda: iletişim şeridi fotoğrafın altına uzamaz */
 .tpl-yonetici .cv-identity {
+  display: contents;
+}
+
+.tpl-yonetici .cv-heading {
   grid-column: 1;
   grid-row: 1;
 }
 
-/*
- * Fotoğraf 26 × 29 mm: üst kenarı adın büyük harf yüksekliğinde (Literata, 2.7em adda satır kutusunun
- * üstünden ~0.23em = 0.62em gövde), alt kenarı iki satırlık iletişim şeridinin alt çizgisinde.
- */
 .tpl-yonetici .cv-photo {
   grid-column: 2;
   grid-row: 1;
-  width: 26mm;
-  height: 29mm;
-  margin: 0.62em 0 0 7mm;
+  width: 17mm;
+  height: 21mm;
+  margin-left: 7mm;
   border-radius: 1mm;
 }
 
 .tpl-yonetici .cv-name {
-  --name-size: 2.7em;
-  --name-room: 128mm;
+  --name-size: 2.75em;
+  --name-room: 130mm;
   --name-char: 0.64;
   font-weight: 600;
   line-height: 1.05;
@@ -50,78 +61,76 @@
 
 .tpl-yonetici .cv-headline {
   margin-top: 1.2mm;
-  font-size: 1.1em;
+  font-size: 1.12em;
   font-style: italic;
   font-weight: 400;
-  line-height: 1.3;
+  line-height: 1.25;
   color: var(--accent-ink);
 }
 
-/* İletişim iki ince çizgi arasında */
+/* İletişim iki ince çizgi arasında, kenardan kenara */
 .tpl-yonetici .cv-contact {
-  margin-top: 4mm;
-  padding: 1.5mm 0;
-  border-top: 0.25mm solid var(--ink);
-  border-bottom: 0.25mm solid var(--ink);
-  line-height: 1.5;
+  grid-column: 1 / -1;
+  grid-row: 2;
+  margin-top: 3mm;
+  padding: 1.3mm 0;
+  border-top: 0.25mm solid var(--accent);
+  border-bottom: 0.25mm solid var(--accent);
+  font-size: 0.92em;
+  line-height: 1.45;
   font-variant-numeric: lining-nums;
   color: var(--ink);
 }
 
+/* Ortalı hâl: fotoğraf adın üstünde, ad ve şerit ortalı */
 .tpl-yonetici.align-center .cv-header {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
   text-align: center;
 }
 
 .tpl-yonetici.align-center .cv-photo {
+  grid-column: 1;
+  grid-row: 1;
   margin: 0 0 3.5mm;
 }
 
-/*
- * Ortalı iletişim: satırlar dengeli; satır sonundaki gizli ayırıcının (K3) payı son öğeye de görünmez
- * bir ayırıcı eklenip liste soldan o kadar içeri alınarak dengelenir (görünen metin tam ortada durur).
- */
+.tpl-yonetici.align-center .cv-heading {
+  grid-row: 2;
+}
+
 .tpl-yonetici.align-center .cv-contact {
+  grid-row: 3;
+  justify-self: stretch;
   text-wrap: balance;
-  padding-left: calc(0.53em + 1.2mm);
 }
 
-.tpl-yonetici.align-center .cv-contact li:last-child::after {
-  content: ' ·';
-  padding-right: 1.2mm;
-  visibility: hidden;
-}
-
-/* ---------- Bölüm başlığı: üstte kalın çizgi, altında etiket ---------- */
+/* ---------- Bölüm başlığı: üstte vurgu renginde kalın çizgi, altında iri tırnaklı başlık ---------- */
 
 .tpl-yonetici .section-title {
-  padding-top: 1.4mm;
-  border-top: 0.5mm solid var(--ink);
-  font-size: 0.86em;
-  font-weight: 700;
-  letter-spacing: 0.05em;
+  padding-top: 1mm;
+  border-top: 0.5mm solid var(--accent);
+  font-size: 1.12em;
+  font-weight: 600;
+  line-height: 1.05;
+  text-transform: none;
+  letter-spacing: 0;
   color: var(--accent-ink);
 }
 
 .tpl-yonetici .section-title + * {
-  margin-top: calc(1.8mm - var(--block-gap));
+  margin-top: calc(1.4mm - var(--block-gap));
 }
 
 /* ---------- Özet: giriş paragrafı, bir boy büyük ---------- */
 
 .tpl-yonetici .entry-summary {
   font-size: 1.06em;
-  line-height: calc(var(--lh) * 1.05);
+  line-height: calc(var(--lh) * 1.03);
   color: var(--ink);
 }
 
 /* ---------- Kayıtlar ---------- */
-
-.tpl-yonetici .entry-title strong {
-  font-weight: 700;
-}
 
 .tpl-yonetici .entry-date {
   font-variant-numeric: lining-nums tabular-nums;
@@ -137,15 +146,16 @@
 }
 
 .tpl-yonetici .entry-body {
-  margin-top: 1mm;
+  margin-top: 0.8mm;
 }
 
 .tpl-yonetici .rich li::marker {
   font-size: 0.75em;
+  color: var(--accent);
 }
 
 .tpl-yonetici .rich li + li {
-  margin-top: 0.6mm;
+  margin-top: 0.4mm;
 }
 
 .tpl-yonetici .entry-skills + .entry-skills,

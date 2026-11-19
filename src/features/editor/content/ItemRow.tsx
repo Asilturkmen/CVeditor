@@ -24,6 +24,7 @@ import { ITEM_FIELDS, type FieldDef } from './fieldDefs'
 import { FORM_LABEL_WIDTH } from './PersonalForm'
 import { RichTextField } from './RichTextField'
 import { useSortableStyle } from './sortableStyle'
+import { DRAG_SOURCE_CLASS } from './SortOverlay'
 
 export type ItemType = Exclude<SectionType, 'summary'>
 
@@ -225,8 +226,8 @@ export const OutlineItem = memo(function OutlineItem({ sectionId, type: sectionT
       onBlurCapture={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && blurItem(item.id)}
       onKeyDown={open ? (e) => closeOnEscape(e, () => setRowOpen(item.id, false)) : undefined}
       className={cn(
-        'bg-content transition-[box-shadow,border-radius,scale] duration-200',
-        isDragging && 'z-20 scale-[1.02] rounded-lg bg-elevated shadow-3',
+        'bg-content',
+        isDragging && DRAG_SOURCE_CLASS,
       )}
     >
       <OutlineRow
@@ -284,8 +285,8 @@ export const InlineItem = memo(function InlineItem({ sectionId, type, item, inde
       onFocusCapture={() => focusItem(item.id)}
       onBlurCapture={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && blurItem(item.id)}
       className={cn(
-        'bg-content transition-[box-shadow,border-radius,scale] duration-200',
-        isDragging && 'z-20 scale-[1.02] rounded-lg bg-elevated shadow-3',
+        'bg-content',
+        isDragging && DRAG_SOURCE_CLASS,
       )}
     >
       <div className="flex min-h-11 items-start gap-1 py-1.5 pr-2 pl-1">
@@ -374,8 +375,9 @@ export const SummaryItem = memo(function SummaryItem({
         onOpenChange={(next) => setRowOpen(item.id, next)}
         title={
           <>
-            <span data-row-title className={first ? undefined : 'text-fg-2'}>
-              {first || m.editor_summary_empty()}
+            {/* Açıkken ilk cümle başlıkta tekrarlanmaz (altındaki metin aynı cümleyle başlıyor). */}
+            <span data-row-title className={first && !open ? undefined : 'text-fg-2'}>
+              {open ? m.editor_summary_open() : first || m.editor_summary_empty()}
             </span>
             <PendingDot kind={pending} />
           </>

@@ -141,7 +141,8 @@ export const RichTextField = memo(function RichTextField({
         </div>
         <div
           className={cn(
-            'mx-[calc(var(--row-px)-12px)] mb-1 cursor-text rounded-lg text-fg transition-shadow duration-150',
+            // Odak halkası iki yanda 4px içeride (grup kenarına yapışmaz), yarıçap 8; metin etiketle aynı x'te kalır.
+            'mx-[calc(var(--row-px)-8px)] mb-1 cursor-text rounded-md text-fg transition-shadow duration-150 [&_.ProseMirror]:px-2',
             state?.focused && 'shadow-[inset_0_0_0_2px_var(--accent)]',
           )}
           onMouseDown={(e) => {

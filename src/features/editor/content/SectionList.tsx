@@ -30,13 +30,14 @@ import { cn } from '@/lib/cn'
 import { focusWhenSettled } from '@/lib/focus'
 import { scrollBehavior } from '@/lib/motion'
 import { m } from '@/paraglide/messages'
-import { itemLabel } from '../labels'
+import { itemLabel, rowParts } from '../labels'
 import { CopyToCvDialog } from './CopyToCvDialog'
 import { dndScreenReaderInstructions, useDndAnnouncements } from './dndA11y'
 import { ADD_ITEM_LABELS, SECTION_LABELS } from './fieldDefs'
 import { HideToggle, INLINE_TYPES, InlineItem, OutlineItem, SummaryItem } from './ItemRow'
 import { useSortDnd, useStableIds } from './keyboardSort'
-import { revealRow } from './reveal'
+import { afterMenusClosed, revealRow } from './reveal'
+import { DragGhost, SortOverlay } from './SortOverlay'
 import { useSortableStyle, VERTICAL_ONLY } from './sortableStyle'
 
 /** Her çizimde aynı kalan olay işleyicisi (DndContext'e yeni işlev verip bağlamını tazelemesin). */
@@ -212,6 +213,14 @@ const SectionCard = memo(function SectionCard({
 
   const addLabel = ADD_ITEM_LABELS[section.type]()
 
+  /** Sürüklenen kaydın kopyası (grubun dışında, gövdede çizilir; grup onu kırpmaz). */
+  const ghost = (id: UniqueIdentifier) => {
+    const item = items.find((i) => i.id === id)
+    if (!item) return null
+    const parts = rowParts(section.type, item, language)
+    return <DragGhost title={parts.title || m.editor_untitled()} meta={parts.meta || undefined} trailing={parts.date || undefined} />
+  }
+
   return (
     <section
       ref={setNodeRef}
@@ -277,6 +286,7 @@ const SectionCard = memo(function SectionCard({
                 ),
               )}
             </SortableContext>
+            <SortOverlay render={ghost} />
           </DndContext>
         )}
       </div>
@@ -300,7 +310,7 @@ function AddSectionMenu({ sections }: { sections: Section[] }) {
     const el = id ? document.querySelector<HTMLElement>(`[data-section-id="${CSS.escape(id)}"]`) : null
     if (!el) return
     el.scrollIntoView({ behavior: scrollBehavior(), block: 'start' })
-    focusWhenSettled(() => el.querySelector<HTMLElement>('[data-section-title]'))
+    afterMenusClosed(() => el.querySelector<HTMLElement>('[data-section-title]')?.focus({ preventScroll: true }))
   }
   return (
     <Menu>

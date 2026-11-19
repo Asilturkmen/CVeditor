@@ -3,7 +3,7 @@
  * bölüm başlıkları renkli ve sağlarına ince çizgi uzanır (Awesome-CV). Tek sütun.
  * Her kural `.tpl-cizgi` ile başlar. Sözleşme ve ortak varsayılanlar: base.css başı. Gövde boyu,
  * satır aralığı ve boşluklar templateMeta.ts `scale` ile gelir (CSS'te yeniden çarpma).
- * İLK SÜRÜM (T0): iskelet ve ölçüler şartnameden; şablon ekibi cilalayacak.
+ * Cilalandı (T-css): örnek CV tek sayfanın %85-95ini doldurur; ölçüler §5 aralıklarında.
  */
 
 /* Üst şerit: her sayfada tekrar eder (zemin, metinsiz) */
@@ -54,6 +54,7 @@
 
 .tpl-cizgi .cv-contact {
   margin-top: 2.2mm;
+  font-size: 0.92em;
   color: var(--muted);
 }
 

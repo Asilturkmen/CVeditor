@@ -43,7 +43,7 @@ export function OutlineRow({
   headingLevel,
 }: {
   title: ReactNode
-  /** Kapalıyken adın yanında/altında soluk bilgi (kurum, tarih). Sarar, kesilmez. */
+  /** Adın altında soluk bilgi (kurum, tarih). Sarar, kesilmez. */
   meta?: ReactNode
   /** Açma düğmesini başlık öğesine sar (WAI-ARIA akordeon deseni; ör. "Kişisel bilgiler" = h2). */
   headingLevel?: 2 | 3 | 4
@@ -67,7 +67,10 @@ export function OutlineRow({
       aria-expanded={open}
       aria-controls={panelId}
       onClick={() => onOpenChange(!open)}
-      className="flex min-w-0 flex-1 items-start gap-1.5 self-stretch rounded-sm px-1 py-3 text-left outline-offset-[-3px]"
+      className={cn(
+        'flex min-w-0 flex-1 items-start gap-1.5 self-stretch rounded-sm px-1 text-left outline-offset-[-3px]',
+        meta ? 'py-2.5' : 'py-3',
+      )}
     >
       <ChevronRight
         aria-hidden
@@ -76,7 +79,8 @@ export function OutlineRow({
           open && 'rotate-90',
         )}
       />
-      <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-1.5">
+      {/* Tek kural: ad üstte, ek bilgi (kurum, madde sayısı) her zaman altta; satır yüksekliği tutarlı. */}
+      <span className="flex min-w-0 flex-1 flex-col">
         <span
           className={cn(
             'text-body break-words',

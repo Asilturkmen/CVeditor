@@ -6,12 +6,11 @@ import type { Keyword, KeywordMatch } from '@/review/keywords'
 import { KeywordAiMatch } from './KeywordAiMatch'
 import { TermChip, TermList } from './Terms'
 
-function Chip({ keyword, present }: { keyword: Keyword; present: boolean }) {
+function Chip({ keyword }: { keyword: Keyword }) {
   return (
-    <TermChip title={m.rv_kw_count({ count: keyword.count })} present={present}>
-      {present && <Check className="size-3.5 shrink-0 text-ok" aria-hidden />}
-      <span className="break-all">{keyword.term}</span>
-      {keyword.count > 1 && <span className="text-fg-2 tabular-nums">×{keyword.count}</span>}
+    <TermChip title={m.rv_kw_count({ count: keyword.count })}>
+      <span>{keyword.term}</span>
+      {keyword.count > 1 && <span className="ml-1 text-fg-2 tabular-nums">×{keyword.count}</span>}
     </TermChip>
   )
 }
@@ -40,19 +39,22 @@ export function KeywordPanel({
         {total === 0 ? (
           <p className="text-body text-fg">{m.rv_kw_none()}</p>
         ) : (
-          <>
-            <TermList title={m.rv_kw_missing()} count={match.missing.length} hint={m.rv_kw_missing_hint()}>
-              {match.missing.map((k) => (
-                <Chip key={k.key} keyword={k} present={false} />
-              ))}
-            </TermList>
-            {match.missing.length === 0 && <p className="-mt-2 text-body text-fg">{m.rv_kw_all_present()}</p>}
-            <TermList title={m.rv_kw_present()} count={match.present.length}>
+          // Geniş sütunda Eksik ve Var yan yana; dar ekranda alt alta.
+          <div className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
+            <div className="flex min-w-0 flex-col gap-2">
+              <TermList title={m.rv_kw_missing()} count={match.missing.length} hint={m.rv_kw_missing_hint()}>
+                {match.missing.map((k) => (
+                  <Chip key={k.key} keyword={k} />
+                ))}
+              </TermList>
+              {match.missing.length === 0 && <p className="text-body text-fg">{m.rv_kw_all_present()}</p>}
+            </div>
+            <TermList title={m.rv_kw_present()} count={match.present.length} icon={<Check className="text-ok" />}>
               {match.present.map((k) => (
-                <Chip key={k.key} keyword={k} present />
+                <Chip key={k.key} keyword={k} />
               ))}
             </TermList>
-          </>
+          </div>
         )}
       </section>
       {ai && total > 0 && <KeywordAiMatch match={match} cv={ai.cv} pdf={ai.pdf} jobAd={ai.jobAd} />}
